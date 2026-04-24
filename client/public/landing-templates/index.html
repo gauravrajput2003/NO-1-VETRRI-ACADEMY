@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Landing Page Template Pack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --ink: #1e2a2c;
+      --card: #fffaf1;
+      --accent: #0f766e;
+      --accent-2: #b45309;
+      --line: rgba(30, 42, 44, 0.15);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Sora", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, #ffe5bd 0, transparent 35%),
+        radial-gradient(circle at 90% 30%, #b9f3ec 0, transparent 35%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 56px 24px 80px;
+    }
+    .eyebrow {
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-size: 12px;
+      color: #7c5b2e;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 6vw, 64px);
+      line-height: 1.02;
+      max-width: 14ch;
+    }
+    .sub {
+      margin-top: 16px;
+      max-width: 64ch;
+      line-height: 1.7;
+      color: rgba(30, 42, 44, 0.8);
+    }
+    .grid {
+      margin-top: 34px;
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .card {
+      background: linear-gradient(150deg, rgba(255,255,255,0.7), var(--card));
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 16px 40px rgba(30, 42, 44, 0.08);
+    }
+    .tag {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 999px;
+      width: fit-content;
+      font-weight: 700;
+      border: 1px solid;
+    }
+    .t1 { color: #0f766e; background: rgba(15,118,110,0.1); border-color: rgba(15,118,110,0.4); }
+    .t2 { color: #7c2d12; background: rgba(154,52,18,0.1); border-color: rgba(154,52,18,0.4); }
+    .t3 { color: #0f172a; background: rgba(15,23,42,0.1); border-color: rgba(15,23,42,0.4); }
+    h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+    p {
+      margin: 0;
+      line-height: 1.6;
+      color: rgba(30, 42, 44, 0.8);
+    }
+    a.btn {
+      margin-top: auto;
+      text-decoration: none;
+      font-weight: 700;
+      padding: 12px 14px;
+      border-radius: 12px;
+      color: white;
+      text-align: center;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    a.btn:hover { transform: translateY(-2px); }
+    .b1 { background: linear-gradient(120deg, #0f766e, #0ea5a0); box-shadow: 0 10px 24px rgba(15,118,110,.3); }
+    .b2 { background: linear-gradient(120deg, #9a3412, #c2410c); box-shadow: 0 10px 24px rgba(154,52,18,.3); }
+    .b3 { background: linear-gradient(120deg, #0f172a, #334155); box-shadow: 0 10px 24px rgba(15,23,42,.3); }
+    .hint {
+      margin-top: 24px;
+      font-size: 13px;
+      color: rgba(30, 42, 44, 0.66);
+    }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <p class="eyebrow">Template Pack</p>
+    <h1>Beautiful Landing Pages, Ready to Customize</h1>
+    <p class="sub">Open any template below and start editing text, colors, or section order. Each one is fully responsive and intentionally styled with a different creative direction.</p>
+
+    <section class="grid">
+      <article class="card">
+        <span class="tag t1">Template 01</span>
+        <h2>Aurora SaaS</h2>
+        <p>Elegant SaaS-style page with layered gradient atmosphere, soft glass cards, and conversion-focused layout.</p>
+        <a class="btn b1" href="./template-aurora-saas.html">Open Template</a>
+      </article>
+
+      <article class="card">
+        <span class="tag t2">Template 02</span>
+        <h2>Editorial Studio</h2>
+        <p>Premium editorial look with serif headlines, warm neutrals, and refined brand storytelling flow.</p>
+        <a class="btn b2" href="./template-editorial-studio.html">Open Template</a>
+      </article>
+
+      <article class="card">
+        <span class="tag t3">Template 03</span>
+        <h2>Neo Burst</h2>
+        <p>Bold modern direction with striking blocks, hard shadows, energetic motion, and clear section rhythm.</p>
+        <a class="btn b3" href="./template-neo-burst.html">Open Template</a>
+      </article>
+    </section>
+
+    <p class="hint">Path: <code>/landing-templates/</code></p>
+  </main>
+</body>
+</html>

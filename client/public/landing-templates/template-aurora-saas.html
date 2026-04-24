@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aurora SaaS Landing Template</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #05171d;
+      --bg-soft: #0b2831;
+      --card: rgba(255, 255, 255, 0.07);
+      --line: rgba(255, 255, 255, 0.18);
+      --text: #e9fffb;
+      --muted: rgba(233, 255, 251, 0.72);
+      --brand: #31d2c3;
+      --brand-2: #f2a93b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Outfit", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 580px at -10% -10%, rgba(49, 210, 195, 0.26), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(242, 169, 59, 0.2), transparent 50%),
+        linear-gradient(165deg, var(--bg) 10%, #08212a 60%, #071a22 100%);
+      min-height: 100vh;
+    }
+    .noise::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.14;
+      background-image: radial-gradient(circle at 1px 1px, #fff 1px, transparent 0);
+      background-size: 4px 4px;
+    }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 22px 20px 100px; }
+    .nav {
+      position: sticky;
+      top: 14px;
+      z-index: 5;
+      backdrop-filter: blur(10px);
+      background: rgba(5, 23, 29, 0.52);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+    }
+    .brand {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+    .menu { display: flex; gap: 20px; color: var(--muted); font-size: 14px; }
+    .btn {
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn.primary {
+      color: #042128;
+      background: linear-gradient(130deg, var(--brand), #8af4ea);
+      box-shadow: 0 14px 28px rgba(49, 210, 195, 0.35);
+    }
+    .btn.ghost {
+      color: var(--text);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .hero {
+      margin-top: 58px;
+      display: grid;
+      gap: 34px;
+      grid-template-columns: 1.2fr .8fr;
+      align-items: center;
+    }
+    .eyebrow {
+      color: #89f0e6;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    h1 {
+      margin: 14px 0 18px;
+      font-family: "Space Grotesk", sans-serif;
+      line-height: 1.02;
+      font-size: clamp(38px, 6.8vw, 78px);
+      max-width: 11ch;
+    }
+    .hero p { color: var(--muted); font-size: 18px; line-height: 1.7; max-width: 54ch; }
+    .cta {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .stats {
+      margin-top: 30px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 12px;
+    }
+    .stat strong { display: block; font-size: 28px; font-family: "Space Grotesk", sans-serif; }
+    .stat span { font-size: 12px; color: var(--muted); }
+    .panel {
+      background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 26px 46px rgba(0, 0, 0, .28);
+      animation: bob 4s ease-in-out infinite;
+    }
+    .panel h3 { margin: 0 0 12px; font-size: 21px; }
+    .check {
+      margin: 10px 0;
+      display: flex;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(49, 210, 195, 0.2);
+      border: 1px solid rgba(49, 210, 195, 0.6);
+      display: grid;
+      place-items: center;
+      color: #90fff2;
+      font-size: 12px;
+      flex: 0 0 20px;
+      margin-top: 2px;
+    }
+    .section-title {
+      margin: 96px 0 20px;
+      font-size: clamp(28px, 5vw, 48px);
+      font-family: "Space Grotesk", sans-serif;
+      line-height: 1.1;
+      max-width: 14ch;
+    }
+    .features {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .feature {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 18px;
+      transition: transform .25s ease;
+    }
+    .feature:hover { transform: translateY(-4px); }
+    .feature h4 { margin: 10px 0 8px; font-size: 20px; }
+    .feature p { margin: 0; color: var(--muted); line-height: 1.6; }
+    .badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(49,210,195,.35), rgba(242,169,59,.32));
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: #fff;
+    }
+    .cta-band {
+      margin-top: 82px;
+      border-radius: 24px;
+      border: 1px solid rgba(242, 169, 59, 0.45);
+      background: linear-gradient(140deg, rgba(242,169,59,.2), rgba(49,210,195,.15));
+      padding: 34px 22px;
+      text-align: center;
+    }
+    .cta-band h3 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 44px); font-family: "Space Grotesk", sans-serif; }
+    .cta-band p { margin: 0 0 18px; color: var(--muted); }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @media (max-width: 980px) {
+      .menu { display: none; }
+      .hero { grid-template-columns: 1fr; }
+      .features { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .stats { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="noise">
+  <div class="wrap">
+    <header class="nav">
+      <div class="brand">AURORA</div>
+      <nav class="menu">
+        <span>Features</span>
+        <span>Pricing</span>
+        <span>Customers</span>
+        <span>Docs</span>
+      </nav>
+      <a class="btn ghost" href="#">Book Demo</a>
+    </header>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow">New Workflow Cloud</div>
+        <h1>Ship better work in half the time.</h1>
+        <p>One place for planning, approvals, design handoff, and launch reports. Build momentum every week with a team workspace your clients actually enjoy using.</p>
+        <div class="cta">
+          <a class="btn primary" href="#">Start Free Trial</a>
+          <a class="btn ghost" href="#">See Product Tour</a>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong>92%</strong><span>Faster approvals</span></div>
+          <div class="stat"><strong>48h</strong><span>Avg. kickoff to launch</span></div>
+          <div class="stat"><strong>4.9/5</strong><span>Team satisfaction</span></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <h3>Live Sprint Snapshot</h3>
+        <div class="check"><span class="dot">+</span><span>Auto-generate release notes from task updates.</span></div>
+        <div class="check"><span class="dot">+</span><span>Pull brand-safe social copy in one click.</span></div>
+        <div class="check"><span class="dot">+</span><span>Track campaign ROI by channel in real time.</span></div>
+        <div class="check"><span class="dot">+</span><span>Client-ready decks from your latest metrics.</span></div>
+        <div style="margin-top:18px;"><a class="btn primary" href="#" style="width:100%;">Generate Sprint Report</a></div>
+      </aside>
+    </section>
+
+    <h2 class="section-title">Everything your launch team needs, nothing it does not.</h2>
+    <section class="features">
+      <article class="feature">
+        <div class="badge">01</div>
+        <h4>Campaign Command</h4>
+        <p>Build a complete launch plan with milestones, owners, blockers, and automatic reminders.</p>
+      </article>
+      <article class="feature">
+        <div class="badge">02</div>
+        <h4>Visual Approvals</h4>
+        <p>Collect feedback directly on files and keep every revision tracked in one shared thread.</p>
+      </article>
+      <article class="feature">
+        <div class="badge">03</div>
+        <h4>Revenue Lens</h4>
+        <p>Map creative output to conversion numbers so teams can focus on what actually performs.</p>
+      </article>
+    </section>
+
+    <section class="cta-band">
+      <h3>Make your next launch your cleanest launch.</h3>
+      <p>Designed for ambitious teams who care about speed and quality.</p>
+      <a class="btn primary" href="#">Create Your Workspace</a>
+    </section>
+  </div>
+</body>
+</html>

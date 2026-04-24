@@ -1,0 +1,39 @@
+{
+  "name": "No.1 Vettri Academy",
+  "short_name": "Vettri Academy",
+  "description": "Online Tuition Platform — Bringing World-Class Education to Your Screen",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A1628",
+  "theme_color": "#F5A623",
+  "orientation": "portrait-primary",
+  "lang": "en-IN",
+  "categories": ["education"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Student Login",
+      "url": "/login/student",
+      "description": "Login as a student"
+    },
+    {
+      "name": "Teacher Login",
+      "url": "/login/teacher",
+      "description": "Login as a teacher"
+    }
+  ]
+}
