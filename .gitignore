@@ -1,55 +1,61 @@
-# Dependencies
+# ─── Dependencies (NEVER commit these) ───────────────────────────────────────
 node_modules/
 .pnp
 .pnp.js
 
-# Environment files
+# ─── Environment / Secrets (NEVER commit these) ───────────────────────────────
 .env
 .env.local
+.env.development
+.env.test
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
 *.env
+.env.*
 
-# Build outputs
+# ─── Build outputs ────────────────────────────────────────────────────────────
 dist/
 build/
 .next/
 out/
-
-# Expo
-.expo/
 web-build/
 
-# Logs
+# ─── Expo ─────────────────────────────────────────────────────────────────────
+.expo/
+.expo-shared/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS files
+# ─── OS files ─────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Editor
+# ─── Editor ───────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Temp files
-*.tmp
-*.temp
-gen_screen.js
-write_screen.js
-
-# Uploads / temp
+# ─── Uploads / temp ───────────────────────────────────────────────────────────
 uploads/
 temp/
+*.tmp
+*.temp
 
-# Misc docs generated during dev
+# ─── Dev scratch files ────────────────────────────────────────────────────────
+gen_screen.js
+write_screen.js
+final-download-fix.js
+fix-download-handler.js
+verify-download-fix.js
 DOWNLOAD_FIX_COMPLETE.md
 DOWNLOAD_FIX_GUIDE.md
 FILES_MODIFIED_SUMMARY.md
@@ -59,6 +65,3 @@ QUICK_START.md
 REFACTOR_COMPLETE.md
 START_HERE.txt
 UPLOAD_DOWNLOAD_REFACTOR.md
-final-download-fix.js
-fix-download-handler.js
-verify-download-fix.js
