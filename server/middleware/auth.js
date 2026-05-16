@@ -2,17 +2,17 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const LoginLog = require('../models/LoginLog');
 
-// ─── Device Type Detection ────────────────────────────────────────────────────
-const detectDevice = (userAgent = '') => {
+
+const detectDevice = (userAgent = '') => { 
   const ua = userAgent.toLowerCase();
-  if (/mobile|android|iphone|ipad|ipod|blackberry|windows phone/i.test(ua)) {
+  if (/mobile|android|iphone|ipad|ipod|blackberry|windows phone/i.test(ua)) { 
     if (/ipad|tablet/i.test(ua)) return 'tablet';
     return 'mobile';
   }
   return 'desktop';
-};
+}; 
+ 
 
-// ─── Verify JWT ───────────────────────────────────────────────────────────────
 const verifyToken = async (req, res, next) => {
   try {
     let token;
@@ -21,6 +21,8 @@ const verifyToken = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     } else if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
     }
 
     if (!token) {
@@ -40,9 +42,9 @@ const verifyToken = async (req, res, next) => {
 
     req.user = user;
 
-    // ─── Login Attendance Log (one per user per day) ─────────────────────────
+  
     try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split('T')[0]; 
 
       const existing = await LoginLog.findOne({ userId: user._id, date: today });
 
@@ -57,7 +59,7 @@ const verifyToken = async (req, res, next) => {
           date: today,
         });
 
-        // Update login streak
+      
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];

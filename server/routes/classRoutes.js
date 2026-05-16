@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
-const { adminOnly, teacherOnly } = require('../middleware/roleCheck');
+const { adminOnly, teacherOnly, teacherOrAdmin } = require('../middleware/roleCheck');
 const { uploadVideo } = require('../middleware/upload');
 const {
   createSchedule, getSchedules, getTodayClasses, getUpcomingClasses,
@@ -14,9 +14,9 @@ const {
 router.post('/upload/sign', verifyToken, teacherOnly, getUploadSignature);
 
 // ─── Admin Routes ─────────────────────────────────────────────────────────────
-router.post('/schedule', verifyToken, adminOnly, createSchedule);
-router.patch('/schedule/:id', verifyToken, adminOnly, updateSchedule);
-router.delete('/schedule/:id', verifyToken, adminOnly, cancelSchedule);
+router.post('/schedule', verifyToken, teacherOrAdmin, createSchedule);
+router.patch('/schedule/:id', verifyToken, teacherOrAdmin, updateSchedule);
+router.delete('/schedule/:id', verifyToken, teacherOrAdmin, cancelSchedule);
 router.post('/generate-year', verifyToken, adminOnly, generateYearSchedule);
 router.get('/live-monitor', verifyToken, adminOnly, getLiveMonitor);
 router.post('/attendance/manual', verifyToken, adminOnly, manualAttendance);

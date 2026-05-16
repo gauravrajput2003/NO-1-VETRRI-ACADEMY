@@ -24,7 +24,10 @@ const generalLimiter = rateLimit({
     }
     return req.ip;
   },
-  skip: (req) => req.path === '/api/health',
+  skip: (req) => {
+    // Skip rate limiting for health checks and download endpoints
+    return req.path === '/api/health' || req.path.includes('/download') || req.path.includes('/preview');
+  },
   message: {
     success: false,
     message: 'Too many requests. Please try again later.',

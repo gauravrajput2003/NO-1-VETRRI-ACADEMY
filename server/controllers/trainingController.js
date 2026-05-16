@@ -2,49 +2,218 @@ const TrainingVideo = require('../models/TrainingVideo');
 const TrainingVideoProgress = require('../models/TrainingVideoProgress');
 const User = require('../models/User');
 const cloudinary = require('../config/cloudinary');
-const { uploadToCloudinary } = require('../middleware/upload');
+const fs = require('fs');
+const path = require('path');
 
-// ─── Admin: Upload Training Video ────────────────────────────────────────────
+// ─── Helper: get the best playable URL from a video doc ──────────────────────
+const getPlayableUrl = (video) =>
+  video.videoUrl || video.cloudinaryUrl || '';
+
+// ─── Helper: cleanup temp file ───────────────────────────────────────────────
+const cleanupTempFile = (filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    try { fs.unlinkSync(filePath); } catch (_) {}
+  }
+};
+
+// ─── ADMIN: Upload Training Video (file upload to Cloudinary) ─────────────────
 const uploadTrainingVideo = async (req, res) => {
+  let tempFilePath = req.file?.path;
   try {
-    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    console.log('[uploadTrainingVideo] req.file:', req.file ? { name: req.file.originalname, mime: req.file.mimetype, size: req.file.size, path: req.file.path } : null);
+    console.log('[uploadTrainingVideo] req.body keys:', Object.keys(req.body || {}));
 
-    const { title, description, category, isMandatory, order } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file received by server. Ensure Content-Type is multipart/form-data and field name is "video".' });
+    }
 
-    // Upload to Cloudinary
-    const result = await uploadToCloudinary(req.file.buffer, {
+    const { title, description, category, isMandatory, order, thumbnailUrl } = req.body;
+    if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
+
+    // Upload to Cloudinary from disk — force resource_type video regardless of MIME
+    const result = await cloudinary.uploader.upload(tempFilePath, {
       folder: 'vettri-academy/training-videos',
       resource_type: 'video',
-      eager: [{ width: 400, height: 300, crop: 'fill', format: 'jpg' }], // Auto thumbnail
+      eager: [{ width: 400, height: 300, crop: 'fill', format: 'jpg' }],
       eager_async: true,
     });
 
-    const thumbnailUrl = result.eager?.[0]?.secure_url ||
+    const autoThumb =
+      result.eager?.[0]?.secure_url ||
       `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_0/${result.public_id}.jpg`;
+
+    // Get max order if not supplied
+    let nextOrder = parseInt(order) || 0;
+    if (!order) {
+      const last = await TrainingVideo.findOne().sort({ order: -1 }).select('order');
+      nextOrder = (last?.order || 0) + 1;
+    }
 
     const video = await TrainingVideo.create({
       title,
       description,
       cloudinaryUrl: result.secure_url,
       cloudinaryPublicId: result.public_id,
-      thumbnailUrl,
+      videoUrl: result.secure_url,      // also set videoUrl for unified player
+      thumbnailUrl: thumbnailUrl || autoThumb,
       duration: result.duration || 0,
-      isMandatory: isMandatory === 'true',
+      isMandatory: isMandatory === 'true' || isMandatory === true,
       uploadedBy: req.user._id,
-      order: parseInt(order) || 0,
-      category: category || 'other',
+      order: nextOrder,
+      category: category || 'getting-started',
+      isActive: true,
     });
 
+    cleanupTempFile(tempFilePath);
     res.status(201).json({ success: true, video });
   } catch (error) {
+    cleanupTempFile(tempFilePath);
+    console.error('[uploadTrainingVideo]', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Teacher: Get All Training Videos (with own progress) ────────────────────
+// ─── ADMIN: Upload Training Video by URL (no file) ───────────────────────────
+const uploadTrainingVideoByUrl = async (req, res) => {
+  try {
+    const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration } = req.body;
+
+    if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
+    if (!videoUrl) return res.status(400).json({ success: false, message: 'videoUrl is required.' });
+
+    let nextOrder = parseInt(order) || 0;
+    if (!order) {
+      const last = await TrainingVideo.findOne().sort({ order: -1 }).select('order');
+      nextOrder = (last?.order || 0) + 1;
+    }
+
+    const video = await TrainingVideo.create({
+      title,
+      description,
+      cloudinaryUrl: '',
+      cloudinaryPublicId: '',
+      videoUrl,
+      thumbnailUrl: thumbnailUrl || '',
+      duration: parseInt(duration) || 0,
+      isMandatory: isMandatory === 'true' || isMandatory === true,
+      uploadedBy: req.user._id,
+      order: nextOrder,
+      category: category || 'getting-started',
+      isActive: true,
+    });
+
+    res.status(201).json({ success: true, video });
+  } catch (error) {
+    console.error('[uploadTrainingVideoByUrl]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── ADMIN: Get ALL Videos (active + inactive) ───────────────────────────────
+const getAllVideosAdmin = async (req, res) => {
+  try {
+    const { search, category, status } = req.query;
+
+    const filter = {};
+    if (search) filter.title = { $regex: search, $options: 'i' };
+    if (category && category !== 'all') filter.category = category;
+    if (status === 'active') filter.isActive = true;
+    else if (status === 'inactive') filter.isActive = false;
+
+    const videos = await TrainingVideo.find(filter)
+      .sort({ order: 1, createdAt: -1 })
+      .populate('uploadedBy', 'name displayName');
+
+    // Attach progress stats per video
+    const progressCounts = await TrainingVideoProgress.aggregate([
+      { $group: { _id: '$videoId', total: { $sum: 1 }, completed: { $sum: { $cond: ['$isCompleted', 1, 0] } } } },
+    ]);
+    const progMap = new Map(progressCounts.map((p) => [p._id.toString(), p]));
+
+    const videosWithStats = videos.map((v) => {
+      const prog = progMap.get(v._id.toString()) || { total: 0, completed: 0 };
+      return {
+        ...v.toObject(),
+        playableUrl: getPlayableUrl(v),
+        stats: { totalWatchers: prog.total, completedCount: prog.completed },
+      };
+    });
+
+    res.json({ success: true, videos: videosWithStats, total: videos.length });
+  } catch (error) {
+    console.error('[getAllVideosAdmin]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── ADMIN: Edit Training Video ───────────────────────────────────────────────
+const editTrainingVideo = async (req, res) => {
+  try {
+    const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration, isActive } = req.body;
+    const video = await TrainingVideo.findById(req.params.id);
+    if (!video) return res.status(404).json({ success: false, message: 'Video not found.' });
+
+    if (title !== undefined) video.title = title;
+    if (description !== undefined) video.description = description;
+    if (category !== undefined) video.category = category;
+    if (isMandatory !== undefined) video.isMandatory = isMandatory === 'true' || isMandatory === true;
+    if (order !== undefined) video.order = parseInt(order) || video.order;
+    if (videoUrl !== undefined) video.videoUrl = videoUrl;
+    if (thumbnailUrl !== undefined) video.thumbnailUrl = thumbnailUrl;
+    if (duration !== undefined) video.duration = parseInt(duration) || video.duration;
+    if (isActive !== undefined) video.isActive = isActive === 'true' || isActive === true;
+
+    await video.save();
+    res.json({ success: true, video });
+  } catch (error) {
+    console.error('[editTrainingVideo]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── ADMIN: Toggle Active Status ──────────────────────────────────────────────
+const toggleVideoStatus = async (req, res) => {
+  try {
+    const video = await TrainingVideo.findById(req.params.id);
+    if (!video) return res.status(404).json({ success: false, message: 'Video not found.' });
+
+    video.isActive = !video.isActive;
+    await video.save();
+
+    res.json({ success: true, isActive: video.isActive, message: `Video ${video.isActive ? 'activated' : 'deactivated'}.` });
+  } catch (error) {
+    console.error('[toggleVideoStatus]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── ADMIN: Reorder Videos ────────────────────────────────────────────────────
+const reorderVideos = async (req, res) => {
+  try {
+    const { items } = req.body; // [{ id, order }, ...]
+    if (!Array.isArray(items)) return res.status(400).json({ success: false, message: 'items array required.' });
+
+    const ops = items.map(({ id, order }) => ({
+      updateOne: { filter: { _id: id }, update: { $set: { order: parseInt(order) || 0 } } },
+    }));
+    await TrainingVideo.bulkWrite(ops);
+
+    res.json({ success: true, message: 'Videos reordered.' });
+  } catch (error) {
+    console.error('[reorderVideos]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── TEACHER: Get All Active Training Videos (with own progress) ──────────────
 const getTrainingVideos = async (req, res) => {
   try {
-    const videos = await TrainingVideo.find({ isActive: true }).sort({ order: 1, createdAt: 1 });
+    const { category, search } = req.query;
+    const filter = { isActive: true };
+    if (category && category !== 'all') filter.category = category;
+    if (search) filter.title = { $regex: search, $options: 'i' };
+
+    const videos = await TrainingVideo.find(filter).sort({ order: 1, createdAt: -1 });
 
     const progressList = await TrainingVideoProgress.find({ teacherId: req.user._id });
     const progressMap = new Map(progressList.map((p) => [p.videoId.toString(), p]));
@@ -53,24 +222,28 @@ const getTrainingVideos = async (req, res) => {
       const progress = progressMap.get(v._id.toString());
       return {
         ...v.toObject(),
+        playableUrl: getPlayableUrl(v),
         progress: progress
           ? {
               isCompleted: progress.isCompleted,
               watchDuration: progress.watchDuration,
               completedAt: progress.completedAt,
-              percentWatched: v.duration > 0 ? Math.min(100, Math.round((progress.watchDuration / v.duration) * 100)) : 0,
+              lastWatchPosition: progress.lastWatchPosition || 0,
+              percentWatched:
+                v.duration > 0 ? Math.min(100, Math.round((progress.watchDuration / v.duration) * 100)) : 0,
             }
-          : { isCompleted: false, watchDuration: 0, percentWatched: 0 },
+          : { isCompleted: false, watchDuration: 0, percentWatched: 0, lastWatchPosition: 0 },
       };
     });
 
     res.json({ success: true, videos: videosWithProgress });
   } catch (error) {
+    console.error('[getTrainingVideos]', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Teacher: Mark Video as Complete ─────────────────────────────────────────
+// ─── TEACHER: Mark Video as Complete ──────────────────────────────────────────
 const markVideoComplete = async (req, res) => {
   try {
     const { watchDuration } = req.body;
@@ -97,7 +270,7 @@ const markVideoComplete = async (req, res) => {
   }
 };
 
-// ─── Teacher: Update Watch Progress ──────────────────────────────────────────
+// ─── TEACHER: Update Watch Progress ───────────────────────────────────────────
 const updateWatchProgress = async (req, res) => {
   try {
     const { watchDuration, currentPosition } = req.body;
@@ -126,7 +299,7 @@ const updateWatchProgress = async (req, res) => {
   }
 };
 
-// ─── Teacher: Get Incomplete Mandatory Count (for sidebar badge) ──────────────
+// ─── TEACHER: Get Incomplete Mandatory Count ───────────────────────────────────
 const getIncompleteMandatoryCount = async (req, res) => {
   try {
     const mandatoryVideos = await TrainingVideo.find({ isMandatory: true, isActive: true });
@@ -145,33 +318,38 @@ const getIncompleteMandatoryCount = async (req, res) => {
   }
 };
 
-// ─── Admin: Delete Training Video ────────────────────────────────────────────
+// ─── ADMIN: Delete Training Video ─────────────────────────────────────────────
 const deleteTrainingVideo = async (req, res) => {
   try {
     const video = await TrainingVideo.findById(req.params.id);
     if (!video) return res.status(404).json({ success: false, message: 'Video not found.' });
 
-    // Delete from Cloudinary
-    await cloudinary.uploader.destroy(video.cloudinaryPublicId, { resource_type: 'video' });
+    // Delete from Cloudinary only if uploaded there
+    if (video.cloudinaryPublicId) {
+      try {
+        await cloudinary.uploader.destroy(video.cloudinaryPublicId, { resource_type: 'video' });
+      } catch (e) {
+        console.warn('[deleteTrainingVideo] Cloudinary delete failed:', e.message);
+      }
+    }
 
-    // Delete progress records
     await TrainingVideoProgress.deleteMany({ videoId: video._id });
     await TrainingVideo.findByIdAndDelete(video._id);
 
     res.json({ success: true, message: 'Training video deleted.' });
   } catch (error) {
+    console.error('[deleteTrainingVideo]', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Admin: Get All Teacher Progress (Matrix) ─────────────────────────────────
+// ─── ADMIN: Get Teacher Progress Matrix ───────────────────────────────────────
 const getProgressMatrix = async (req, res) => {
   try {
     const teachers = await User.find({ role: 'teacher', isActive: true }).select('name displayName profilePic');
     const videos = await TrainingVideo.find({ isActive: true }).sort({ order: 1 });
     const allProgress = await TrainingVideoProgress.find();
 
-    // Build matrix
     const matrix = teachers.map((teacher) => {
       const teacherProgress = allProgress.filter(
         (p) => p.teacherId.toString() === teacher._id.toString()
@@ -199,7 +377,6 @@ const getProgressMatrix = async (req, res) => {
     });
 
     const allDone = matrix.filter((t) => t.allMandatoryDone).length;
-
     res.json({ success: true, matrix, summary: { total: teachers.length, allDone } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -207,11 +384,18 @@ const getProgressMatrix = async (req, res) => {
 };
 
 module.exports = {
+  // Admin
   uploadTrainingVideo,
+  uploadTrainingVideoByUrl,
+  getAllVideosAdmin,
+  editTrainingVideo,
+  toggleVideoStatus,
+  reorderVideos,
+  deleteTrainingVideo,
+  getProgressMatrix,
+  // Teacher
   getTrainingVideos,
   markVideoComplete,
   updateWatchProgress,
   getIncompleteMandatoryCount,
-  deleteTrainingVideo,
-  getProgressMatrix,
 };

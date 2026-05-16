@@ -95,4 +95,94 @@ router.put('/courses/:id', async (req, res) => {
   }
 });
 
+// Top Rankers
+router.get('/top-rankers', async (req, res) => {
+  try {
+    const ExamScore = require('../models/ExamScore');
+    const topRankers = await ExamScore.find()
+      .sort({ score: -1 })
+      .limit(10)
+      .populate('studentId', 'name displayName')
+      .exec();
+    
+    res.json({ 
+      success: true, 
+      topRankers: topRankers.map((r, idx) => ({
+        rank: idx + 1,
+        name: r.studentId?.displayName || r.studentId?.name || 'N/A',
+        score: `${r.score}%`,
+        grade: r.grade || 'A'
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Student Marks
+router.get('/student-marks', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const ExamScore = require('../models/ExamScore');
+    const marks = await ExamScore.find()
+      .limit(limit)
+      .populate('studentId', 'name displayName')
+      .sort({ createdAt: -1 })
+      .exec();
+    
+    res.json({ success: true, marks });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Salaries
+router.get('/salaries', async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const SalaryTransaction = require('../models/SalaryTransaction');
+    
+    const query = {};
+    if (month && year) {
+      const startDate = new Date(year, new Date(`${month} 1`).getMonth(), 1);
+      const endDate = new Date(year, new Date(`${month} 1`).getMonth() + 1, 0);
+      query.transactionDate = { $gte: startDate, $lte: endDate };
+    }
+    
+    const salaries = await SalaryTransaction.find(query)
+      .populate('teacherId', 'name displayName email')
+      .sort({ transactionDate: -1 })
+      .exec();
+    
+    res.json({ success: true, salaries });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Salary Reports
+router.get('/salary/reports', async (req, res) => {
+  try {
+    const { period } = req.query; // monthly, yearly, etc.
+    const SalaryTransaction = require('../models/SalaryTransaction');
+    
+    const reports = await SalaryTransaction.aggregate([
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$transactionDate' } },
+          totalPaid: { $sum: '$amount' },
+          count: { $sum: 1 },
+          avgAmount: { $avg: '$amount' }
+        }
+      },
+      { $sort: { _id: -1 } },
+      { $limit: 12 }
+    ]);
+    
+    res.json({ success: true, reports });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

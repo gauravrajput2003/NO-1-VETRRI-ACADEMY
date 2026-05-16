@@ -12,6 +12,52 @@ const ClassSchedule = require('../models/ClassSchedule');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const s3Client = require('../config/s3');
+const storageService = require('../services/storageService');
+const { resolveFileAccessUrl } = require('../utils/downloadHelper');
+const { proxyDownload } = require('../middleware/fileDownloadHandler');
+
+const isMaterialLockedForStudent = (material, studentId) => {
+  return (
+    material.lockedFor.includes(studentId) ||
+    (material.lockedForAll && !material.unlockedFor.includes(studentId))
+  );
+};
+
+/**
+ * Resolve material access URL with proper download handling
+ * Supports both S3 and Cloudinary storage with correct filenames
+ */
+const resolveMaterialAccessUrl = async (material, forceDownload = false) => {
+  try {
+    // S3 backend
+    if (material.s3Bucket && material.s3Key) {
+      console.log(`[Student] Resolving S3 URL: ${material.s3Key}`);
+      
+      const command = new GetObjectCommand({
+        Bucket: material.s3Bucket,
+        Key: material.s3Key,
+        ResponseContentDisposition: forceDownload
+          ? `attachment; filename="${material.originalFilename || material.s3Key}"`
+          : 'inline',
+      });
+
+      return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    }
+
+    // Cloudinary backend (primary)
+    if (material.fileUrl) {
+      console.log(`[Student] Resolving Cloudinary URL: ${material.originalFilename}`);
+      
+      return await resolveFileAccessUrl(material, forceDownload);
+    }
+
+    console.warn('[Student] No file URL found for material:', material._id);
+    return null;
+  } catch (error) {
+    console.error('[Student] Error resolving access URL:', error.message);
+    throw error;
+  }
+};
 
 // @desc    Get student dashboard data
 // @route   GET /api/student/dashboard
@@ -137,10 +183,10 @@ const getStudentMaterials = async (req, res) => {
   }
 };
 
-// @desc    Get presigned URL for material (if unlocked)
-// @route   GET /api/student/materials/:id/view
+// @desc    Get preview URL for material (if unlocked)
+// @route   GET /api/student/materials/:id/preview
 // @access  Student
-const getMaterialUrl = async (req, res) => {
+const getMaterialPreviewUrl = async (req, res) => {
   try {
     const studentId = req.user._id;
     const material = await StudyMaterial.findById(req.params.id);
@@ -149,10 +195,7 @@ const getMaterialUrl = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
 
-    // Check access
-    const isLocked =
-      material.lockedFor.includes(studentId) ||
-      (material.lockedForAll && !material.unlockedFor.includes(studentId));
+    const isLocked = isMaterialLockedForStudent(material, studentId);
 
     if (isLocked) {
       return res.status(403).json({
@@ -161,18 +204,145 @@ const getMaterialUrl = async (req, res) => {
       });
     }
 
-    // Generate presigned URL (1 hour expiry, no download headers — view only)
-    const command = new GetObjectCommand({
-      Bucket: material.s3Bucket,
-      Key: material.s3Key,
-      ResponseContentDisposition: 'inline', // Forces browser to view, not download
+    const signedUrl = await resolveMaterialAccessUrl(material, false);
+
+    if (!signedUrl) {
+      console.error(`[getMaterialPreviewUrl] Material ${req.params.id} has no accessible URL. s3Bucket=${material.s3Bucket}, s3Key=${material.s3Key}, fileUrl=${material.fileUrl}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Material file is missing or inaccessible.',
+      });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      url: signedUrl, 
+      type: material.type,
+      mimeType: material.mimeType,
+      storageType: material.storageType,
     });
-
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-
-    res.status(200).json({ success: true, url: signedUrl, type: material.type });
   } catch (error) {
+    console.error(`[getMaterialPreviewUrl] Error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get download URL for material (if unlocked)
+// @route   GET /api/student/materials/:id/download
+// @access  Student
+// 
+// PRODUCTION-READY implementation:
+// - Checks if material is unlocked for student
+// - Generates proper download URL with original filename and extension
+// - Handles both Cloudinary and S3 storage
+// - Forces download (attachment) instead of preview
+const getMaterialDownloadUrl = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const material = await StudyMaterial.findById(req.params.id);
+
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        message: 'Material not found.',
+      });
+    }
+
+    // Check if material is locked for this student
+    const isLocked = isMaterialLockedForStudent(material, studentId);
+
+    if (isLocked) {
+      return res.status(403).json({
+        success: false,
+        message: 'This material is locked. Contact your teacher for access.',
+      });
+    }
+
+    console.log(`[Download] Generating URL for material: ${material._id}`);
+
+    // Return the direct-download endpoint URL (no leading /api)
+    // Frontend already prefixes API_BASE_URL which includes /api
+    const directDownloadUrl = `/student/materials/${material._id}/direct-download`;
+
+    console.log(`[Download] Returning direct-download endpoint: ${material.originalFilename}`);
+
+    res.status(200).json({
+      success: true,
+      url: directDownloadUrl,
+      type: material.type,
+      metadata: {
+        filename: material.originalFilename,
+        extension: material.extension,
+        fileSize: material.fileSize,
+        mimeType: material.mimeType,
+      },
+    });
+  } catch (error) {
+    console.error('[Download] Error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate download URL.',
+    });
+  }
+};
+
+/**
+ * Direct download endpoint with proper Content-Disposition headers
+ * Serves file with correct filename, bypassing Cloudinary URL issues
+ * 
+ * Usage: GET /api/student/materials/:id/direct-download
+ */
+const downloadMaterialDirect = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const material = await StudyMaterial.findById(req.params.id);
+
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        message: 'Material not found.',
+      });
+    }
+
+    // Check if material is locked for this student
+    const isLocked = isMaterialLockedForStudent(material, studentId);
+
+    if (isLocked) {
+      return res.status(403).json({
+        success: false,
+        message: 'This material is locked. Contact your teacher for access.',
+      });
+    }
+
+    if (!material.fileUrl) {
+      return res.status(404).json({
+        success: false,
+        message: 'Material file URL not found.',
+      });
+    }
+
+    console.log(`[Download] Direct download requested: ${material._id} - ${material.originalFilename}`);
+
+    // Get download URL
+    const downloadUrl = material.fileUrl.startsWith('https://')
+      ? material.fileUrl
+      : material.fileUrl.replace('http://', 'https://');
+
+    const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
+    const mimeType = material.mimeType || 'application/octet-stream';
+
+    console.log(`[Download] Streaming: ${filename} from Cloudinary`);
+
+    // Use proxyDownload to serve file with proper headers
+    await proxyDownload(downloadUrl, filename, mimeType, res);
+  } catch (error) {
+    console.error('[Download] Direct download error:', error.message);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to download material.',
+      });
+    }
   }
 };
 
@@ -361,7 +531,9 @@ const getChatMessages = async (req, res) => {
 module.exports = {
   getStudentDashboard,
   getStudentMaterials,
-  getMaterialUrl,
+  getMaterialPreviewUrl,
+  getMaterialDownloadUrl,
+    downloadMaterialDirect,
   getStudentScores,
   getStudentAttendance,
   getStudentSchedule,

@@ -12,6 +12,16 @@ const parseAnswer = (providerData) => {
     .join('\n')
     .trim(); 
 };
+
+const buildFallbackAnswer = () => {
+  return [
+    'English:',
+    'Vettri AI is temporarily unavailable due to an upstream service issue. Please try again in a moment. You can continue by asking your teacher or checking your study materials.',
+    '',
+    'Tamil:',
+    'Vettri AI இப்போது தற்காலிகமாக கிடைக்கவில்லை. சில நிமிடங்களில் மீண்டும் முயற்சிக்கவும். இதற்குள் உங்கள் ஆசிரியரிடம் கேள்வி கேட்கலாம் அல்லது படிப்புப் பொருட்களை பார்க்கலாம்.',
+  ].join('\n');
+};
   
 const buildSystemPrompt = (role, userName) => {
   return [
@@ -70,37 +80,55 @@ const askVettriAI = async (req, res) => {
     let lastProviderMessage = 'Gemini request failed.';
 
     for (const model of modelCandidates) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${systemPrompt}\n\nUser question: ${question}` }],
-            },
-          ],
-        }),
-      });
+      let timeout;
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+        const abortController = new AbortController();
+        timeout = setTimeout(() => abortController.abort(), 12000);
 
-      const data = await response.json();
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemPrompt}\n\nUser question: ${question}` }],
+              },
+            ],
+          }),
+          signal: abortController.signal,
+        });
 
-      if (!response.ok) {
-        lastProviderMessage = data?.error?.message || 'Gemini request failed.';
-        continue;
-      }
+        clearTimeout(timeout);
 
-      const parsed = parseAnswer(data);
-      if (parsed) {
-        answer = parsed;
-        usedModel = model;
-        break;
+        const data = await response.json();
+
+        if (!response.ok) {
+          lastProviderMessage = data?.error?.message || 'Gemini request failed.';
+          continue;
+        }
+
+        const parsed = parseAnswer(data);
+        if (parsed) {
+          answer = parsed;
+          usedModel = model;
+          break;
+        }
+      } catch (providerError) {
+        lastProviderMessage = providerError?.message || 'Gemini request failed.';
+      } finally {
+        if (timeout) clearTimeout(timeout);
       }
     }
 
     if (!answer) {
-      return res.status(502).json({ success: false, message: `Vettri AI error: ${lastProviderMessage}` });
+      return res.json({
+        success: true,
+        answer: buildFallbackAnswer(),
+        fallback: true,
+        message: `Vettri AI fallback used: ${lastProviderMessage}`,
+      });
     }
 
     return res.json({ success: true, answer, model: usedModel || preferredModel });

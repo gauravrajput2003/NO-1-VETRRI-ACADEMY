@@ -15,7 +15,9 @@ const createSchedule = async (req, res) => {
       dayOfWeek, academicYear, batch, notes,
     } = req.body;
 
-    const teacherId = req.body.teacherId || req.body.teacher;
+    const teacherId = req.user.role === 'teacher'
+      ? req.user._id
+      : (req.body.teacherId || req.body.teacher);
     const studentIds = req.body.studentIds || req.body.students || [];
 
     if (!teacherId) {
@@ -442,7 +444,20 @@ const getClassAttendance = async (req, res) => {
 // ─── Admin: Update Schedule ───────────────────────────────────────────────────
 const updateSchedule = async (req, res) => {
   try {
-    const schedule = await ClassSchedule.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const existing = await ClassSchedule.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Schedule not found.' });
+
+    if (req.user.role === 'teacher' && existing.teacherId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'You can only update your own classes.' });
+    }
+
+    const updates = { ...req.body };
+    if (req.user.role === 'teacher') {
+      delete updates.teacherId;
+      delete updates.teacher;
+    }
+
+    const schedule = await ClassSchedule.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found.' });
     res.json({ success: true, schedule });
   } catch (error) {
@@ -455,6 +470,13 @@ const cancelSchedule = async (req, res) => {
   try {
     const { reason } = req.body;
     const io = req.app.get('io');
+
+    const existing = await ClassSchedule.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Schedule not found.' });
+
+    if (req.user.role === 'teacher' && existing.teacherId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'You can only cancel your own classes.' });
+    }
 
     const cls = await ClassSchedule.findByIdAndUpdate(
       req.params.id,

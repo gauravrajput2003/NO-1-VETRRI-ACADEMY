@@ -1,13 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
+const { Server } = require('socket.io'); 
 const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const mongoSanitize = require('express-mongo-sanitize');
-
+  
 const connectDB = require('./config/db');
 const { generalLimiter } = require('./middleware/rateLimiter');
 
@@ -26,6 +26,7 @@ const announcementRoutes = require('./routes/announcementRoutes');
 const demoRoutes = require('./routes/demoRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const downloadRoutes = require('./routes/downloadRoutes');
 
 // ─── Models for Socket.io ──────────────────────────────────────────────────────
 const ChatMessage = require('./models/ChatMessage');
@@ -37,10 +38,18 @@ const TeacherPermissions = require('./models/TeacherPermissions');
 const app = express();
 const server = http.createServer(app);
 
+// ─── CORS Configuration ────────────────────────────────────────────────────────
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'http://localhost:5173',  // Web client
+  'http://localhost:8081',                             // Expo/React Native app
+  'http://127.0.0.1:8081',
+  'http://localhost:19000',                            // Expo dev server
+];
+
 // ─── Socket.io Setup ───────────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     credentials: true,
   },
@@ -53,7 +62,13 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
@@ -78,6 +93,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/downloads', downloadRoutes);
 
 // ─── Public course listing ─────────────────────────────────────────────────────
 app.get('/api/courses', async (req, res) => {

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // Run every Monday at 6 AM IST (00:30 UTC)
 const startWeeklyTopPerformerJob = () => {
   cron.schedule('30 0 * * 1', async () => {
-    try {
+    try {   
       console.log('🏆 Running weekly top performer calculation...');
       const WeeklyTopPerformer = require('../models/WeeklyTopPerformer');
       const ClassAttendance = require('../models/ClassAttendance');

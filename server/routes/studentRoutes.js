@@ -5,7 +5,9 @@ const { studentOnly } = require('../middleware/roleCheck');
 const {
   getStudentDashboard,
   getStudentMaterials,
-  getMaterialUrl,
+  getMaterialPreviewUrl,
+  getMaterialDownloadUrl,
+    downloadMaterialDirect,
   getStudentScores,
   getStudentAttendance,
   getStudentSchedule,
@@ -22,7 +24,10 @@ router.use(verifyToken, studentOnly);
 
 router.get('/dashboard', getStudentDashboard);
 router.get('/materials', getStudentMaterials);
-router.get('/materials/:id/view', getMaterialUrl);
+router.get('/materials/:id/preview', getMaterialPreviewUrl);
+router.get('/materials/:id/download', getMaterialDownloadUrl);
+router.get('/materials/:id/direct-download', downloadMaterialDirect);
+router.get('/materials/:id/view', getMaterialPreviewUrl);
 router.get('/scores', getStudentScores);
 router.get('/attendance', getStudentAttendance);
 router.get('/schedule', getStudentSchedule);

@@ -1,0 +1,38 @@
+import React from 'react';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { Colors } from '../../utils/colors';
+
+export function UsersScreen({ navigation }) {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Users</Text>
+        <Text style={styles.subtitle}>Students & Teachers Management</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.offWhite,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.navy,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Colors.gray,
+    marginTop: 8,
+  },
+});
+
+export default UsersScreen;
