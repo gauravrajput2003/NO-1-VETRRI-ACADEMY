@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "No.1 Vettri Academy",
-    "slug": "VettriAcademy",
+    "slug": "no-1-vettri-academy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/Picsart_ client.png",
@@ -30,6 +30,12 @@
     "plugins": [
       "expo-font",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "546a14a2-77ac-4b76-8596-097f8e81d7d8"
+      }
+    },
+    "owner": "vettriinstitutes-organization"
   }
 }
