@@ -1,56 +1,7 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-
-// ─── API Configuration 
-const getExpoHost = () => {
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    Constants.manifest?.debuggerHost ||
-    Constants.expoGoConfig?.debuggerHost ||
-    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
-    '';
-
-  if (!hostUri) return '';
-
-  return hostUri
-    .replace(/^https?:\/\//, '')
-    .split(':')[0]
-    .split('/')[0]
-    .trim();
-};
-
-const getWebHost = () => {
-  if (typeof window === 'undefined') return '';
-
-  const hostname = window.location?.hostname?.trim();
-  if (!hostname) return '';
-
-  return hostname;
-};
-
-const getApiHost = () => {
-  const explicitHost = process.env.EXPO_PUBLIC_API_HOST?.trim();
-  if (explicitHost) return explicitHost;
-
-  if (Platform.OS === 'web') {
-    return getWebHost() || 'localhost';
-  }
-
-  return (
-    getExpoHost() ||
-    Platform.select({
-      android: '10.0.2.2',
-      ios: 'localhost',
-      default: 'localhost',
-    })
-  );
-};
-
-const API_HOST = getApiHost();
-const API_PROTOCOL = process.env.EXPO_PUBLIC_API_PROTOCOL?.trim() || 'http';
-
-export const API_BASE_URL = `${API_PROTOCOL}://${API_HOST}:5000/api`;
-export const SOCKET_URL = `${API_PROTOCOL}://${API_HOST}:5000`;
+// ─── API Configuration
+const PROD_API_ORIGIN = 'https://no-1-vetrri-academy.onrender.com';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || `${PROD_API_ORIGIN}/api`;
+export const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL?.trim() || PROD_API_ORIGIN;
 
 // ─── Storage Keys ──────────────────────────────────────────────────────────────
 export const STORAGE_KEYS = {

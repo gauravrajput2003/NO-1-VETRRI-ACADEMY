@@ -33,6 +33,7 @@ const {
 } = require('../controllers/enquiryController');
 const Course = require('../models/Course');
 const FeesRecord = require('../models/FeesRecord');
+const { uploadImage, uploadToCloudinary } = require('../middleware/upload');
 
 // All routes: admin only
 router.use(verifyToken, adminOnly);
@@ -178,5 +179,20 @@ router.post('/salary/process', processSalary);
 router.post('/salary/process-all', processAllSalaries);
 router.post('/teacher/:teacherId/salary-config', setTeacherSalaryConfig);
 router.get('/salary/reports', getSalaryReports);
+router.post('/salary/upload-proof', uploadImage.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    const result = await uploadToCloudinary(req.file.buffer, {
+      folder: 'vettri-academy/salary-proofs',
+      resource_type: 'image',
+      public_id: `proof_${Date.now()}`,
+    });
+    res.json({ success: true, url: result.secure_url });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 module.exports = router;

@@ -177,6 +177,7 @@ const getAdminSalaryDashboard = async (req, res) => {
         paidAmount: tx?.paidAmount || 0,
         paymentMethod: tx?.paymentMethod || teacher.salary?.paymentMode || 'bank_transfer',
         transactionId: tx?.transactionId || '',
+        payments: tx?.payments || [],
         processedByName: tx?.processedByName || '',
         processedAt: tx?.processedAt || null,
         salarySlipGenerated: Boolean(tx?.salarySlipGenerated),
@@ -189,6 +190,10 @@ const getAdminSalaryDashboard = async (req, res) => {
       if (row.paymentStatus === 'paid') {
         acc.alreadyPaid += row.paidAmount || row.netSalary;
         acc.paidCount += 1;
+      } else if (row.paymentStatus === 'partial') {
+        acc.alreadyPaid += row.paidAmount;
+        acc.pending += Math.max(row.netSalary - row.paidAmount, 0);
+        acc.pendingCount += 1;
       } else {
         acc.pending += row.netSalary;
         acc.pendingCount += 1;
@@ -205,7 +210,7 @@ const getAdminSalaryDashboard = async (req, res) => {
 
 const processSalary = async (req, res) => {
   try {
-    const { teacherId, month, year, paymentDate, transactionId, notes, paymentMethod, processedByName } = req.body;
+    const { teacherId, month, year, paymentDate, transactionId, notes, paymentMethod, processedByName, payingAmount, proofImage, remarks } = req.body;
     const teacher = await User.findOne({ _id: teacherId, role: 'teacher' });
 
     if (!teacher) {
@@ -233,18 +238,48 @@ const processSalary = async (req, res) => {
     transaction.otherDeductions = breakdown.otherDeductions;
     transaction.totalDeductions = breakdown.totalDeductions;
     transaction.netSalary = breakdown.netSalary;
-    transaction.paymentStatus = req.body.paymentStatus || 'paid';
+
+    const newlyPaying = toNumber(payingAmount, breakdown.netSalary);
+
+    // Append to payments list if newlyPaying > 0
+    if (newlyPaying > 0) {
+      if (!Array.isArray(transaction.payments)) {
+        transaction.payments = [];
+      }
+      transaction.payments.push({
+        amount: newlyPaying,
+        method: paymentMethod || 'Cash',
+        transactionId: transactionId || '',
+        proofImage: proofImage || '',
+        remarks: remarks || '',
+        paidAt: paidDate,
+      });
+    }
+
+    if (!Array.isArray(transaction.payments)) {
+      transaction.payments = [];
+    }
+    const totalPaid = transaction.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    transaction.paidAmount = totalPaid;
     transaction.paidDate = paidDate;
-    transaction.paidAmount = breakdown.netSalary;
-    transaction.paymentMethod = paymentMethod || teacher.salary?.paymentMode || 'bank_transfer';
-    transaction.transactionId = transactionId || transaction.transactionId || '';
+    transaction.paymentMethod = paymentMethod || (transaction.payments.length > 0 ? transaction.payments[transaction.payments.length - 1].method : 'Cash');
+    transaction.transactionId = transactionId || (transaction.payments.length > 0 ? transaction.payments[transaction.payments.length - 1].transactionId : '');
+
+    if (totalPaid >= breakdown.netSalary) {
+      transaction.paymentStatus = 'paid';
+    } else if (totalPaid > 0) {
+      transaction.paymentStatus = 'partial';
+    } else {
+      transaction.paymentStatus = 'pending';
+    }
+
     transaction.processedBy = req.user?._id || null;
     transaction.processedByName = req.user?.name || req.user?.displayName || processedByName || '';
     transaction.processedAt = new Date();
     transaction.salarySlipGenerated = true;
     transaction.salarySlipUrl = slipUrl;
     transaction.notes = notes || transaction.notes || '';
-    transaction.remarks = req.body.remarks || transaction.remarks || '';
+    transaction.remarks = remarks || transaction.remarks || '';
     await transaction.save();
 
     await upsertTeacherSalaryHistory(teacher, {
@@ -258,7 +293,7 @@ const processSalary = async (req, res) => {
       sender: req.user?._id,
       type: 'salary_paid',
       title: 'Salary Processed',
-      message: `Your salary for ${context.monthYear} has been processed and credited. Net salary: ₹${breakdown.netSalary}.`,
+      message: `Your salary payment for ${context.monthYear} of ₹${newlyPaying} has been processed. Total Paid: ₹${totalPaid}/${breakdown.netSalary}.`,
       link: '/teacher/salary',
       data: {
         monthYear: context.monthYear,

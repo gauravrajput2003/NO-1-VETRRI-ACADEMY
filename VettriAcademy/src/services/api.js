@@ -412,6 +412,24 @@ export const getAdminSalaryDashboardAPI = (params) =>
 export const processTeacherSalaryAPI = (data) =>
   api.post('/admin/salary/process', data);
 
+export const uploadSalaryProofAPI = async (formData) => {
+  const token = await getToken();
+  const response = await fetch(`${API_BASE_URL}/admin/salary/upload-proof`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const err = new Error(data.message || 'Upload failed');
+    err.response = { data, status: response.status };
+    throw err;
+  }
+  return { data };
+};
+
 export const processAllSalariesAPI = (data) =>
   api.post('/admin/salary/process-all', data);
 

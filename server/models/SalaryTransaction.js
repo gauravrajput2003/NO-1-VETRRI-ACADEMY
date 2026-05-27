@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+const salaryPaymentSchema = new mongoose.Schema({
+  amount: { type: Number, required: true },
+  method: { type: String, default: 'Cash' },
+  transactionId: { type: String, default: '' },
+  proofImage: { type: String, default: '' },
+  remarks: { type: String, default: '' },
+  paidAt: { type: Date, default: Date.now }
+});
+
 const salaryTransactionSchema = new mongoose.Schema(
   {
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -22,11 +31,13 @@ const salaryTransactionSchema = new mongoose.Schema(
 
     netSalary: { type: Number, default: 0 },
 
-    paymentStatus: { type: String, enum: ['paid', 'pending', 'advance'], default: 'pending' },
+    paymentStatus: { type: String, enum: ['paid', 'pending', 'partial', 'advance'], default: 'pending' },
     paidDate: { type: Date },
     paidAmount: { type: Number, default: 0 },
     paymentMethod: { type: String, default: 'bank_transfer' },
     transactionId: { type: String, default: '' },
+
+    payments: [salaryPaymentSchema],
 
     processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     processedByName: { type: String, default: '' },

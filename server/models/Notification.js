@@ -6,7 +6,7 @@ const notificationSchema = new mongoose.Schema(
     sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     type: {
       type: String,
-      enum: ['new_score', 'new_material', 'class_reminder', 'leave_update', 'fee_reminder', 'chat', 'announcement'],
+      enum: ['new_score', 'new_material', 'class_reminder', 'class_starting', 'leave_update', 'fee_reminder', 'chat', 'announcement', 'salary_paid'],
       required: true,
     },
     title: { type: String, required: true },
