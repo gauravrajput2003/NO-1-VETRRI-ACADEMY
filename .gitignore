@@ -65,3 +65,10 @@ QUICK_START.md
 REFACTOR_COMPLETE.md
 START_HERE.txt
 UPLOAD_DOWNLOAD_REFACTOR.md
+node_modules
+.expo
+dist
+build
+android
+ios
+.env
