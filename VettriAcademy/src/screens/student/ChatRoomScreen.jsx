@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Image, Modal, ActionSheetIOS } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -14,6 +16,8 @@ import { sendChatFileAPI } from '../../services/api';
 export default function ChatRoomScreen({ route, navigation }) {
   const { conversationId, otherUser } = route.params;
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { messages, loading, typingUsers } = useSelector((s) => s.chat);
   const { user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
@@ -156,7 +160,7 @@ export default function ChatRoomScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView style={[styles.container, { backgroundColor: bgColor }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
-      <FlatList
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16}
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item._id}

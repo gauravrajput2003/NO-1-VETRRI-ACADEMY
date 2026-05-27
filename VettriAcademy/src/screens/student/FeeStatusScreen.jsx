@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +11,8 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 import { getStudentFeesAPI } from '../../services/api';
 
 export default function FeeStatusScreen({ navigation }) {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
   const [data, setData] = useState(null);

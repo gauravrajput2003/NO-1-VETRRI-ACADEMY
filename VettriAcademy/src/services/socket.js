@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { SOCKET_URL } from '../utils/constants';
+import { logDev, warnDev } from '../utils/logger';
 
 // ─── Socket.io Service ─────────────────────────────────────────────────────────
 // Modular design to allow FCM integration later without refactoring.
@@ -23,21 +24,21 @@ export const connectSocket = (userId, role) => {
   });
 
   socket.on('connect', () => {
-    console.log('🔌 Socket connected:', socket.id);
+    logDev('Socket connected');
     // Identify user and join personal room
     socket.emit('user:join', { userId, role });
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('❌ Socket disconnected:', reason);
+    logDev('Socket disconnected');
   });
 
   socket.on('connect_error', (error) => {
-    console.log('⚠️ Socket connection error:', error.message);
+    warnDev('Socket connection error:', error.message);
   });
 
   socket.on('reconnect', (attempt) => {
-    console.log('🔄 Socket reconnected after', attempt, 'attempts');
+    logDev('Socket reconnected');
     // Re-identify on reconnect
     socket.emit('user:join', { userId, role });
   });

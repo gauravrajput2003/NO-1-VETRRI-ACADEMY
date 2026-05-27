@@ -116,7 +116,6 @@ export default function AdminDashboardHome() {
     { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: FiUsers, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/admin/students' },
     { label: 'Total Teachers', value: stats?.totalTeachers ?? 0, icon: FiUsers, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/admin/teachers' },
     { label: 'Classes Today', value: stats?.classesToday ?? 0, icon: FiVideo, color: 'text-green-400', bg: 'bg-green-500/10', href: '/admin/live-monitor' },
-    { label: 'Revenue This Month', value: `₹${(stats?.monthlyRevenue || 0).toLocaleString('en-IN')}`, icon: FiDollarSign, color: 'text-gold', bg: 'bg-gold/10', href: '/admin/fees' },
     { label: 'Pending Demos', value: pendingDemos, icon: FiCalendar, color: 'text-yellow-400', bg: 'bg-yellow-500/10', href: '/admin/demo-bookings' },
     { label: 'Pending Leaves', value: pendingLeaves, icon: FiFileText, color: 'text-red-400', bg: 'bg-red-500/10', href: '/admin/leave' },
   ];

@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -9,6 +11,8 @@ import { formatDate } from '../../utils/formatters';
 
 export default function DiscussScenarioScreen({ navigation }) {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -112,10 +116,17 @@ export default function DiscussScenarioScreen({ navigation }) {
       style={[styles.container, { backgroundColor: bgColor }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
     >
-      {/* Teal Header */}
+      {/* Teal Header with back button */}
       <View style={styles.tealHeader}>
-        <Text style={styles.headerTitle}>Discuss Scenario</Text>
-        <Text style={styles.headerSub}>Share knowledge & solve problems together</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Discuss Scenario</Text>
+            <Text style={styles.headerSub}>Share knowledge & solve problems together</Text>
+          </View>
+        </View>
       </View>
 
       {/* White Content Section */}
@@ -226,7 +237,14 @@ const styles = StyleSheet.create({
   tealHeader: {
     backgroundColor: '#00A8AB',
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontSize: 24, fontWeight: '900', color: Colors.white, marginBottom: 4 },
   headerSub: { fontSize: 14, color: 'rgba(255,255,255,0.85)' },

@@ -6,6 +6,8 @@ import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { getInitials } from '../../utils/formatters';
 import { fetchTeacherStudents } from '../../redux/slices/teacherSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 export default function StudentsScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -13,6 +15,8 @@ export default function StudentsScreen({ navigation }) {
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
   const [search, setSearch] = useState('');
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -55,10 +59,12 @@ export default function StudentsScreen({ navigation }) {
           data={filtered}
           keyExtractor={(item) => item._id}
           renderItem={renderStudent}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding }}
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="people-outline" size={48} color={Colors.mediumGray} /><Text style={[styles.emptyText, { color: textSec }]}>No students assigned</Text></View>}
           refreshing={loading}
           onRefresh={() => dispatch(fetchTeacherStudents())}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
         />
       )}
     </View>

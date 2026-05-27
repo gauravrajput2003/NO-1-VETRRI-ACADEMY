@@ -7,6 +7,8 @@ import { Colors, gradeColors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate, calculateGrade } from '../../utils/formatters';
 import { fetchTeacherStudents, submitScore, fetchRecentScores } from '../../redux/slices/teacherSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 export default function GradesScreen() {
   const dispatch = useDispatch();
@@ -18,11 +20,13 @@ export default function GradesScreen() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentQuery, setStudentQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
   const textSec = isDark ? Colors.textSecondary.dark : Colors.textSecondary.light;
+  const bottomPadding = useBottomTabBarPadding();
 
   useEffect(() => { dispatch(fetchTeacherStudents()); dispatch(fetchRecentScores()); }, []);
 
@@ -77,7 +81,13 @@ export default function GradesScreen() {
       </View>
 
       {tab === 'enter' ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }} 
+          keyboardShouldPersistTaps="handled"
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
+        >
           {/* Student Selector */}
           <Text style={[styles.label, { color: textColor }]}>Student *</Text>
           <View style={styles.autoCompleteWrap}>
@@ -166,7 +176,7 @@ export default function GradesScreen() {
         <FlatList
           data={recentScores}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
           renderItem={({ item }) => {
             const pct = ((item.marksObtained / item.maxMarks) * 100);
             const grade = item.grade || calculateGrade(pct);
@@ -188,6 +198,8 @@ export default function GradesScreen() {
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="document-outline" size={48} color={Colors.mediumGray} /><Text style={[styles.emptyText, { color: textSec }]}>No scores entered yet</Text></View>}
           refreshing={loading}
           onRefresh={() => dispatch(fetchRecentScores())}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
         />
       )}
 

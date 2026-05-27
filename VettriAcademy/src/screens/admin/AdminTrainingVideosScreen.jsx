@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
@@ -52,6 +54,8 @@ function Toast({ msg, type }) {
 }
 
 export default function AdminTrainingVideosScreen({ navigation }) {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const theme = useSelector(s => s.ui.theme);
   const isDark = theme === 'dark';
   const bg = isDark ? Colors.background.dark : Colors.surface.light;
@@ -289,7 +293,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor:bg }]}>
       <Toast msg={toast.msg} type={toast.type} />
-      <LinearGradient colors={['#FF4F8B','#6C5CE7']} style={styles.header}>
+      <LinearGradient colors={['#FF4F8B','#6C5CE7']} style={[styles.header, { paddingBottom: 12 }]}>
         <View style={{ flexDirection:'row', alignItems:'center' }}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight:10 }}>
             <Ionicons name='arrow-back' size={24} color='#fff' />
@@ -308,7 +312,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
         {search ? <TouchableOpacity onPress={() => setSearch('')}><Ionicons name='close-circle' size={18} color={txtSec} /></TouchableOpacity> : null}
       </View>
 
-      <FlatList data={CATEGORIES} horizontal showsHorizontalScrollIndicator={false} keyExtractor={i=>i.key} contentContainerStyle={{ paddingHorizontal:16, paddingBottom:8 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={CATEGORIES} horizontal showsHorizontalScrollIndicator={false} keyExtractor={i=>i.key} contentContainerStyle={{ paddingHorizontal:16, paddingBottom:8 }}
         renderItem={({ item:c }) => {
           const a = category===c.key;
           return <TouchableOpacity style={[styles.fChip, a?{backgroundColor:c.color,borderColor:c.color}:{borderColor:border}]} onPress={() => setCategory(c.key)}><Ionicons name={c.icon} size={13} color={a?'#fff':c.color} style={{marginRight:4}} /><Text style={[styles.fTxt,{color:a?'#fff':c.color}]}>{c.label}</Text></TouchableOpacity>;
@@ -317,10 +321,10 @@ export default function AdminTrainingVideosScreen({ navigation }) {
       {loading ? (
         <View style={{ flex:1, justifyContent:'center', alignItems:'center' }}><ActivityIndicator size='large' color={Colors.primary} /></View>
       ) : (
-        <FlatList data={videos} keyExtractor={i=>i._id} renderItem={renderVideo} contentContainerStyle={{ padding:16, paddingBottom:32 }}
+        <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={videos} keyExtractor={i=>i._id} renderItem={renderVideo} contentContainerStyle={{ padding:16, paddingBottom:32 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} colors={[Colors.primary]} />}
           ListEmptyComponent={
-            <View style={styles.empty}>
+            <View style={[styles.empty, { paddingBottom: Math.max(40, bottomPadding) }]}>
               <Ionicons name='videocam-off-outline' size={64} color={Colors.mediumGray} />
               <Text style={[styles.emptyTitle,{color:txt}]}>No Videos Yet</Text>
               <Text style={[styles.emptyDesc,{color:txtSec}]}>Tap + to add your first training video</Text>
@@ -339,7 +343,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
               <Text style={[styles.modalTitle,{color:txt}]}>{editingId ? 'Edit Video' : 'Add Training Video'}</Text>
               <TouchableOpacity onPress={() => setShowModal(false)}><Ionicons name='close' size={24} color={txt} /></TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} showsVerticalScrollIndicator={false}>
               {/* Title */}
               <Text style={[styles.label,{color:txtSec}]}>Title *</Text>
               <TextInput style={[styles.input,{color:txt,borderColor:border}]} placeholder='e.g. How to Take Live Classes' placeholderTextColor={txtSec} value={form.title} onChangeText={v=>setForm(p=>({...p,title:v}))} />
@@ -418,7 +422,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
 
               {/* Category */}
               <Text style={[styles.label,{color:txtSec}]}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:12 }}>
+              <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:12 }}>
                 {CATEGORIES.filter(c=>c.key!=='all').map(c => (
                   <TouchableOpacity key={c.key} style={[styles.catPicker, form.category===c.key?{backgroundColor:c.color,borderColor:c.color}:{borderColor:border}]} onPress={() => setForm(p=>({...p,category:c.key}))}>
                     <Text style={{ color:form.category===c.key?'#fff':c.color, fontSize:12, fontWeight:'700' }}>{c.label}</Text>
@@ -469,7 +473,7 @@ const ts = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex:1 },
-  header: { paddingTop:52, paddingBottom:20, paddingHorizontal:20 },
+  header: { paddingTop:52, paddingBottom: 20, paddingHorizontal:20 },
   hTitle: { fontSize:22, fontWeight:'800', color:'#fff' },
   hSub: { fontSize:12, color:'rgba(255,255,255,0.8)', marginTop:2 },
   addBtn: { width:44, height:44, borderRadius:22, backgroundColor:'rgba(255,255,255,0.25)', justifyContent:'center', alignItems:'center' },
@@ -496,7 +500,7 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection:'row', alignItems:'center', gap:8, marginTop:10 },
   actionBtn: { flexDirection:'row', alignItems:'center', paddingHorizontal:12, paddingVertical:6, borderRadius:10, gap:4 },
   actionBtnTxt: { fontSize:12, fontWeight:'700' },
-  empty: { alignItems:'center', paddingTop:80, paddingBottom:40 },
+  empty: { alignItems:'center', paddingTop:80, paddingBottom: 40 },
   emptyTitle: { fontSize:20, fontWeight:'800', marginTop:16 },
   emptyDesc: { fontSize:13, marginTop:6, textAlign:'center' },
   emptyAddBtn: { flexDirection:'row', alignItems:'center', marginTop:20, backgroundColor:Colors.primary, paddingHorizontal:20, paddingVertical:12, borderRadius:14 },

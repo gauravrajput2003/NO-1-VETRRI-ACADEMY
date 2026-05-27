@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
+import { PersistGate } from 'redux-persist/integration/react'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ActivityIndicator, View } from 'react-native';
 import Toast from 'react-native-toast-message';
@@ -9,6 +9,7 @@ import { store, persistor } from './src/redux/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import { Colors } from './src/utils/colors';
 import { cleanupTempFiles } from './src/utils/fileUtils';
+import { AnnouncementPopup } from './src/components/AnnouncementPopup';
  
 export default function App() {
   // Auto-cleanup cached downloads older than 7 days on app startup
@@ -30,6 +31,7 @@ export default function App() {
             persistor={persistor}
           >
             <RootNavigator />
+            <AnnouncementPopup />
             <Toast />
           </PersistGate>
         </Provider>

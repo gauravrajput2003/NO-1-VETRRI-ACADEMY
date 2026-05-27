@@ -42,13 +42,13 @@ export default function AIAssistantDrawer() {
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     } else {
       Animated.timing(slideAnim, {
         toValue: DRAWER_WIDTH,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   }, [isAIOpen]);
@@ -102,9 +102,13 @@ export default function AIAssistantDrawer() {
       <Animated.View 
         style={[
           styles.drawerContainer, 
-          { backgroundColor: bgColor, transform: [{ translateX: slideAnim }] }
+          { backgroundColor: isDark ? '#0f172a' : '#f8fafc', transform: [{ translateX: slideAnim }] }
         ]}
       >
+        <LinearGradient 
+          colors={isDark ? ['#0f172a', '#1e1b4b'] : ['#f8fafc', '#eef2ff']} 
+          style={StyleSheet.absoluteFillObject} 
+        />
         <KeyboardAvoidingView 
           style={styles.container} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

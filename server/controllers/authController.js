@@ -5,6 +5,28 @@ const { generateToken, generateRefreshToken, setCookieToken, clearCookieToken } 
 const { sendWelcomeEmail } = require('../utils/email');
 const jwt = require('jsonwebtoken');
 
+const normalizeBoard = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  const key = raw.toLowerCase().replace(/\s+/g, ' ');
+  const boardMap = {
+    cbse: 'CBSE',
+    'state board': 'State Board',
+    stateboard: 'State Board',
+    'arts college': 'Arts College',
+    artscollege: 'Arts College',
+    'eng college': 'Eng College',
+    engcollege: 'Eng College',
+    tnpsc: 'TNPSC',
+    trb: 'TRB',
+    tet: 'TET',
+  };
+
+  return boardMap[key] || raw;
+};
+
 // ─── Unified Register ───────────────────────────────────────────────────────────
 const register = async (req, res) => {
   try {
@@ -17,6 +39,7 @@ const register = async (req, res) => {
 
     if (role === 'student') {
       const { name, mobile, email, password, grade, course, board } = req.body;
+      const normalizedBoard = normalizeBoard(board);
 
       const userExists = await User.findOne({ mobile });
       if (userExists) {
@@ -30,7 +53,7 @@ const register = async (req, res) => {
         password,
         role: 'student',
         grade,
-        board,
+        board: normalizedBoard,
         firstLogin: true,
         admissionFormFilled: false,
       });
@@ -95,6 +118,9 @@ const register = async (req, res) => {
     }
 
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

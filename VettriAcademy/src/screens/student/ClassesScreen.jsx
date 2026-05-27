@@ -7,6 +7,8 @@ import { Colors, classStatusColors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatScheduledTime, formatDate } from '../../utils/formatters';
 import { fetchSchedules, joinClass, clearJoinResult } from '../../redux/slices/classesSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 export default function ClassesScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -15,6 +17,8 @@ export default function ClassesScreen({ navigation }) {
   const isDark = theme === 'dark';
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -114,7 +118,9 @@ export default function ClassesScreen({ navigation }) {
           keyExtractor={(item) => item._id}
           renderItem={renderClass}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="calendar-outline" size={48} color={Colors.mediumGray} />

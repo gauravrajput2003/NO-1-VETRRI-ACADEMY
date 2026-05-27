@@ -11,6 +11,7 @@ const announcementSchema = new mongoose.Schema(
     isPinned: { type: Boolean, default: false },
     expiresAt: { type: Date },
     isActive: { type: Boolean, default: true },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

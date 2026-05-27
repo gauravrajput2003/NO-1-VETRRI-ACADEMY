@@ -3,7 +3,7 @@ const cron = require('node-cron');
 // Run every minute — check for classes starting in 15 minutes
 const startClassReminderJob = (io) => {
   cron.schedule('* * * * *', async () => {
-    try {
+    try { 
       const ClassSchedule = require('../models/ClassSchedule');
       const Notification = require('../models/Notification');
 

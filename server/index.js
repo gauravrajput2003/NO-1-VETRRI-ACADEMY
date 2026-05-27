@@ -3,10 +3,11 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io'); 
 const helmet = require('helmet');
-const cors = require('cors');
+const cors = require('cors'); 
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const mongoSanitize = require('express-mongo-sanitize');
+const { logDev, warnDev, infoProd, errorCrit } = require('./utils/logger');
   
 const connectDB = require('./config/db');
 const { generalLimiter } = require('./middleware/rateLimiter');
@@ -27,6 +28,9 @@ const demoRoutes = require('./routes/demoRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const downloadRoutes = require('./routes/downloadRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
+const storageRoutes = require('./routes/storageRoutes');
+
 
 // ─── Models for Socket.io ──────────────────────────────────────────────────────
 const ChatMessage = require('./models/ChatMessage');
@@ -94,6 +98,9 @@ app.use('/api/demo', demoRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/downloads', downloadRoutes);
+app.use('/api/pdf', pdfRoutes);
+app.use('/api/storage', storageRoutes);
+
 
 // ─── Public course listing ─────────────────────────────────────────────────────
 app.get('/api/courses', async (req, res) => {
@@ -118,7 +125,8 @@ app.use((req, res) => {
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  errorCrit('[Server] Error:', err.message);
+  logDev(err.stack);
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
@@ -129,7 +137,7 @@ app.use((err, req, res, next) => {
 const onlineUsers = new Map(); // userId → socketId
 
 io.on('connection', (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
+  logDev('Socket connected');
 
   // ─── User identifies + joins rooms ────────────────────────────────────────
   socket.on('user:join', async ({ userId, role }) => {
@@ -145,13 +153,13 @@ io.on('connection', (socket) => {
       await User.findByIdAndUpdate(userId, { isOnline: true });
     } catch {}
 
-    console.log(`👤 User ${userId} (${role}) joined`);
+    logDev('User joined socket room');
   });
 
   // ─── Room management for broadcasts ───────────────────────────────────────
   socket.on('join:room', ({ room }) => {
     socket.join(room);
-    console.log(`📢 Socket ${socket.id} joined room: ${room}`);
+    logDev('Socket joined room');
   });
 
   socket.on('leave:room', ({ room }) => {
@@ -237,7 +245,7 @@ io.on('connection', (socket) => {
         await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
       } catch {}
     }
-    console.log(`❌ Socket disconnected: ${socket.id}`);
+    logDev('Socket disconnected');
   });
 });
 
@@ -250,8 +258,8 @@ const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
   server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    infoProd(`🚀 Server running on http://localhost:${PORT}`);
+    infoProd(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 
   // ─── Start Cron Jobs ────────────────────────────────────────────────────────
@@ -260,9 +268,9 @@ connectDB().then(() => {
     const { startClassReminderJob } = require('./jobs/classReminder');
     startWeeklyTopPerformerJob();
     startClassReminderJob(io);
-    console.log('⏰ Cron jobs started');
+    logDev('⏰ Cron jobs started');
   } catch (err) {
-    console.warn('⚠️ Cron job startup error:', err.message);
+    warnDev('⚠️ Cron job startup error:', err.message);
   }
 });
 

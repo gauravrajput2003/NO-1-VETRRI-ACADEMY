@@ -1,14 +1,22 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import RoleSelectScreen from '../screens/auth/RoleSelectScreen';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import WorkspaceSelectionScreen from '../screens/auth/WorkspaceSelectionScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 export default function AuthNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
+      <Stack.Screen name="RoleSelect">
+        {(props) => (
+          <WorkspaceSelectionScreen
+            onSelectWorkspace={(role) =>
+              props.navigation.navigate('Login', { role })
+            }
+          />
+        )}
+      </Stack.Screen>
       <Stack.Screen name="Login" component={LoginScreen} />
     </Stack.Navigator>
   );

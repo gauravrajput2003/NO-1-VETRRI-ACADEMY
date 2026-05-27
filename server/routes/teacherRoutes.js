@@ -18,6 +18,11 @@ const {
   applyLeave,
   getTeacherLeaves,
 } = require('../controllers/teacherController');
+const {
+  getTeacherCurrentMonthSalary,
+  getTeacherSalaryHistory,
+  downloadSalarySlip,
+} = require('../controllers/salaryController');
 
 // All routes protected — teacher or admin
 router.use(verifyToken, teacherOrAdmin);
@@ -43,6 +48,11 @@ router.post('/attendance', markAttendance);
 
 // Monthly grading
 router.get('/grading/:month/:year', getMonthlyGrading);
+
+// Salary
+router.get('/salary/current-month', getTeacherCurrentMonthSalary);
+router.get('/salary/history', getTeacherSalaryHistory);
+router.get('/salary/:teacherId/:monthYear/slip', downloadSalarySlip);
 
 // Leave
 router.post('/leave', applyLeave);

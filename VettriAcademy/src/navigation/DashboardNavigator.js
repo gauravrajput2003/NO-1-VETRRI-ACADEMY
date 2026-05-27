@@ -13,7 +13,6 @@ import { StudentDashboardScreen } from '../screens/Student/StudentDashboardScree
 import { UsersScreen } from '../screens/Users/UsersScreen';
 import { ScheduleScreen } from '../screens/Schedule/ScheduleScreen';
 import { SalaryScreen } from '../screens/Salary/SalaryScreen';
-import { ChatScreen } from '../screens/Chat/ChatScreen';
 import { ProfileScreen } from '../screens/Profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -48,7 +47,6 @@ export function DashboardNavigator({ userRole = 'admin' }) {
             Users: '👥',
             Schedule: '📅',
             Salary: '💰',
-            Chat: '💬',
             Profile: '👤',
           };
           return (
@@ -66,7 +64,6 @@ export function DashboardNavigator({ userRole = 'admin' }) {
       <Tab.Screen name="Users" component={UsersScreen} />
       <Tab.Screen name="Schedule" component={ScheduleScreen} />
       <Tab.Screen name="Salary" component={SalaryScreen} />
-      <Tab.Screen name="Chat" component={ChatScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

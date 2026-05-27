@@ -9,6 +9,8 @@ import { Shadows } from '../../utils/theme';
 import { formatDate, formatFileSize } from '../../utils/formatters';
 import { fetchTeacherMaterials, toggleLock, uploadMaterial, deleteMaterial, editMaterial } from '../../redux/slices/teacherSlice';
 import { getCoursesMetaAPI } from '../../services/api';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 const typeIcons = { pdf: 'document-text', ppt: 'easel', video: 'videocam', image: 'image' };
 const typeColors = { pdf: '#F44336', ppt: '#FF9800', video: '#2196F3', image: '#4CAF50' };
@@ -45,6 +47,8 @@ export default function TeacherMaterialsScreen() {
   const [description, setDescription] = useState('');
   const [isLocked, setIsLocked] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   useEffect(() => { 
     dispatch(fetchTeacherMaterials());
@@ -284,7 +288,7 @@ export default function TeacherMaterialsScreen() {
           data={filteredMaterials}
           keyExtractor={(item) => item._id}
           renderItem={renderMaterial}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="document-text-outline" size={64} color={Colors.mediumGray} />
@@ -294,6 +298,8 @@ export default function TeacherMaterialsScreen() {
           }
           refreshing={loading && !uploading}
           onRefresh={() => dispatch(fetchTeacherMaterials())}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
         />
       )}
 

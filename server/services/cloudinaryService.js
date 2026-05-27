@@ -2,6 +2,7 @@ const cloudinary = require('../config/cloudinary');
 const { Readable } = require('stream');
 const fs = require('fs');
 const path = require('path');
+const { logDev, warnDev, errorCrit } = require('../utils/logger');
 
 /**
  * PRODUCTION-READY CloudinaryService
@@ -81,15 +82,15 @@ class CloudinaryService {
         ...options,
       };
 
-      console.log(`[Cloudinary] Uploading: ${filename} (${resourceType})`);
+      logDev(`[Cloudinary] Uploading: ${filename} (${resourceType})`);
 
       const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
         if (error) {
-          console.error('[Cloudinary] Upload failed:', error.message);
+          errorCrit('[Cloudinary] Upload failed:', error.message);
           return reject(error);
         }
 
-        console.log(`[Cloudinary] Upload successful: ${result.public_id}`);
+        logDev(`[Cloudinary] Upload successful: ${result.public_id}`);
 
         resolve({
           fileUrl: result.secure_url,
@@ -139,7 +140,7 @@ class CloudinaryService {
         ...options,
       };
 
-      console.log(
+      logDev(
         `[Cloudinary] Streaming upload: ${filename} (${(stats.size / 1024 / 1024).toFixed(2)}MB, ${resourceType})`
       );
 
@@ -150,17 +151,17 @@ class CloudinaryService {
         // Clean up temp file after upload completes (success or failure)
         if (fs.existsSync(filePath)) {
           fs.unlink(filePath, (err) => {
-            if (err) console.error(`[Temp] Failed to clean up: ${filePath}`, err.message);
-            else console.log(`[Temp] Cleaned up: ${filePath}`);
+            if (err) warnDev('[Temp] Failed to clean up temp file:', err.message);
+            else logDev('[Temp] Cleaned up temp file');
           });
         }
 
         if (error) {
-          console.error('[Cloudinary] Stream upload failed:', error.message);
+          errorCrit('[Cloudinary] Stream upload failed:', error.message);
           return reject(error);
         }
 
-        console.log(`[Cloudinary] Stream upload successful: ${result.public_id}`);
+        logDev(`[Cloudinary] Stream upload successful: ${result.public_id}`);
 
         resolve({
           fileUrl: result.secure_url,
@@ -177,7 +178,7 @@ class CloudinaryService {
       readStream.pipe(uploadStream);
 
       readStream.on('error', (err) => {
-        console.error('[Cloudinary] Stream read error:', err.message);
+        errorCrit('[Cloudinary] Stream read error:', err.message);
         reject(err);
       });
     });
@@ -193,14 +194,14 @@ class CloudinaryService {
     try {
       if (!publicId) throw new Error('No public_id provided');
       
-      console.log(`[Cloudinary] Deleting: ${publicId} (${resourceType})`);
+      logDev(`[Cloudinary] Deleting: ${publicId} (${resourceType})`);
       
       await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
       
-      console.log(`[Cloudinary] Deleted: ${publicId}`);
+      logDev(`[Cloudinary] Deleted: ${publicId}`);
       return true;
     } catch (error) {
-      console.error('[Cloudinary] Delete failed:', error.message);
+      errorCrit('[Cloudinary] Delete failed:', error.message);
       return false;
     }
   }
@@ -242,7 +243,7 @@ class CloudinaryService {
 
       return downloadUrl;
     } catch (error) {
-      console.error('[Download] URL generation failed:', error.message);
+      errorCrit('[Download] URL generation failed:', error.message);
       return fileUrl; // Fallback to original URL
     }
   }
@@ -251,10 +252,10 @@ class CloudinaryService {
    * Get all file metadata in a structured format
    * @param {Object} uploadResult - Result from uploadFileFromBuffer or uploadFileFromDisk
    * @returns {Object} Formatted metadata
-   */
-  getMetadata(uploadResult) {
-    return {
-      fileUrl: uploadResult.fileUrl,
+   */ 
+  getMetadata(uploadResult) {  
+    return {  
+      fileUrl: uploadResult.fileUrl, 
       publicId: uploadResult.publicId,
       originalFilename: uploadResult.originalFilename,
       extension: uploadResult.extension,
@@ -269,6 +270,55 @@ class CloudinaryService {
         true
       ),
     };
+  }
+  /**
+   * Generate PDF first-page thumbnail URL using Cloudinary transformations
+   * @param {string} publicId - Cloudinary public_id of the PDF
+   * @param {number} width - Thumbnail width (default 400)
+   * @param {number} height - Thumbnail height (default 560)
+   * @returns {string} Thumbnail URL
+   */
+  getPdfThumbnailUrl(publicId, width = 400, height = 560) {
+    if (!publicId) return '';
+    try {
+      return cloudinary.url(publicId, {
+        resource_type: 'image',
+        format: 'jpg',
+        page: 1,
+        width,
+        height,
+        crop: 'fill',
+        quality: 'auto',
+        fetch_format: 'auto',
+      });
+    } catch (error) {
+      errorCrit('[Cloudinary] Thumbnail generation failed:', error.message);
+      return '';
+    }
+  }
+
+  /**
+   * Generate a time-limited signed URL for secure PDF access
+   * @param {string} publicId - Cloudinary public_id
+   * @param {string} resourceType - Resource type (default 'raw')
+   * @param {number} expiresInSeconds - URL validity duration (default 900 = 15 min)
+   * @returns {string} Signed URL
+   */
+  getSignedUrl(publicId, resourceType = 'raw', expiresInSeconds = 900) {
+    if (!publicId) return '';
+    try {
+      const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+      return cloudinary.url(publicId, {
+        resource_type: resourceType,
+        sign_url: true,
+        type: 'authenticated',
+        expires_at: expiresAt,
+      });
+    } catch (error) {
+      errorCrit('[Cloudinary] Signed URL generation failed:', error.message);
+      // Fallback: return regular URL (still protected by JWT middleware)
+      return cloudinary.url(publicId, { resource_type: resourceType });
+    }
   }
 }
 

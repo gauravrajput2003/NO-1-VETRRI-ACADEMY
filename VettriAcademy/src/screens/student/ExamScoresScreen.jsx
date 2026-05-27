@@ -1,3 +1,4 @@
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -6,8 +7,11 @@ import { Colors, gradeColors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate, formatPercentage, calculateGrade } from '../../utils/formatters';
 import { getStudentScoresAPI } from '../../services/api';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 
 export default function ExamScoresScreen() {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
   const [scores, setScores] = useState([]);
@@ -68,11 +72,11 @@ export default function ExamScoresScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
-      <FlatList
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16}
         data={scores}
         keyExtractor={(item) => item._id}
         renderItem={renderScore}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="stats-chart-outline" size={48} color={Colors.mediumGray} />

@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -9,6 +11,8 @@ import { fetchCourses, addCourse, editCourse } from '../../redux/slices/adminSli
 
 export default function CourseManagementScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { courses, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -51,7 +55,7 @@ export default function CourseManagementScreen() {
         <Text style={styles.addText}>Add Course</Text>
       </TouchableOpacity>
 
-      <FlatList data={courses} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={courses} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
           <TouchableOpacity style={[styles.card, { backgroundColor: cardBg }]} onPress={() => openEdit(item)}>
             <View style={[styles.catBadge, { backgroundColor: (categoryColors[item.category] || Colors.primary) + '18' }]}>
@@ -71,7 +75,7 @@ export default function CourseManagementScreen() {
 
       <Modal visible={showForm} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, paddingBottom: Math.max(40, bottomPadding) }]}> 
             <Text style={[styles.modalTitle, { color: textColor }]}>{editMode ? 'Edit' : 'New'} Course</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Course Title *" placeholderTextColor={Colors.mediumGray} value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} />
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Category (academic/competitive/language)" placeholderTextColor={Colors.mediumGray} value={form.category} onChangeText={(v) => setForm({ ...form, category: v })} />
@@ -105,7 +109,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60 },
   emptyText: { fontSize: 15, marginTop: 12 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, marginBottom: 12 },
   textArea: { height: 80, textAlignVertical: 'top' },

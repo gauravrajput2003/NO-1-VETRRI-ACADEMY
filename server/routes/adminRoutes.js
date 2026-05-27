@@ -21,6 +21,13 @@ const {
   getLiveMonitor,
 } = require('../controllers/leaveController');
 const {
+  getAdminSalaryDashboard,
+  processSalary,
+  processAllSalaries,
+  setTeacherSalaryConfig,
+  getSalaryReports,
+} = require('../controllers/salaryController');
+const {
   getEnquiries,
   updateEnquiryStatus,
 } = require('../controllers/enquiryController');
@@ -99,20 +106,30 @@ router.put('/courses/:id', async (req, res) => {
 router.get('/top-rankers', async (req, res) => {
   try {
     const ExamScore = require('../models/ExamScore');
-    const topRankers = await ExamScore.find()
-      .sort({ score: -1 })
-      .limit(10)
-      .populate('studentId', 'name displayName')
+    // fetch recent published scores and compute percentage server-side
+    const scores = await ExamScore.find({ isPublished: true })
+      .populate('student', 'name displayName')
       .exec();
-    
-    res.json({ 
-      success: true, 
-      topRankers: topRankers.map((r, idx) => ({
+
+    const withPct = scores.map((r) => {
+      const max = r.maxMarks || 100;
+      const obtained = typeof r.marksObtained === 'number' ? r.marksObtained : 0;
+      const pct = max > 0 ? (obtained / max) * 100 : 0;
+      return { raw: r, pct };
+    });
+
+    withPct.sort((a, b) => b.pct - a.pct);
+
+    const top = withPct.slice(0, 10);
+
+    res.json({
+      success: true,
+      topRankers: top.map((item, idx) => ({
         rank: idx + 1,
-        name: r.studentId?.displayName || r.studentId?.name || 'N/A',
-        score: `${r.score}%`,
-        grade: r.grade || 'A'
-      }))
+        name: item.raw.student?.displayName || item.raw.student?.name || 'N/A',
+        score: `${item.pct.toFixed(1)}%`,
+        grade: item.raw.grade || 'A',
+      })),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -126,63 +143,40 @@ router.get('/student-marks', async (req, res) => {
     const ExamScore = require('../models/ExamScore');
     const marks = await ExamScore.find()
       .limit(limit)
-      .populate('studentId', 'name displayName')
+      .populate('student', 'name displayName')
       .sort({ createdAt: -1 })
       .exec();
-    
-    res.json({ success: true, marks });
+
+    // attach percentage to each record to match client expectations
+    const annotated = marks.map((r) => {
+      const max = r.maxMarks || 100;
+      const obtained = typeof r.marksObtained === 'number' ? r.marksObtained : 0;
+      const percentage = max > 0 ? Number(((obtained / max) * 100).toFixed(1)) : 0;
+      return {
+        _id: r._id,
+        student: r.student,
+        subject: r.subject,
+        examTitle: r.examTitle,
+        marksObtained: r.marksObtained,
+        maxMarks: r.maxMarks,
+        percentage,
+        grade: r.grade,
+        examDate: r.examDate,
+        createdAt: r.createdAt,
+      };
+    });
+
+    res.json({ success: true, marks: annotated });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // Salaries
-router.get('/salaries', async (req, res) => {
-  try {
-    const { month, year } = req.query;
-    const SalaryTransaction = require('../models/SalaryTransaction');
-    
-    const query = {};
-    if (month && year) {
-      const startDate = new Date(year, new Date(`${month} 1`).getMonth(), 1);
-      const endDate = new Date(year, new Date(`${month} 1`).getMonth() + 1, 0);
-      query.transactionDate = { $gte: startDate, $lte: endDate };
-    }
-    
-    const salaries = await SalaryTransaction.find(query)
-      .populate('teacherId', 'name displayName email')
-      .sort({ transactionDate: -1 })
-      .exec();
-    
-    res.json({ success: true, salaries });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Salary Reports
-router.get('/salary/reports', async (req, res) => {
-  try {
-    const { period } = req.query; // monthly, yearly, etc.
-    const SalaryTransaction = require('../models/SalaryTransaction');
-    
-    const reports = await SalaryTransaction.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$transactionDate' } },
-          totalPaid: { $sum: '$amount' },
-          count: { $sum: 1 },
-          avgAmount: { $avg: '$amount' }
-        }
-      },
-      { $sort: { _id: -1 } },
-      { $limit: 12 }
-    ]);
-    
-    res.json({ success: true, reports });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+router.get('/salaries', getAdminSalaryDashboard);
+router.post('/salary/process', processSalary);
+router.post('/salary/process-all', processAllSalaries);
+router.post('/teacher/:teacherId/salary-config', setTeacherSalaryConfig);
+router.get('/salary/reports', getSalaryReports);
 
 module.exports = router;

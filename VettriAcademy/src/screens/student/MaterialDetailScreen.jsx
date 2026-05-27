@@ -1,10 +1,12 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 /**
  * ─── MaterialDetailScreen ─────────────────────────────────────────────────────
  * 
  * Shows material details and handles preview/download for all file types.
  * 
  * Preview routing:
- * - PDFs → DocumentViewer (Google Docs viewer in WebView — renders inside app)
+ * - PDFs → PdfViewerScreen (pdf.js in WebView — in-app reading with bookmarks, notes, progress)
  * - Images → In-app native Image preview with zoom
  * - Videos → DocumentViewer (HTML5 video player)
  * - Office docs → DocumentViewer (MS Office Online viewer)
@@ -35,6 +37,7 @@ import {
   FILE_TYPE_ICONS,
 } from '../../utils/fileUtils';
 import { getToken } from '../../services/storage';
+import { getSignedPdfUrlAPI } from '../../services/api';
 
 export default function MaterialDetailScreen({ route, navigation }) {
   const { material } = route.params;
@@ -47,6 +50,8 @@ export default function MaterialDetailScreen({ route, navigation }) {
   }
 
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { currentDownloadUrl, previewLoading, downloadLoading } = useSelector((s) => s.materials);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -108,7 +113,39 @@ export default function MaterialDetailScreen({ route, navigation }) {
         setViewUrl(url);
         break;
 
-      case 'pdf-webview':
+      case 'pdf-webview': {
+        // Route PDFs to the dedicated PdfViewerScreen with signed URL
+        try {
+          const signedRes = await getSignedPdfUrlAPI(material._id);
+          const signedData = signedRes.data;
+          if (signedData.success) {
+            navigation.navigate('PdfViewer', {
+              materialId: material._id,
+              title: material.title,
+              pdfUrl: signedData.url,
+              totalPages: signedData.material?.totalPages || material.totalPages || 0,
+            });
+          } else {
+            // Fallback: use the preview URL
+            navigation.navigate('PdfViewer', {
+              materialId: material._id,
+              title: material.title,
+              pdfUrl: url,
+              totalPages: material.totalPages || 0,
+            });
+          }
+        } catch (signErr) {
+          // Fallback: use preview URL directly
+          navigation.navigate('PdfViewer', {
+            materialId: material._id,
+            title: material.title,
+            pdfUrl: url,
+            totalPages: material.totalPages || 0,
+          });
+        }
+        break;
+      }
+
       case 'office-viewer':
       case 'video-webview':
       case 'text-webview':
@@ -227,7 +264,7 @@ export default function MaterialDetailScreen({ route, navigation }) {
             {downloading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="download-outline" size={24} color="#fff" />}
           </TouchableOpacity>
         </View>
-        <ScrollView
+        <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16}
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
           maximumZoomScale={5}

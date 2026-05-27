@@ -8,6 +8,8 @@ import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate } from '../../utils/formatters';
 import { applyLeave, fetchLeaves } from '../../redux/slices/teacherSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 export default function LeaveScreen() {
   const dispatch = useDispatch();
@@ -25,6 +27,8 @@ export default function LeaveScreen() {
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
   const textSec = isDark ? Colors.textSecondary.dark : Colors.textSecondary.light;
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   useEffect(() => { dispatch(fetchLeaves()); }, []);
 
@@ -70,7 +74,11 @@ export default function LeaveScreen() {
         <Text style={styles.addText}>Apply Leave</Text>
       </TouchableOpacity>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView 
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
+      >
         {loading ? <ActivityIndicator size="large" color={Colors.primary} /> : leaves.length === 0 ? (
           <View style={styles.empty}><Ionicons name="airplane-outline" size={48} color={Colors.mediumGray} /><Text style={[styles.emptyText, { color: textSec }]}>No leave applications</Text></View>
         ) : leaves.map((l) => (

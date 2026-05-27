@@ -1,3 +1,4 @@
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -6,9 +7,12 @@ import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatRelativeTime } from '../../utils/formatters';
 import { fetchConversations } from '../../redux/slices/chatSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 
 export default function ChatListScreen({ navigation }) {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { conversations, loading, unreadCount } = useSelector((s) => s.chat);
   const { user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
@@ -67,11 +71,11 @@ export default function ChatListScreen({ navigation }) {
       {loading ? (
         <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
       ) : (
-        <FlatList
+        <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16}
           data={conversations}
           keyExtractor={(item) => item._id || item.conversationId}
           renderItem={renderConversation}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubbles-outline" size={48} color={Colors.mediumGray} />

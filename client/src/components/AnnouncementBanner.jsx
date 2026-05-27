@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX } from 'react-icons/fi';
-import { getAnnouncements } from '../services/api';
+import { getActiveAnnouncements, markAnnouncementRead } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -32,9 +32,16 @@ export default function AnnouncementBanner() {
 
   const fetchAnnouncements = async () => {
     try {
-      const { data } = await getAnnouncements();
+      const { data } = await getActiveAnnouncements();
       if (data.success) setAnnouncements(data.announcements || []);
     } catch {}
+  };
+
+  const handleDismiss = async (id) => {
+    try {
+      await markAnnouncementRead(id);
+    } catch {}
+    setDismissed((d) => new Set([...d, id]));
   };
 
   const visible = announcements.filter((a) => !dismissed.has(a._id));
@@ -57,7 +64,7 @@ export default function AnnouncementBanner() {
               <p className="text-white/60 text-xs mt-0.5 line-clamp-2">{ann.content}</p>
             </div>
             <button
-              onClick={() => setDismissed((d) => new Set([...d, ann._id]))}
+              onClick={() => handleDismiss(ann._id)}
               className="text-white/30 hover:text-white/60 flex-shrink-0 p-0.5"
             >
               <FiX size={14} />

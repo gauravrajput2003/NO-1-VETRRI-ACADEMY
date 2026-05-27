@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -9,6 +11,8 @@ import { fetchLiveMonitor } from '../../redux/slices/adminSlice';
 
 export default function LiveMonitorScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { liveMonitor, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -30,7 +34,7 @@ export default function LiveMonitorScreen() {
         <Text style={[styles.countText, { color: textSec }]}>{classes.length} class{classes.length !== 1 ? 'es' : ''}</Text>
       </View>
 
-      <FlatList data={classes} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={classes} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: Colors.error }]}>
             <View style={styles.cardTop}>

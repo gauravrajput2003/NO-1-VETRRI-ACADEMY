@@ -1,4 +1,5 @@
 const storageService = require('../services/storageService');
+const { logDev, errorCrit } = require('./logger');
 
 /**
  * PRODUCTION-READY Download Helper
@@ -40,7 +41,7 @@ async function getSecureDownloadUrl(resource, forceDownload = true) {
 
     // S3 backend
     if (storageType === 's3' && s3Bucket && s3Key) {
-      console.log(`[Download] Generating S3 presigned URL: ${s3Key}`);
+      logDev('[Download] Generating S3 presigned URL');
       
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -56,7 +57,7 @@ async function getSecureDownloadUrl(resource, forceDownload = true) {
       });
 
       const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      console.log('[Download] S3 URL generated successfully');
+      logDev('[Download] S3 URL generated successfully');
       return url;
     }
 
@@ -65,9 +66,7 @@ async function getSecureDownloadUrl(resource, forceDownload = true) {
       throw new Error('File URL not available');
     }
 
-    console.log(
-      `[Download] Generating Cloudinary URL for: ${originalFilename || publicId}`
-    );
+    logDev('[Download] Generating Cloudinary URL');
 
     const url = await storageService.getDownloadUrl(
       fileUrl,
@@ -80,10 +79,10 @@ async function getSecureDownloadUrl(resource, forceDownload = true) {
       forceDownload
     );
 
-    console.log('[Download] Cloudinary URL generated successfully');
+    logDev('[Download] Cloudinary URL generated successfully');
     return url;
   } catch (error) {
-    console.error('[Download] Error generating URL:', error.message);
+    errorCrit('[Download] Error generating URL:', error.message);
     throw error;
   }
 }

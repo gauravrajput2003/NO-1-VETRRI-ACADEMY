@@ -116,9 +116,11 @@ export const markAllNotificationsRead = () => api.patch('/notifications/read-all
 
 // ─── Announcements ────────────────────────────────────────────────────────────
 export const getAnnouncements = () => api.get('/announcements');
+export const getActiveAnnouncements = () => api.get('/announcements/active');
 export const createAnnouncement = (data) => api.post('/announcements', data);
 export const updateAnnouncement = (id, data) => api.patch(`/announcements/${id}`, data);
 export const deleteAnnouncement = (id) => api.delete(`/announcements/${id}`);
+export const markAnnouncementRead = (id) => api.post(`/announcements/${id}/read`);
 
 // ─── Demo Bookings ────────────────────────────────────────────────────────────
 export const createDemoBooking = (data) => api.post('/demo', data);
@@ -183,4 +185,11 @@ export const updateEnquiry = (id, data) => api.patch(`/enquiries/${id}`, data);
 export const getAllTeacherGradings = (params) => api.get('/teacher-grading', { params });
 export const submitTeacherGrading = (data) => api.post('/teacher-grading', data);
 
+// ─── Storage - Direct Upload ──────────────────────────────────────────────────
+export const getS3UploadUrl = (data) => api.post('/storage/s3/upload-url', data);
+export const getCloudinaryUploadParams = (data) => api.post('/storage/cloudinary/upload-params', data);
+export const confirmDirectUpload = (data) => api.post('/storage/confirm-upload', data);
+export const getDirectDownloadUrl = (id) => api.get(`/storage/download-url/${id}`);
+
 export default api;
+

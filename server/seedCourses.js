@@ -75,20 +75,21 @@ const COURSES = [
 async function seed() {
   try {
     await mongoose.connect(MONGO_URI);
-    console.log('✅ Connected to MongoDB');
+      const { logDev } = require('./utils/logger');
+      logDev('Connected to MongoDB (seedCourses)');
 
     const existing = await Course.countDocuments();
     if (existing > 0) {
-      console.log(`ℹ️  ${existing} courses already exist. Deleting and re-seeding...`);
+        logDev(`${existing} courses already exist. Deleting and re-seeding...`);
       await Course.deleteMany({});
     }
 
     const inserted = await Course.insertMany(COURSES);
-    console.log(`✅ Successfully seeded ${inserted.length} courses!`);
-    inserted.forEach(c => console.log(`   • ${c.icon} ${c.title} (${c.category})`));
+      logDev(`Successfully seeded ${inserted.length} courses`);
+      logDev('Disconnected. Done');
 
     await mongoose.disconnect();
-    console.log('🔌 Disconnected. Done!');
+    
     process.exit(0);
   } catch (err) {
     console.error('❌ Seed failed:', err.message);

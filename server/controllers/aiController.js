@@ -1,4 +1,5 @@
-const ALLOWED_ROLES = new Set(['student', 'teacher']);
+// Allow admin to use the assistant for testing and administrative tasks
+const ALLOWED_ROLES = new Set(['student', 'teacher', 'admin']);
 
 const normalizeModelName = (value) => {
   if (!value) return '';
@@ -59,7 +60,7 @@ const askVettriAI = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Question is too long. Keep it under 2000 characters.' });
     }
 
-    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const geminiApiKey = (process.env.GEMINI_API_KEY || '').trim();
     if (!geminiApiKey) {
       return res.status(500).json({ success: false, message: 'GEMINI_API_KEY is missing on the server.' });
     }
@@ -68,6 +69,7 @@ const askVettriAI = async (req, res) => {
     const fallbackModels = [
       preferredModel,
       'gemini-2.0-flash',
+      'gemini-1.5-flash',
       'gemini-2.0-flash-lite',
       'gemini-2.5-flash',
     ].filter(Boolean);
@@ -81,6 +83,7 @@ const askVettriAI = async (req, res) => {
 
     for (const model of modelCandidates) {
       let timeout;
+
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
         const abortController = new AbortController();
@@ -106,6 +109,7 @@ const askVettriAI = async (req, res) => {
 
         if (!response.ok) {
           lastProviderMessage = data?.error?.message || 'Gemini request failed.';
+          console.error(`[AI Controller] Gemini model ${model} failed with status ${response.status}:`, data?.error || data);
           continue;
         }
 
@@ -117,9 +121,11 @@ const askVettriAI = async (req, res) => {
         }
       } catch (providerError) {
         lastProviderMessage = providerError?.message || 'Gemini request failed.';
+        console.error(`[AI Controller] Gemini model ${model} threw error:`, providerError);
       } finally {
         if (timeout) clearTimeout(timeout);
       }
+
     }
 
     if (!answer) {

@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Platform, FlatList } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -10,6 +12,8 @@ import { formatDate } from '../../utils/formatters';
 import { applyStudentLeaveAPI, getStudentLeavesAPI } from '../../services/api';
 
 export default function StudentLeaveScreen() {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
   const [loading, setLoading] = useState(true);
@@ -85,7 +89,7 @@ export default function StudentLeaveScreen() {
         <Text style={styles.addText}>Apply Leave</Text>
       </TouchableOpacity>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} contentContainerStyle={{ padding: 16 }}>
         {loading ? (
           <ActivityIndicator size="large" color={Colors.primary} />
         ) : leaves.length === 0 ? (
@@ -106,7 +110,7 @@ export default function StudentLeaveScreen() {
 
       <Modal visible={showForm} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}> 
+          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, paddingBottom: Math.max(40, bottomPadding) }]}> 
             <Text style={[styles.modalTitle, { color: textColor }]}>Apply Leave</Text>
 
             <Text style={[styles.label, { color: textColor }]}>Leave Type</Text>
@@ -246,7 +250,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60 },
   emptyText: { fontSize: 15, marginTop: 12 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   pickerModalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '70%' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '600', marginTop: 12, marginBottom: 6 },

@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -10,6 +12,8 @@ import { fetchAdminLeaves, updateLeave } from '../../redux/slices/adminSlice';
 
 export default function AdminLeavesScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { leaves, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -56,7 +60,7 @@ export default function AdminLeavesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
-      <FlatList data={leaves} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={leaves} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.cardHeader}>

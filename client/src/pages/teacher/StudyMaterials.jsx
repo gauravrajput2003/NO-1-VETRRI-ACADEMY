@@ -2,11 +2,13 @@ import { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { FiUpload, FiToggleLeft, FiToggleRight, FiFileText, FiVideo } from 'react-icons/fi';
+import { performDirectUploadFlow } from '../../services/directUpload';
 
 export default function StudyMaterials() {
   const [materials, setMaterials] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState('');
   const fileRef = useRef();
   const [form, setForm] = useState({ title: '', subject: '', grade: '', lockedForAll: true });
@@ -21,15 +23,23 @@ export default function StudyMaterials() {
     const file = fileRef.current?.files[0];
     if (!file) { toast.error('Select a file'); return; }
     setLoading(true);
+    setUploadProgress(0);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-      const res = await api.post('/teacher/materials', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      if (res.data.success) { toast.success('Material uploaded!'); setMaterials(prev => [res.data.material, ...prev]); fileRef.current.value = ''; }
-    } catch (e) { toast.error(e.response?.data?.message || 'Upload failed'); }
-    finally { setLoading(false); }
+      const material = await performDirectUploadFlow(file, form, 'cloudinary', (progress) => {
+        setUploadProgress(progress);
+      });
+      toast.success('Material uploaded!');
+      setMaterials(prev => [material, ...prev]);
+      fileRef.current.value = '';
+      setForm({ title: '', subject: '', grade: '', lockedForAll: true });
+    } catch (e) {
+      toast.error(e.message || 'Upload failed');
+    } finally {
+      setLoading(false);
+      setUploadProgress(0);
+    }
   };
+
 
   const toggleLock = async (matId, studentId, unlock) => {
     try {
@@ -61,8 +71,19 @@ export default function StudyMaterials() {
             <input ref={fileRef} type="file" accept=".pdf,.ppt,.pptx,.mp4,.webm,.jpg,.png,.jpeg" className="input-field py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-gold/20 file:text-gold file:text-sm cursor-pointer" />
           </div>
           <button type="submit" disabled={loading} className="btn-primary py-2.5 px-6 flex items-center gap-2">
-            {loading ? <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" /> : <FiUpload size={16} />} Upload to S3
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Uploading {uploadProgress}%</span>
+              </>
+            ) : (
+              <>
+                <FiUpload size={16} />
+                <span>Upload Material</span>
+              </>
+            )}
           </button>
+
         </form>
       </div>
 

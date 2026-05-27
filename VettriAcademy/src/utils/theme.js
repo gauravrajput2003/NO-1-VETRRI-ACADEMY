@@ -1,4 +1,5 @@
 import { Colors } from './colors';
+import { Platform } from 'react-native';
 
 // ─── Typography ────────────────────────────────────────────────────────────────
 export const Typography = {
@@ -32,28 +33,26 @@ export const BorderRadius = {
 };
 
 // ─── Shadows ───────────────────────────────────────────────────────────────────
+const makeShadow = ({ y, blur, opacity, elevation }) => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: `0px ${y}px ${blur}px rgba(0, 0, 0, ${opacity})`,
+    };
+  }
+
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: y },
+    shadowOpacity: opacity,
+    shadowRadius: blur,
+    elevation,
+  };
+};
+
 export const Shadows = {
-  light: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  medium: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  heavy: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
+  light: makeShadow({ y: 2, blur: 8, opacity: 0.1, elevation: 3 }),
+  medium: makeShadow({ y: 4, blur: 12, opacity: 0.15, elevation: 5 }),
+  heavy: makeShadow({ y: 6, blur: 16, opacity: 0.2, elevation: 8 }),
 };
 
 // ─── Theme Objects ─────────────────────────────────────────────────────────────

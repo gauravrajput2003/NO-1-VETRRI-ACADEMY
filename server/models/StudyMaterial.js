@@ -27,6 +27,10 @@ const studyMaterialSchema = new mongoose.Schema(
     fileSize: { type: Number }, // bytes
     mimeType: { type: String }, // MIME type for content-type headers
 
+    // PDF-specific fields
+    totalPages: { type: Number, default: 0 },
+    thumbnailUrl: { type: String, default: '' },
+
     // Access control — per student/batch
     // If lockedForAll = true, locked for everyone by default
     lockedForAll: { type: Boolean, default: true },

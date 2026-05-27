@@ -6,7 +6,6 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  FlatList,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatCard } from '../../components/StatCard';
@@ -127,20 +126,16 @@ export function AdminDashboardScreen({ navigation }) {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Management</Text>
           <View style={styles.mgmtGrid}>
-            <FlatList
-              data={managementCards}
-              numColumns={2}
-              scrollEnabled={false}
-              keyExtractor={(item, index) => `mgmt-${index}`}
-              renderItem={({ item }) => (
+            {managementCards.map((item, index) => (
+              <View key={`mgmt-${index}`} style={styles.mgmtCardWrap}>
                 <MgmtCard
                   icon={item.icon}
                   title={item.title}
                   number={item.number}
                   onPress={() => navigation.navigate('Users', { tab: item.title })}
                 />
-              )}
-            />
+              </View>
+            ))}
           </View>
         </View>
 

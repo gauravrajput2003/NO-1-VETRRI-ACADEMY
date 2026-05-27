@@ -221,8 +221,8 @@ export const changePasswordAPI = (currentPassword, newPassword) =>
   api.patch('/profile/password', { currentPassword, newPassword });
 
 // Announcements
-export const getAnnouncementsAPI = () =>
-  api.get('/announcements');
+export const getAnnouncementsAPI = (params) =>
+  api.get('/announcements', { params });
 
 // Courses (public)
 export const getCoursesAPI = () =>
@@ -510,6 +510,12 @@ export const updateAnnouncementAPI = (id, data) =>
 export const deleteAnnouncementAPI = (id) =>
   api.delete(`/announcements/${id}`);
 
+export const getActiveAnnouncementsAPI = () =>
+  api.get('/announcements/active');
+
+export const markAnnouncementReadAPI = (id) =>
+  api.post(`/announcements/${id}/read`);
+
 // Class scheduling (admin)
 export const createScheduleAPI = (data) =>
   api.post('/classes/schedule', data);
@@ -538,5 +544,60 @@ export const getDownloadResourcesAPI = (params) =>
 
 export const getNcertResourcesAPI = (params) =>
   api.get('/downloads/ncert', { params });
+
+// ─── PDF Module ────────────────────────────────────────────────────────────────
+
+// PDF Progress
+export const savePdfProgressAPI = (data) =>
+  api.post('/pdf/progress', data);
+
+export const getPdfProgressAPI = (materialId) =>
+  api.get(`/pdf/progress/${materialId}`);
+
+// PDF Bookmarks
+export const addBookmarkAPI = (data) =>
+  api.post('/pdf/bookmarks', data);
+
+export const removeBookmarkAPI = (id) =>
+  api.delete(`/pdf/bookmarks/${id}`);
+
+export const getMaterialBookmarksAPI = (materialId) =>
+  api.get(`/pdf/bookmarks/${materialId}`);
+
+export const getAllBookmarksAPI = () =>
+  api.get('/pdf/bookmarks/all');
+
+// PDF Notes
+export const addNoteAPI = (data) =>
+  api.post('/pdf/notes', data);
+
+export const updateNoteAPI = (id, data) =>
+  api.put(`/pdf/notes/${id}`, data);
+
+export const deleteNoteAPI = (id) =>
+  api.delete(`/pdf/notes/${id}`);
+
+export const getMaterialNotesAPI = (materialId) =>
+  api.get(`/pdf/notes/${materialId}`);
+
+export const getPageNotesAPI = (materialId, page) =>
+  api.get(`/pdf/notes/${materialId}/${page}`);
+
+// PDF Analytics
+export const trackPdfOpenAPI = (data) =>
+  api.post('/pdf/analytics/open', data);
+
+export const trackPdfCloseAPI = (data) =>
+  api.post('/pdf/analytics/close', data);
+
+export const getTeacherPdfAnalyticsAPI = (params) =>
+  api.get('/pdf/analytics/teacher', { params });
+
+export const getMaterialAnalyticsAPI = (materialId) =>
+  api.get(`/pdf/analytics/material/${materialId}`);
+
+// Signed PDF URL
+export const getSignedPdfUrlAPI = (materialId) =>
+  api.get(`/pdf/signed-url/${materialId}`);
 
 export default api;

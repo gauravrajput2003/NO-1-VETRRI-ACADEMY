@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, ActivityIndicator, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -10,6 +12,8 @@ import { fetchAdminFees, updateFee } from '../../redux/slices/adminSlice';
 
 export default function FeeManagementScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { fees, feeSummary, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -76,7 +80,7 @@ export default function FeeManagementScreen() {
         <Text style={[styles.revLabel, { color: textSec }]}>Collection Rate</Text>
         <Text style={[styles.revAmount, { color: Colors.primary }]}>{collectionRate}</Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {filterTabs.map((t) => (
           <TouchableOpacity key={t} style={[styles.filterChip, filter === t && styles.filterActive]} onPress={() => setFilter(t)}>
             <Text style={[styles.filterText, filter === t && { color: Colors.white }]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
@@ -88,7 +92,7 @@ export default function FeeManagementScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}> 
-      <FlatList data={fees} keyExtractor={(i) => i._id} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={fees} keyExtractor={(i) => i._id} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Math.max(24, bottomPadding) }}
         ListHeaderComponent={renderHeader}
         renderItem={({ item }) => (
           <View style={[styles.feeCard, { backgroundColor: cardBg }]}>
@@ -114,7 +118,7 @@ export default function FeeManagementScreen() {
 
       <Modal visible={!!editModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, paddingBottom: Math.max(40, bottomPadding) }]}> 
             <Text style={[styles.modalTitle, { color: textColor }]}>Record Payment</Text>
             <Text style={[styles.modalSub, { color: textSec }]}>{editModal?.student?.name} — Due {formatCurrency(editModal?.dueAmount || editModal?.amount)} · Remaining {formatCurrency(editModal?.remainingAmount || 0)}</Text>
             <Text style={[styles.label, { color: textColor }]}>Amount Paid</Text>
@@ -169,7 +173,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60 },
   emptyText: { fontSize: 15, marginTop: 12 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold' },
   modalSub: { fontSize: 14, marginTop: 4, marginBottom: 12 },
   label: { fontSize: 14, fontWeight: '600', marginTop: 12, marginBottom: 6 },

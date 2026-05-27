@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { fetchGrading } from '../../redux/slices/teacherSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 export default function MonthlyReportScreen() {
   const dispatch = useDispatch();
@@ -16,6 +18,8 @@ export default function MonthlyReportScreen() {
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
   const textSec = isDark ? Colors.textSecondary.dark : Colors.textSecondary.light;
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const now = new Date();
   useEffect(() => {
@@ -39,7 +43,12 @@ export default function MonthlyReportScreen() {
   const totalScore = g?.totalScore || 0;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: bgColor }]} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: bgColor }]} 
+      contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
+      onScroll={onTabBarScroll}
+      scrollEventThrottle={16}
+    >
       {!g ? (
         <View style={styles.empty}>
           <Ionicons name="document-outline" size={48} color={Colors.mediumGray} />

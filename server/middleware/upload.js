@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const cloudinary = require('../config/cloudinary');
 const { Readable } = require('stream');
+const { logDev, warnDev, errorCrit } = require('../utils/logger');
 
 /**
  * PRODUCTION-READY Multer Configuration
@@ -50,10 +51,10 @@ const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     try {
       const tempDir = ensureTempDir();
-      console.log(`[Multer] Storing file to: ${tempDir}`);
+      logDev('[Multer] Storing file to temp directory');
       cb(null, tempDir);
     } catch (error) {
-      console.error('[Multer] Disk storage error:', error);
+      errorCrit('[Multer] Disk storage error:', error.message);
       cb(error);
     }
   },
@@ -61,7 +62,7 @@ const diskStorage = multer.diskStorage({
     // Generate unique filename: <timestamp>-<random>-<originalname>
     // Preserves original name for Cloudinary metadata
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
-    console.log(`[Multer] File saved as: ${uniqueName}`);
+    logDev('[Multer] File saved');
     cb(null, uniqueName);
   },
 });
@@ -196,10 +197,10 @@ const uploadVideo = multer({
     const mime = (file.mimetype || '').toLowerCase();
     const isVideo = mime.startsWith('video/') || mime === 'application/octet-stream';
     if (!isVideo) {
-      console.warn('[uploadVideo] Rejected MIME type:', mime);
+      warnDev('[uploadVideo] Rejected MIME type:', mime);
       return cb(new Error(`Only video files allowed. Got: ${mime}`));
     }
-    console.log('[uploadVideo] Accepted MIME type:', mime);
+    logDev('[uploadVideo] Accepted MIME type:', mime);
     cb(null, true);
   },
 });

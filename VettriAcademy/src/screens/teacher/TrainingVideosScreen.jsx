@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { getTrainingVideosAPI, markVideoCompleteAPI, getIncompleteMandatoryCountAPI } from '../../services/api';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 const CATEGORIES = [
   { key: 'all', label: 'All', icon: 'grid-outline' },
@@ -84,6 +86,8 @@ export default function TrainingVideosScreen({ navigation }) {
   const [mandatoryLeft, setMandatoryLeft] = useState(0);
   const [marking, setMarking] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const bg = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -198,15 +202,17 @@ export default function TrainingVideosScreen({ navigation }) {
         <TextInput style={[styles.searchIn, { color: txt }]} placeholder="Search videos..." placeholderTextColor={Colors.mediumGray} value={search} onChangeText={setSearch} />
         {search ? <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={Colors.mediumGray} /></TouchableOpacity> : null}
       </View>
-      <FlatList data={CATEGORIES} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(i) => i.key} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
-        renderItem={({ item: c }) => {
+      <View style={{ height: 44, marginBottom: 4 }}>
+        <FlatList data={CATEGORIES} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(i) => i.key} contentContainerStyle={{ paddingHorizontal: 16 }}
+          renderItem={({ item: c }) => {
           const a = category === c.key; const cc2 = getCatColor(c.key);
           return (<TouchableOpacity style={[styles.fChip, a && { backgroundColor: cc2, borderColor: cc2 }, !a && { borderColor: isDark ? '#30475E' : '#E0E0E0' }]} onPress={() => setCategory(c.key)}>
             <Ionicons name={c.icon} size={13} color={a ? '#fff' : cc2} style={{ marginRight: 4 }} />
             <Text style={[styles.fText, a && { color: '#fff' }, !a && { color: cc2 }]}>{c.label}</Text>
           </TouchableOpacity>);
         }} />
-      <FlatList data={filtered} keyExtractor={(i) => i._id} renderItem={renderItem} contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 32 }}
+      </View>
+      <FlatList data={filtered} keyExtractor={(i) => i._id} renderItem={renderItem} contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: bottomPadding }}
         ListHeaderComponent={
           <>
             {inProgress.length > 0 && category === 'all' && !search && (
@@ -263,7 +269,10 @@ export default function TrainingVideosScreen({ navigation }) {
           </>
         }
         ListEmptyComponent={<View style={styles.empty}><Ionicons name="videocam-off-outline" size={56} color={Colors.mediumGray} /><Text style={[styles.emptyTitle, { color: txt }]}>No Videos Found</Text><Text style={[{ color: txtSec, fontSize: 13, marginTop: 4 }]}>{search ? 'Try different keywords' : 'No training videos yet'}</Text></View>}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} colors={[Colors.primary]} />} />
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} colors={[Colors.primary]} />} 
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
+      />
     </View>
   );
 }

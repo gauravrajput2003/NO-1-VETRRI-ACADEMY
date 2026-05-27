@@ -1,11 +1,8 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
-import { Colors } from '../utils/colors';
-import { Shadows } from '../utils/theme';
-import { useBottomTabBarStyle } from './useBottomTabBarStyle';
 
 // Admin Screens
 import AdminDashboard from '../screens/admin/DashboardScreen';
@@ -21,10 +18,8 @@ import ClassSchedulerScreen from '../screens/admin/ClassSchedulerScreen';
 import EnquiriesScreen from '../screens/admin/EnquiriesScreen';
 import AdminMaterialsScreen from '../screens/admin/AdminMaterialsScreen';
 import AdminTrainingVideosScreen from '../screens/admin/AdminTrainingVideosScreen';
+import StudentMarksScreen from '../screens/admin/StudentMarksScreen';
 
-// Shared Screens
-import ChatListScreen from '../screens/student/ChatListScreen';
-import ChatRoomScreen from '../screens/student/ChatRoomScreen';
 import NotificationsScreen from '../screens/common/NotificationsScreen';
 import SettingsScreen from '../screens/common/SettingsScreen';
 import ProfileScreen from '../screens/student/ProfileScreen';
@@ -32,8 +27,12 @@ import DownloadCenterScreen from '../screens/common/DownloadCenterScreen';
 import NcertViewerScreen from '../screens/common/NcertViewerScreen';
 import DocumentViewerScreen from '../screens/common/DocumentViewerScreen';
 import HeaderActions from '../components/HeaderActions';
+import CustomTabBar from '../components/CustomTabBar';
+import { TabBarVisibilityProvider } from '../context/TabBarVisibilityContext';
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
+
+const PINK = '#FF4FA3';
 
 // ─── Stack Navigators ───────────────────────────────────────────────────────────
 
@@ -54,6 +53,7 @@ function HomeStack() {
       <Stack.Screen name="Enquiries" component={EnquiriesScreen} options={{ headerShown: true, title: 'Enquiries' }} />
       <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} options={{ headerShown: true, title: 'Manage Materials' }} />
       <Stack.Screen name="AdminTrainingVideos" component={AdminTrainingVideosScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="StudentMarks" component={StudentMarksScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Downloads" component={DownloadCenterScreen} options={{ headerShown: true, title: 'Download Center' }} />
       <Stack.Screen name="NcertViewer" component={NcertViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} options={{ headerShown: false }} />
@@ -79,15 +79,6 @@ function ScheduleStack() {
   );
 }
 
-function ChatStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
-      <Stack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Messages' }} />
-      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={({ route }) => ({ title: route.params?.otherUser?.displayName || route.params?.otherUser?.name || 'Chat' })} />
-    </Stack.Navigator>
-  );
-}
-
 function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
@@ -98,46 +89,30 @@ function ProfileStack() {
   );
 }
 
+// ─── Tab icon definitions ────────────────────────────────────────────────────
+const ADMIN_TAB_CFG = {
+  Home:     { active: 'home',     inactive: 'home-outline'     },
+  Users:    { active: 'people',   inactive: 'people-outline'   },
+  Schedule: { active: 'calendar', inactive: 'calendar-outline' },
+  Salary:   { active: 'cash',     inactive: 'cash-outline'     },
+  Profile:  { active: 'person',   inactive: 'person-outline'   },
+};
+
 // ─── Tab Navigator ──────────────────────────────────────────────────────────────
 
 export default function AdminNavigator() {
-  const theme = useSelector((s) => s.ui.theme);
-  const isDark = theme === 'dark';
-  const { unreadCount } = useSelector((s) => s.chat);
-  const tabBarStyles = useBottomTabBarStyle({
-    backgroundColor: isDark ? Colors.navy : Colors.white,
-    shadowStyle: Shadows.light,
-  });
-
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        lazy: false,
-        tabBarShowLabel: false,
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          switch (route.name) {
-            case 'Home': iconName = focused ? 'grid' : 'grid-outline'; break;
-            case 'Users': iconName = focused ? 'people' : 'people-outline'; break;
-            case 'Schedule': iconName = focused ? 'calendar' : 'calendar-outline'; break;
-            case 'Salary': iconName = focused ? 'cash' : 'cash-outline'; break;
-            case 'Chat': iconName = focused ? 'chatbubbles' : 'chatbubbles-outline'; break;
-            case 'Profile': iconName = focused ? 'person' : 'person-outline'; break;
-          }
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.mediumGray,
-        ...tabBarStyles,
-      })}
-    >
-      <Tab.Screen name="Home" component={HomeStack} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Users" component={ManageStack} options={{ tabBarLabel: 'Users' }} />
-      <Tab.Screen name="Schedule" component={ScheduleStack} options={{ tabBarLabel: 'Schedule' }} />
-      <Tab.Screen name="Salary" component={SalaryManagementScreen} options={{ tabBarLabel: 'Salary' }} />
-      <Tab.Screen name="Chat" component={ChatStack} options={{ tabBarLabel: 'Chat', tabBarBadge: unreadCount > 0 ? unreadCount : undefined }} />
-      <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: 'Profile' }} />
-    </Tab.Navigator>
+    <TabBarVisibilityProvider>
+      <Tab.Navigator
+        screenOptions={{ headerShown: false }}
+        tabBar={(props) => <CustomTabBar {...props} iconConfig={ADMIN_TAB_CFG} />}
+      >
+        <Tab.Screen name="Home" component={HomeStack} />
+        <Tab.Screen name="Users" component={ManageStack} />
+        <Tab.Screen name="Schedule" component={ScheduleStack} />
+        <Tab.Screen name="Salary" component={SalaryManagementScreen} />
+        <Tab.Screen name="Profile" component={ProfileStack} />
+      </Tab.Navigator>
+    </TabBarVisibilityProvider>
   );
 }

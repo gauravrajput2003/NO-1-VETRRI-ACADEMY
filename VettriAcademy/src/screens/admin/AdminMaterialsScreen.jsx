@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -13,6 +15,8 @@ const typeColors = { pdf: '#F44336', ppt: '#FF9800', video: '#2196F3', image: '#
 
 export default function AdminMaterialsScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { materials, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -111,11 +115,11 @@ export default function AdminMaterialsScreen() {
       {loading ? (
         <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
       ) : (
-        <FlatList
+        <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16}
           data={filteredMaterials}
           keyExtractor={(item) => item._id}
           renderItem={renderMaterial}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(24, bottomPadding) }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="document-text-outline" size={64} color={Colors.mediumGray} />

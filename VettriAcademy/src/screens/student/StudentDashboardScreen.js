@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -16,6 +18,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { Colors } from '../../utils/colors';
 
 export function StudentDashboardScreen({ navigation }) {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const [progressValue] = useState(0.78);
   const [attendanceValue] = useState(0.92);
 
@@ -64,9 +68,9 @@ export function StudentDashboardScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
       >
         {/* Header */}
         <View style={styles.header}>

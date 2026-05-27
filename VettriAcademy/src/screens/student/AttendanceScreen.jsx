@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -8,6 +10,8 @@ import { formatDate, formatPercentage } from '../../utils/formatters';
 import { getStudentClassAttendanceAPI } from '../../services/api';
 
 export default function AttendanceScreen() {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -44,7 +48,7 @@ export default function AttendanceScreen() {
   const statusIcons = { present: 'checkmark-circle', absent: 'close-circle', late: 'time' };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: bgColor }]}>
+    <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} style={[styles.container, { backgroundColor: bgColor }]}>
       {/* Summary */}
       <View style={[styles.summaryCard, { backgroundColor: cardBg }]}>
         <Text style={[styles.summaryTitle, { color: textColor }]}>This Month's Summary</Text>

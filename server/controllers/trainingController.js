@@ -2,6 +2,7 @@ const TrainingVideo = require('../models/TrainingVideo');
 const TrainingVideoProgress = require('../models/TrainingVideoProgress');
 const User = require('../models/User');
 const cloudinary = require('../config/cloudinary');
+const { logDev, warnDev, errorCrit } = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -20,8 +21,7 @@ const cleanupTempFile = (filePath) => {
 const uploadTrainingVideo = async (req, res) => {
   let tempFilePath = req.file?.path;
   try {
-    console.log('[uploadTrainingVideo] req.file:', req.file ? { name: req.file.originalname, mime: req.file.mimetype, size: req.file.size, path: req.file.path } : null);
-    console.log('[uploadTrainingVideo] req.body keys:', Object.keys(req.body || {}));
+    logDev('[uploadTrainingVideo] Upload request received');
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file received by server. Ensure Content-Type is multipart/form-data and field name is "video".' });
@@ -68,7 +68,7 @@ const uploadTrainingVideo = async (req, res) => {
     res.status(201).json({ success: true, video });
   } catch (error) {
     cleanupTempFile(tempFilePath);
-    console.error('[uploadTrainingVideo]', error);
+    errorCrit('[uploadTrainingVideo]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -104,7 +104,7 @@ const uploadTrainingVideoByUrl = async (req, res) => {
 
     res.status(201).json({ success: true, video });
   } catch (error) {
-    console.error('[uploadTrainingVideoByUrl]', error);
+    errorCrit('[uploadTrainingVideoByUrl]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -141,7 +141,7 @@ const getAllVideosAdmin = async (req, res) => {
 
     res.json({ success: true, videos: videosWithStats, total: videos.length });
   } catch (error) {
-    console.error('[getAllVideosAdmin]', error);
+    errorCrit('[getAllVideosAdmin]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -166,7 +166,7 @@ const editTrainingVideo = async (req, res) => {
     await video.save();
     res.json({ success: true, video });
   } catch (error) {
-    console.error('[editTrainingVideo]', error);
+    errorCrit('[editTrainingVideo]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -182,7 +182,7 @@ const toggleVideoStatus = async (req, res) => {
 
     res.json({ success: true, isActive: video.isActive, message: `Video ${video.isActive ? 'activated' : 'deactivated'}.` });
   } catch (error) {
-    console.error('[toggleVideoStatus]', error);
+    errorCrit('[toggleVideoStatus]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -200,7 +200,7 @@ const reorderVideos = async (req, res) => {
 
     res.json({ success: true, message: 'Videos reordered.' });
   } catch (error) {
-    console.error('[reorderVideos]', error);
+    errorCrit('[reorderVideos]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -238,7 +238,7 @@ const getTrainingVideos = async (req, res) => {
 
     res.json({ success: true, videos: videosWithProgress });
   } catch (error) {
-    console.error('[getTrainingVideos]', error);
+    errorCrit('[getTrainingVideos]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -329,7 +329,7 @@ const deleteTrainingVideo = async (req, res) => {
       try {
         await cloudinary.uploader.destroy(video.cloudinaryPublicId, { resource_type: 'video' });
       } catch (e) {
-        console.warn('[deleteTrainingVideo] Cloudinary delete failed:', e.message);
+        warnDev('[deleteTrainingVideo] Cloudinary delete failed:', e.message);
       }
     }
 
@@ -338,7 +338,7 @@ const deleteTrainingVideo = async (req, res) => {
 
     res.json({ success: true, message: 'Training video deleted.' });
   } catch (error) {
-    console.error('[deleteTrainingVideo]', error);
+    errorCrit('[deleteTrainingVideo]', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Modal, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +34,8 @@ const emptyConfig = {
 };
 
 export default function SalaryManagementScreen() {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboard, setDashboard] = useState(null);
@@ -182,7 +186,7 @@ export default function SalaryManagementScreen() {
 
       <Modal visible={!!activeTeacher} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalSheet} contentContainerStyle={{ padding: 20 }}>
+          <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} style={styles.modalSheet} contentContainerStyle={{ padding: 20 }}>
             <Text style={styles.modalTitle}>Salary Config - {activeTeacher?.teacherName}</Text>
             {[
               ['Base Salary', 'baseSalary'],

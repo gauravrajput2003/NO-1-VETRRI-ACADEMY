@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Modal, FlatList } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -11,6 +13,8 @@ import { formatDate } from '../../utils/formatters';
 
 export default function AnnouncementsScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
   const [showForm, setShowForm] = useState(false);
@@ -53,7 +57,7 @@ export default function AnnouncementsScreen() {
         <Text style={styles.createText}>New Announcement</Text>
       </TouchableOpacity>
 
-      <FlatList data={announcements} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={announcements} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.cardHeader}>
@@ -80,7 +84,7 @@ export default function AnnouncementsScreen() {
 
       <Modal visible={showForm} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, paddingBottom: Math.max(40, bottomPadding) }]}> 
             <Text style={[styles.modalTitle, { color: textColor }]}>New Announcement</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Title" placeholderTextColor={Colors.mediumGray} value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} />
             <TextInput style={[styles.input, styles.textArea, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Content" placeholderTextColor={Colors.mediumGray} multiline value={form.content} onChangeText={(v) => setForm({ ...form, content: v })} />
@@ -123,7 +127,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60 },
   emptyText: { fontSize: 15, marginTop: 12 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, marginBottom: 12 },
   textArea: { height: 100, textAlignVertical: 'top' },

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
+import { warnDev } from '../utils/logger';
 
 // ─── Token Management ──────────────────────────────────────────────────────────
 
@@ -7,7 +8,7 @@ export const setToken = async (token) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
   } catch (error) {
-    console.error('Error saving token:', error);
+    warnDev('Error saving token:', error.message);
   }
 };
 
@@ -15,7 +16,7 @@ export const getToken = async () => {
   try {
     return await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
   } catch (error) {
-    console.error('Error getting token:', error);
+    warnDev('Error getting token:', error.message);
     return null;
   }
 };
@@ -24,7 +25,7 @@ export const removeToken = async () => {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
   } catch (error) {
-    console.error('Error removing token:', error);
+    warnDev('Error removing token:', error.message);
   }
 };
 
@@ -34,7 +35,7 @@ export const setRefreshToken = async (token) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
   } catch (error) {
-    console.error('Error saving refresh token:', error);
+    warnDev('Error saving refresh token:', error.message);
   }
 };
 
@@ -42,7 +43,7 @@ export const getRefreshToken = async () => {
   try {
     return await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
   } catch (error) {
-    console.error('Error getting refresh token:', error);
+    warnDev('Error getting refresh token:', error.message);
     return null;
   }
 };
@@ -51,7 +52,7 @@ export const removeRefreshToken = async () => {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   } catch (error) {
-    console.error('Error removing refresh token:', error);
+    warnDev('Error removing refresh token:', error.message);
   }
 };
 
@@ -61,7 +62,7 @@ export const setUserData = async (user) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   } catch (error) {
-    console.error('Error saving user data:', error);
+    warnDev('Error saving user data:', error.message);
   }
 };
 
@@ -70,7 +71,7 @@ export const getUserData = async () => {
     const data = await AsyncStorage.getItem(STORAGE_KEYS.USER);
     return data ? JSON.parse(data) : null;
   } catch (error) {
-    console.error('Error getting user data:', error);
+    warnDev('Error getting user data:', error.message);
     return null;
   }
 };
@@ -85,7 +86,7 @@ export const clearAuthData = async () => {
       STORAGE_KEYS.USER,
     ]);
   } catch (error) {
-    console.error('Error clearing auth data:', error);
+    warnDev('Error clearing auth data:', error.message);
   }
 };
 
@@ -95,7 +96,7 @@ export const setThemePreference = async (theme) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.THEME, theme);
   } catch (error) {
-    console.error('Error saving theme:', error);
+    warnDev('Error saving theme:', error.message);
   }
 };
 

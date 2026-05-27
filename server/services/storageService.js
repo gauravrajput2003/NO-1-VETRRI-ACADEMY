@@ -161,6 +161,33 @@ class StorageService {
     }
     return uploadResult;
   }
+  /**
+   * Generate PDF first-page thumbnail URL
+   * @param {string} publicId - Cloudinary public_id
+   * @param {number} width - Width (default 400)
+   * @param {number} height - Height (default 560)
+   * @returns {string} Thumbnail URL
+   */
+  getPdfThumbnailUrl(publicId, width = 400, height = 560) {
+    if (typeof cloudinaryService.getPdfThumbnailUrl === 'function') {
+      return cloudinaryService.getPdfThumbnailUrl(publicId, width, height);
+    }
+    return '';
+  }
+
+  /**
+   * Generate time-limited signed URL
+   * @param {string} publicId - Cloudinary public_id
+   * @param {string} resourceType - Resource type
+   * @param {number} expiresInSeconds - Expiry duration
+   * @returns {string} Signed URL
+   */
+  getSignedUrl(publicId, resourceType = 'raw', expiresInSeconds = 900) {
+    if (typeof cloudinaryService.getSignedUrl === 'function') {
+      return cloudinaryService.getSignedUrl(publicId, resourceType, expiresInSeconds);
+    }
+    return '';
+  }
 }
 
 module.exports = new StorageService();

@@ -13,6 +13,8 @@ import { getDownloadResourcesAPI, getNcertResourcesAPI } from '../../services/ap
 import { checkBlockedSite, downloadFileToCache, getMimeType } from '../../utils/fileUtils';
 import { API_BASE_URL } from '../../utils/constants';
 import { getToken } from '../../services/storage';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 const GRADES = ['All', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
@@ -40,6 +42,8 @@ export default function DownloadCenterScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [grade, setGrade] = useState('All');
   const [downloading, setDownloading] = useState(null);
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const bg = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -156,8 +160,42 @@ export default function DownloadCenterScreen({ navigation }) {
     const tc = typeColors[item.type] || Colors.primary;
     const ti = typeIcons[item.type] || 'document';
     const isDownloading = downloading === item._id;
+
+    const handlePreview = async () => {
+      // PDFs → open in PdfViewerScreen
+      if (item.type === 'pdf' && item._id) {
+        try {
+          const { getSignedPdfUrlAPI } = require('../../services/api');
+          const res = await getSignedPdfUrlAPI(item._id);
+          const pdfUrl = res.data?.success ? res.data.url : item.fileUrl;
+          navigation.navigate('PdfViewer', {
+            materialId: item._id,
+            title: item.title,
+            pdfUrl,
+            totalPages: res.data?.material?.totalPages || item.totalPages || 0,
+          });
+        } catch {
+          navigation.navigate('PdfViewer', {
+            materialId: item._id,
+            title: item.title,
+            pdfUrl: item.fileUrl,
+            totalPages: item.totalPages || 0,
+          });
+        }
+        return;
+      }
+      // Other files → DocumentViewer
+      if (item.fileUrl) {
+        navigation.navigate('DocumentViewer', {
+          url: item.fileUrl,
+          title: item.title,
+          fileType: item.type,
+        });
+      }
+    };
+
     return (
-      <View style={[styles.matCard, { backgroundColor: cardBg }]}>
+      <TouchableOpacity style={[styles.matCard, { backgroundColor: cardBg }]} onPress={handlePreview} activeOpacity={0.8}>
         <View style={[styles.matIconBox, { backgroundColor: tc + '18' }]}>
           <Ionicons name={ti} size={24} color={tc} />
         </View>
@@ -169,7 +207,7 @@ export default function DownloadCenterScreen({ navigation }) {
         <TouchableOpacity style={[styles.dlBtn, { backgroundColor: tc }]} onPress={() => downloadFile(item)} disabled={isDownloading}>
           {isDownloading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="download-outline" size={18} color="#fff" />}
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -177,8 +215,8 @@ export default function DownloadCenterScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>
-      {/* Header */}
-      <LinearGradient colors={['#6C63FF', '#A29BFE']} style={styles.header}>
+      {/* Header — pink gradient */}
+      <LinearGradient colors={['#FF4FA3', '#C2185B']} style={styles.header}>
         <View style={styles.hRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.hTitle}>📥 Download Center</Text>
@@ -195,13 +233,13 @@ export default function DownloadCenterScreen({ navigation }) {
       </LinearGradient>
 
       {/* Tab Switcher */}
-      <View style={[styles.tabRow, { backgroundColor: isDark ? Colors.surface.dark : '#F0F0F0' }]}>
+      <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, tab === 'ncert' && styles.tabActive]} onPress={() => setTab('ncert')}>
-          <Ionicons name="school" size={16} color={tab === 'ncert' ? '#fff' : '#6C63FF'} />
+          <Ionicons name="school" size={16} color={tab === 'ncert' ? '#fff' : '#FF4FA3'} />
           <Text style={[styles.tabTxt, tab === 'ncert' && styles.tabActiveTxt]}>NCERT Books</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, tab === 'materials' && styles.tabActive]} onPress={() => setTab('materials')}>
-          <Ionicons name="folder-open" size={16} color={tab === 'materials' ? '#fff' : '#6C63FF'} />
+          <Ionicons name="folder-open" size={16} color={tab === 'materials' ? '#fff' : '#FF4FA3'} />
           <Text style={[styles.tabTxt, tab === 'materials' && styles.tabActiveTxt]}>Materials</Text>
         </TouchableOpacity>
       </View>
@@ -215,6 +253,7 @@ export default function DownloadCenterScreen({ navigation }) {
 
       {/* Grade Filter */}
       <FlatList data={GRADES} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(i) => i}
+        style={{ maxHeight: 50, minHeight: 45, flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
         renderItem={({ item: g }) => (
           <TouchableOpacity style={[styles.gChip, grade === g && styles.gActive]} onPress={() => setGrade(g)}>
@@ -225,12 +264,14 @@ export default function DownloadCenterScreen({ navigation }) {
       {/* Content */}
       {tab === 'ncert' ? (
         <FlatList data={filteredNcert} keyExtractor={(i, idx) => `${i.title}-${idx}`} renderItem={renderNcertBook}
-          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 32 }}
+          onScroll={onTabBarScroll} scrollEventThrottle={16}
+          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: bottomPadding }}
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="book-outline" size={56} color={Colors.mediumGray} /><Text style={[styles.emptyTitle, { color: txt }]}>No Books Found</Text><Text style={{ color: txtSec, fontSize: 13, marginTop: 4 }}>Try a different class or search</Text></View>}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[Colors.primary]} />} />
       ) : (
         <FlatList data={filteredMats} keyExtractor={(i) => i._id} renderItem={renderMaterial}
-          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 32 }}
+          onScroll={onTabBarScroll} scrollEventThrottle={16}
+          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: bottomPadding }}
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="folder-open-outline" size={56} color={Colors.mediumGray} /><Text style={[styles.emptyTitle, { color: txt }]}>No Materials</Text><Text style={{ color: txtSec, fontSize: 13, marginTop: 4 }}>No downloadable materials available</Text></View>}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[Colors.primary]} />} />
       )}
@@ -240,7 +281,7 @@ export default function DownloadCenterScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 }, ctr: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { margin: 16, marginBottom: 0, borderRadius: 20, padding: 20 },
+  header: { marginHorizontal: 12, marginTop: 14, marginBottom: 0, borderRadius: 20, padding: 22 },
   hRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   hTitle: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
   hSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
@@ -248,25 +289,25 @@ const styles = StyleSheet.create({
   hStats: { flexDirection: 'row', gap: 16, marginTop: 14 },
   hStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   hStatTxt: { fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
-  tabRow: { flexDirection: 'row', marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 4 },
+  tabRow: { flexDirection: 'row', marginHorizontal: 12, marginTop: 16, borderRadius: 16, padding: 4, backgroundColor: '#FFE4F0' },
   tabBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 11, gap: 6 },
-  tabActive: { backgroundColor: '#6C63FF' },
-  tabTxt: { fontSize: 13, fontWeight: '700', color: '#6C63FF' },
+  tabActive: { backgroundColor: '#FF4FA3' },
+  tabTxt: { fontSize: 13, fontWeight: '700', color: '#FF4FA3' },
   tabActiveTxt: { color: '#fff' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', margin: 16, marginBottom: 8, borderRadius: 14, paddingHorizontal: 14, ...Shadows.light },
+  searchBox: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginTop: 16, marginBottom: 8, borderRadius: 16, paddingHorizontal: 16, backgroundColor: '#FFF', shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4 },
   searchIn: { flex: 1, fontSize: 14, paddingVertical: 11, marginLeft: 8 },
-  gChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 18, backgroundColor: 'rgba(108,99,255,0.08)', marginRight: 8 },
-  gActive: { backgroundColor: '#6C63FF' },
-  gText: { fontSize: 12, fontWeight: '700', color: '#6C63FF' },
+  gChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: '#FFE4F0', marginRight: 8, borderWidth: 1, borderColor: '#FFB3D0' },
+  gActive: { backgroundColor: '#FF4FA3', borderColor: '#FF4FA3' },
+  gText: { fontSize: 12, fontWeight: '700', color: '#FF4FA3' },
   gActiveTxt: { color: '#fff' },
-  bookCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, padding: 14, marginBottom: 10, ...Shadows.light },
+  bookCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 16, marginBottom: 14, backgroundColor: '#FFF', shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 5 },
   bookIcon: { width: 56, height: 56, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   bookInfo: { flex: 1 },
   bookTitle: { fontSize: 15, fontWeight: '700' },
   bookMeta: { fontSize: 12, marginTop: 3 },
   bookActions: { flexDirection: 'row', gap: 8 },
   openBtn: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  matCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, padding: 14, marginBottom: 10, ...Shadows.light },
+  matCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 16, marginBottom: 14, backgroundColor: '#FFF', shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 5 },
   matIconBox: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   matInfo: { flex: 1 },
   matTitle: { fontSize: 15, fontWeight: '600' },

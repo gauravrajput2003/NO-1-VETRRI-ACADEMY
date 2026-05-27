@@ -86,22 +86,42 @@ export default function SalaryScreen() {
     { label: 'Tax', value: currentSalary?.taxDeduction || 0 },
     { label: 'Other', value: currentSalary?.otherDeductions || 0 },
   ];
+  const paymentStatus = String(currentSalary?.paymentStatus || 'pending');
+  const paymentTone = paymentStatus === 'paid' ? Colors.success : Colors.warning;
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: bgColor }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
     >
-      <LinearGradient colors={['#00A8AB', '#008B8D']} style={styles.hero}>
-        <Text style={styles.heroTitle}>My Salary & Payments</Text>
-        <Text style={styles.heroSub}>{currentSalary?.monthYear || 'Current month'} salary statement</Text>
-      </LinearGradient>
+      <View style={styles.heroShell}>
+        <View style={styles.heroRow}>
+          <View style={styles.heroIconWrap}>
+            <Ionicons name="wallet-outline" size={24} color={Colors.pink} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroEyebrow}>Teacher Payroll</Text>
+            <Text style={styles.heroTitle}>Salary Management</Text>
+            <Text style={styles.heroSub}>{currentSalary?.monthYear || 'Current month'} payout summary</Text>
+          </View>
+        </View>
+        <View style={styles.heroStatusBar}>
+          <View style={[styles.heroDot, { backgroundColor: paymentTone }]} />
+          <Text style={styles.heroStatusText}>{paymentStatus === 'paid' ? 'Salary processed' : 'Salary pending review'}</Text>
+        </View>
+      </View>
 
       <View style={[styles.card, { backgroundColor: cardBg }]}>
-        <Text style={[styles.sectionTitle, { color: textColor }]}>Current Month</Text>
+        <View style={styles.cardTopRow}>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Current Month</Text>
+          <View style={[styles.statusChip, { backgroundColor: paymentStatus === 'paid' ? 'rgba(76, 175, 80, 0.12)' : 'rgba(255, 152, 0, 0.12)' }]}>
+            <Text style={[styles.statusChipText, { color: paymentTone }]}>{paymentStatus.toUpperCase()}</Text>
+          </View>
+        </View>
         <Text style={[styles.bigAmount, { color: textColor }]}>{formatCurrency(currentSalary?.netSalary || 0)}</Text>
+        <Text style={[styles.small, { color: textSec }]}>Net salary for {currentSalary?.monthYear || 'this month'}</Text>
         <Text style={[styles.status, { color: currentSalary?.paymentStatus === 'paid' ? Colors.success : Colors.warning }]}>
-          {String(currentSalary?.paymentStatus || 'pending').toUpperCase()}
+          {paymentStatus.toUpperCase()}
         </Text>
         <Text style={[styles.small, { color: textSec }]}>Paid on: {formatDate(currentSalary?.paidDate) || 'Not yet paid'}</Text>
         <Text style={[styles.small, { color: textSec }]}>Method: {currentSalary?.paymentMethod || salaryConfig?.paymentMode || 'bank_transfer'}</Text>
@@ -166,22 +186,31 @@ export default function SalaryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  hero: { margin: 16, borderRadius: 20, padding: 20 },
-  heroTitle: { color: Colors.white, fontSize: 24, fontWeight: '800' },
-  heroSub: { color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  card: { marginHorizontal: 16, marginBottom: 12, borderRadius: 18, padding: 16, ...Shadows.light },
-  sectionTitle: { fontSize: 17, fontWeight: '800', marginBottom: 10 },
+  heroShell: { margin: 16, borderRadius: 22, padding: 16, backgroundColor: Colors.white, ...Shadows.light },
+  heroRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  heroIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255, 79, 139, 0.12)', justifyContent: 'center', alignItems: 'center' },
+  heroEyebrow: { color: Colors.pink, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  heroTitle: { color: Colors.navy, fontSize: 24, fontWeight: '900', marginTop: 2 },
+  heroSub: { color: Colors.mediumGray, marginTop: 4 },
+  heroStatusBar: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: Colors.surface.light },
+  heroDot: { width: 8, height: 8, borderRadius: 4 },
+  heroStatusText: { color: Colors.navy, fontSize: 13, fontWeight: '600' },
+  card: { marginHorizontal: 16, marginBottom: 12, borderRadius: 18, padding: 16, backgroundColor: Colors.white, ...Shadows.light },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  sectionTitle: { fontSize: 17, fontWeight: '800' },
   bigAmount: { fontSize: 30, fontWeight: '900' },
   status: { fontSize: 12, fontWeight: '800', marginTop: 4 },
+  statusChip: { borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
+  statusChipText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   small: { fontSize: 13, marginTop: 4 },
   primaryBtn: { marginTop: 14, backgroundColor: Colors.pink, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   primaryBtnText: { color: Colors.white, fontWeight: '800' },
   grid: { flexDirection: 'row', gap: 10 },
-  gridItem: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: 12 },
+  gridItem: { flex: 1, backgroundColor: Colors.surface.light, borderRadius: 14, padding: 12 },
   gridLabel: { fontSize: 12 },
   gridValue: { fontSize: 15, fontWeight: '800', marginTop: 4 },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 14 },
-  historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  divider: { height: 1, backgroundColor: Colors.gray, marginVertical: 14 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.gray },
   historyMonth: { fontSize: 15, fontWeight: '700' },
   historyAmount: { fontSize: 15, fontWeight: '800' },
 });

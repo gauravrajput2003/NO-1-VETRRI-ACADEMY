@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Modal, TextInput, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -11,6 +13,8 @@ import { registerAPI } from '../../services/api';
 
 export default function ManageTeachersScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { teachers, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -18,6 +22,7 @@ export default function ManageTeachersScreen() {
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
   const textSec = isDark ? Colors.textSecondary.dark : Colors.textSecondary.light;
+  const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createData, setCreateData] = useState({
     name: '',
@@ -102,13 +107,36 @@ export default function ManageTeachersScreen() {
     </View>
   );
 
+  const filteredTeachers = teachers.filter((teacher) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      (teacher.name || '').toLowerCase().includes(query)
+      || (teacher.displayName || '').toLowerCase().includes(query)
+      || (teacher.mobile || '').toLowerCase().includes(query)
+      || (teacher.email || '').toLowerCase().includes(query)
+    );
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
       <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreateModal(true)}>
         <Ionicons name="person-add-outline" size={18} color={Colors.white} />
         <Text style={styles.addBtnText}>Add Teacher</Text>
       </TouchableOpacity>
-      <FlatList data={teachers} keyExtractor={(i) => i._id} renderItem={renderTeacher}
+      <View style={[styles.searchBox, { backgroundColor: cardBg }]}> 
+        <Ionicons name="search-outline" size={19} color={Colors.mediumGray} />
+        <TextInput
+          style={[styles.searchInput, { color: textColor }]}
+          placeholder="Search teacher by name, mobile, email..."
+          placeholderTextColor={Colors.mediumGray}
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
+      <Text style={[styles.count, { color: textSec }]}>{filteredTeachers.length} teachers</Text>
+
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={filteredTeachers} keyExtractor={(i) => i._id} renderItem={renderTeacher}
         contentContainerStyle={{ padding: 16 }}
         ListEmptyComponent={<View style={styles.empty}><Ionicons name="people-outline" size={48} color={Colors.mediumGray} /><Text style={[styles.emptyText, { color: textSec }]}>No teachers</Text></View>}
         refreshing={loading} onRefresh={() => dispatch(fetchAdminTeachers())}
@@ -116,7 +144,7 @@ export default function ManageTeachersScreen() {
 
       <Modal visible={showCreateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
+          <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]} contentContainerStyle={{ padding: 24, paddingBottom: Math.max(40, bottomPadding) }}>
             <Text style={[styles.modalTitle, { color: textColor }]}>Add Teacher Account</Text>
 
             <Text style={[styles.label, { color: textColor }]}>Name *</Text>
@@ -158,6 +186,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   addBtn: { marginHorizontal: 16, marginTop: 16, marginBottom: 4, borderRadius: 12, backgroundColor: Colors.pink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
   addBtnText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 10, borderRadius: 12, paddingHorizontal: 14, gap: 8, borderWidth: 1, borderColor: '#E5E7EB', ...Shadows.light },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 12 },
+  count: { paddingHorizontal: 20, fontSize: 13, marginTop: 8, marginBottom: 2 },
   card: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 12, ...Shadows.light },
   avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   avatarText: { color: Colors.white, fontSize: 18, fontWeight: 'bold' },

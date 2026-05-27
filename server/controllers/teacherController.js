@@ -11,6 +11,7 @@ const s3Client = require('../config/s3');
 const LeaveApplication = require('../models/LeaveApplication');
 const TeacherGrading = require('../models/TeacherGrading');
 const storageService = require('../services/storageService');
+const { logDev, warnDev, errorCrit } = require('../utils/logger');
 
 const getMaterialTypeFromMime = (mimeType = '') => {
   if (mimeType.startsWith('video/')) return 'video';
@@ -26,6 +27,15 @@ const getMaterialTypeFromMime = (mimeType = '') => {
   return 'image';
 };
 
+const getTeacherStudentFilter = async () => {
+  const students = await User.find({
+    role: 'student',
+    isActive: true,
+  }).select('_id');
+
+  return students.map((student) => student._id.toString());
+};
+
 // @desc    Get teacher dashboard
 // @route   GET /api/teacher/dashboard
 // @access  Teacher
@@ -37,12 +47,12 @@ const getTeacherDashboard = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [todayClasses, myStudents, pendingLeaves, totalMaterials] = await Promise.all([
+    const [todayClasses, teacherStudentIds, pendingLeaves, totalMaterials] = await Promise.all([
       ClassSchedule.find({
         teacherId,
         scheduledDate: { $gte: today, $lt: tomorrow },
       }).select('-meetLink').populate('studentIds', 'name grade'),
-      User.countDocuments({ assignedTeacher: teacherId, role: 'student', isActive: true }),
+      getTeacherStudentFilter(),
       require('../models/LeaveApplication').countDocuments({ applicant: teacherId, status: 'pending' }),
       StudyMaterial.countDocuments({ teacher: teacherId }),
     ]);
@@ -51,7 +61,7 @@ const getTeacherDashboard = async (req, res) => {
       success: true,
       dashboard: {
         todayClasses,
-        totalStudents: myStudents,
+        totalStudents: teacherStudentIds.length,
         pendingLeaves,
         totalMaterials,
       },
@@ -67,8 +77,10 @@ const getTeacherDashboard = async (req, res) => {
 const getMyStudents = async (req, res) => {
   try {
     // Students expose their info to teacher, but NOT phone/email to students
+    const studentIds = await getTeacherStudentFilter();
+
     const students = await User.find({
-      assignedTeacher: req.user._id,
+      _id: { $in: studentIds },
       role: 'student',
       isActive: true,
     })
@@ -167,7 +179,7 @@ const uploadMaterial = async (req, res) => {
       });
     }
 
-    console.log(`[Teacher Upload] Starting upload: ${req.file.originalname} (${req.file.size} bytes)`);
+    logDev('[Teacher Upload] Starting upload');
 
     let uploadResult;
 
@@ -177,7 +189,7 @@ const uploadMaterial = async (req, res) => {
     if (req.file.path) {
       // DISK STORAGE PATH: Stream from disk to Cloudinary
       // This is for large files (200MB+ study materials, videos, archives)
-      console.log(`[Teacher Upload] Using disk storage: ${req.file.path}`);
+      logDev('[Teacher Upload] Using disk storage');
       
       uploadResult = await storageService.uploadFileFromDisk(
         req.file.path,
@@ -188,7 +200,7 @@ const uploadMaterial = async (req, res) => {
     } else if (req.file.buffer) {
       // MEMORY STORAGE PATH: Buffer to Cloudinary
       // This is for small files (avatars, small images)
-      console.log('[Teacher Upload] Using memory storage (buffer)');
+      logDev('[Teacher Upload] Using memory storage (buffer)');
       
       uploadResult = await storageService.uploadFileFromBuffer(
         req.file.buffer,
@@ -200,7 +212,7 @@ const uploadMaterial = async (req, res) => {
       throw new Error('No file buffer or path available');
     }
 
-    console.log('[Teacher Upload] Upload successful, saving to database');
+    logDev('[Teacher Upload] Upload successful, saving to database');
 
     // Build material payload with full metadata
     const materialPayload = {
@@ -237,7 +249,23 @@ const uploadMaterial = async (req, res) => {
     // Save to database
     const material = await StudyMaterial.create(materialPayload);
 
-    console.log(`[Teacher Upload] Complete: ${material._id}`);
+    // Generate PDF thumbnail if file is PDF
+    if (req.file.mimetype === 'application/pdf' && uploadResult.publicId) {
+      try {
+        const thumbnailUrl = storageService.getPdfThumbnailUrl
+          ? storageService.getPdfThumbnailUrl(uploadResult.publicId)
+          : '';
+        if (thumbnailUrl) {
+          material.thumbnailUrl = thumbnailUrl;
+          await material.save();
+        }
+      } catch (thumbErr) {
+        warnDev('[Teacher Upload] Thumbnail generation failed:', thumbErr.message);
+        // Non-critical, don't fail the upload
+      }
+    }
+
+    logDev('[Teacher Upload] Complete');
 
     res.status(201).json({
       success: true,
@@ -245,14 +273,14 @@ const uploadMaterial = async (req, res) => {
       message: `Material uploaded successfully: ${uploadResult.originalFilename}`,
     });
   } catch (error) {
-    console.error('[Teacher Upload] Error:', error.message);
+    errorCrit('[Teacher Upload] Error:', error.message);
     
     // Clean up file if on disk
     if (req.file && req.file.path) {
       const fs = require('fs');
       if (fs.existsSync(req.file.path)) {
         fs.unlink(req.file.path, (err) => {
-          if (err) console.error('[Cleanup] Failed to delete temp file:', err.message);
+          if (err) warnDev('[Cleanup] Failed to delete temp file:', err.message);
         });
       }
     }

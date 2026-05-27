@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, ScrollView, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -13,6 +15,8 @@ import { createScheduleAPI, cancelScheduleAPI, getTeacherStudentsAPI } from '../
 
 export default function ClassSchedulerScreen() {
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { schedules, loading } = useSelector((s) => s.classes);
   const { teachers, students } = useSelector((s) => s.admin);
   const { user } = useSelector((s) => s.auth);
@@ -201,7 +205,7 @@ export default function ClassSchedulerScreen() {
         <Text style={styles.addText}>Schedule Class</Text>
       </TouchableOpacity>
 
-      <FlatList data={schedules} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={schedules} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.cardHeader}>
@@ -225,7 +229,7 @@ export default function ClassSchedulerScreen() {
       {/* Schedule Form Modal */}
       <Modal visible={showForm} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
+          <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]} contentContainerStyle={{ padding: 24, paddingBottom: Math.max(40, bottomPadding) }}>
             <Text style={[styles.modalTitle, { color: textColor }]}>Schedule New Class</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Title *" placeholderTextColor={Colors.mediumGray} value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} />
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Subject *" placeholderTextColor={Colors.mediumGray} value={form.subject} onChangeText={(v) => setForm({ ...form, subject: v })} />
@@ -296,7 +300,7 @@ export default function ClassSchedulerScreen() {
                 <Text style={styles.pickerCancel}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            <FlatList data={courseOptions} keyExtractor={(i) => i}
+            <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={courseOptions} keyExtractor={(i) => i}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.teacherItem} onPress={() => { setForm({ ...form, course: item }); setShowCoursePicker(false); }}>
                   <Text style={[styles.teacherName, { color: textColor }]}>{item}</Text>
@@ -316,7 +320,7 @@ export default function ClassSchedulerScreen() {
                 <Text style={styles.pickerCancel}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            <FlatList data={gradeOptions} keyExtractor={(i) => i}
+            <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={gradeOptions} keyExtractor={(i) => i}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.teacherItem} onPress={() => { setForm({ ...form, grade: item }); setShowGradePicker(false); }}>
                   <Text style={[styles.teacherName, { color: textColor }]}>{item}</Text>
@@ -336,7 +340,7 @@ export default function ClassSchedulerScreen() {
                 <Text style={styles.pickerCancel}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            <FlatList data={dateOptions} keyExtractor={(i) => i.value}
+            <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={dateOptions} keyExtractor={(i) => i.value}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.teacherItem} onPress={() => { setForm({ ...form, scheduledDate: item.value }); setShowDatePicker(false); }}>
                   <Text style={[styles.teacherName, { color: textColor }]}>{item.label}</Text>
@@ -396,7 +400,7 @@ export default function ClassSchedulerScreen() {
                 <Text style={styles.pickerCancel}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            <FlatList data={teachers.filter((t) => t.isApproved)} keyExtractor={(i) => i._id}
+            <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={teachers.filter((t) => t.isApproved)} keyExtractor={(i) => i._id}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.teacherItem} onPress={() => { setSelectedTeacher(item); setForm({ ...form, teacherId: item._id }); setShowTeacherPicker(false); }}>
                   <Text style={[styles.teacherName, { color: textColor }]}>{item.name}</Text>
@@ -437,7 +441,7 @@ export default function ClassSchedulerScreen() {
                 onChangeText={setStudentSearchQuery}
               />
             </View>
-            <FlatList
+            <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16}
               data={filteredStudents}
               keyExtractor={(i) => i._id}
               renderItem={({ item }) => (

@@ -11,6 +11,7 @@ import notificationsReducer from './slices/notificationsSlice';
 import uiReducer from './slices/uiSlice';
 import teacherReducer from './slices/teacherSlice';
 import adminReducer from './slices/adminSlice';
+import pdfReducer from './slices/pdfSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -21,6 +22,7 @@ const rootReducer = combineReducers({
   ui: uiReducer,
   teacher: teacherReducer,
   admin: adminReducer,
+  pdf: pdfReducer,
 });
 
 const persistConfig = {

@@ -121,8 +121,8 @@ export const downloadStudyMaterial = async (materialId, filename, onProgress) =>
   try {
     console.log(`[Material Download] Requesting URL for: ${materialId}`);
 
-    // Step 1: Get download URL from backend
-    const response = await fetch(`/api/student/materials/${materialId}/download`);
+    // Step 1: Get download URL from backend (using new unified endpoint)
+    const response = await fetch(`/api/storage/download-url/${materialId}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -130,23 +130,25 @@ export const downloadStudyMaterial = async (materialId, filename, onProgress) =>
     }
 
     const data = await response.json();
+    const downloadUrl = data.downloadUrl || data.url;
 
-    if (!data.success || !data.url) {
+    if (!data.success || !downloadUrl) {
       throw new Error('Download URL not available');
     }
 
     // Use filename from response metadata or provided filename
-    const downloadFilename = filename || data.metadata?.filename || 'material.pdf';
+    const downloadFilename = filename || data.originalFilename || data.metadata?.filename || 'material.pdf';
 
     console.log(`[Material Download] Received URL, downloading: ${downloadFilename}`);
 
     // Step 2: Download file with proper name
-    await downloadFile(data.url, downloadFilename, onProgress);
+    await downloadFile(downloadUrl, downloadFilename, onProgress);
   } catch (error) {
     console.error('[Material Download] Error:', error.message);
     throw error;
   }
 };
+
 
 /**
  * Download training video from backend

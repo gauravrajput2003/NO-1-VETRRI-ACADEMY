@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -13,6 +15,8 @@ import { getClassAttendanceAPI } from '../../services/api';
 export default function ClassDetailScreen({ route, navigation }) {
   const { classId } = route.params;
   const dispatch = useDispatch();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { currentClass, loading, joinResult } = useSelector((s) => s.classes);
   const { user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
@@ -56,7 +60,7 @@ export default function ClassDetailScreen({ route, navigation }) {
   const statusColor = classStatusColors[cls.status] || Colors.mediumGray;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: bgColor }]}>
+    <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} style={[styles.container, { backgroundColor: bgColor }]}>
       {/* Header */}
       <LinearGradient colors={isLive ? [Colors.error, '#FF6B6B'] : Colors.gradient.primary} style={styles.header}>
         <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>

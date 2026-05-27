@@ -30,6 +30,9 @@ export default function LiveMonitorScreen({ navigation, route }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const pollRef = useRef(null);
 
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
+
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
@@ -219,7 +222,12 @@ export default function LiveMonitorScreen({ navigation, route }) {
         </Text>
       </Animated.View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: bottomPadding || 120 }} 
+        showsVerticalScrollIndicator={false}
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
+      >
         {/* Class info + stats */}
         <View style={[styles.statsCard, { backgroundColor: cardBg }]}>
           <Text style={[styles.statsClassName, { color: textColor }]}>{className || monitor.title}</Text>

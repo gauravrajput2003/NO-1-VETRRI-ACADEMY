@@ -15,6 +15,7 @@ const s3Client = require('../config/s3');
 const storageService = require('../services/storageService');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
 const { proxyDownload } = require('../middleware/fileDownloadHandler');
+const { logDev, warnDev, errorCrit } = require('../utils/logger');
 
 const isMaterialLockedForStudent = (material, studentId) => {
   return (
@@ -31,7 +32,7 @@ const resolveMaterialAccessUrl = async (material, forceDownload = false) => {
   try {
     // S3 backend
     if (material.s3Bucket && material.s3Key) {
-      console.log(`[Student] Resolving S3 URL: ${material.s3Key}`);
+      logDev('[Student] Resolving material access URL (S3)');
       
       const command = new GetObjectCommand({
         Bucket: material.s3Bucket,
@@ -46,15 +47,15 @@ const resolveMaterialAccessUrl = async (material, forceDownload = false) => {
 
     // Cloudinary backend (primary)
     if (material.fileUrl) {
-      console.log(`[Student] Resolving Cloudinary URL: ${material.originalFilename}`);
+      logDev('[Student] Resolving material access URL (Cloudinary)');
       
       return await resolveFileAccessUrl(material, forceDownload);
     }
 
-    console.warn('[Student] No file URL found for material:', material._id);
+    warnDev('[Student] No file URL found for material');
     return null;
   } catch (error) {
-    console.error('[Student] Error resolving access URL:', error.message);
+    errorCrit('[Student] Error resolving access URL:', error.message);
     throw error;
   }
 };
@@ -118,7 +119,7 @@ const getStudentDashboard = async (req, res) => {
         },
       },
       { $sort: { totalScore: -1 } },
-      { $limit: 3 },
+      { $limit: 5 },
     ]);
 
     // Populate leaderboard student names (no contact info)
@@ -207,7 +208,7 @@ const getMaterialPreviewUrl = async (req, res) => {
     const signedUrl = await resolveMaterialAccessUrl(material, false);
 
     if (!signedUrl) {
-      console.error(`[getMaterialPreviewUrl] Material ${req.params.id} has no accessible URL. s3Bucket=${material.s3Bucket}, s3Key=${material.s3Key}, fileUrl=${material.fileUrl}`);
+      errorCrit('[getMaterialPreviewUrl] Material has no accessible URL');
       return res.status(404).json({
         success: false,
         message: 'Material file is missing or inaccessible.',
@@ -222,7 +223,7 @@ const getMaterialPreviewUrl = async (req, res) => {
       storageType: material.storageType,
     });
   } catch (error) {
-    console.error(`[getMaterialPreviewUrl] Error: ${error.message}`);
+    errorCrit('[getMaterialPreviewUrl] Error:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -258,13 +259,13 @@ const getMaterialDownloadUrl = async (req, res) => {
       });
     }
 
-    console.log(`[Download] Generating URL for material: ${material._id}`);
+    logDev('[Download] Generating material download URL');
 
     // Return the direct-download endpoint URL (no leading /api)
     // Frontend already prefixes API_BASE_URL which includes /api
     const directDownloadUrl = `/student/materials/${material._id}/direct-download`;
 
-    console.log(`[Download] Returning direct-download endpoint: ${material.originalFilename}`);
+    logDev('[Download] Returning direct-download endpoint');
 
     res.status(200).json({
       success: true,
@@ -278,7 +279,7 @@ const getMaterialDownloadUrl = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Download] Error:', error.message);
+    errorCrit('[Download] Error:', error.message);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to generate download URL.',
@@ -321,7 +322,7 @@ const downloadMaterialDirect = async (req, res) => {
       });
     }
 
-    console.log(`[Download] Direct download requested: ${material._id} - ${material.originalFilename}`);
+    logDev('[Download] Direct download requested');
 
     // Get download URL
     const downloadUrl = material.fileUrl.startsWith('https://')
@@ -331,12 +332,12 @@ const downloadMaterialDirect = async (req, res) => {
     const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
     const mimeType = material.mimeType || 'application/octet-stream';
 
-    console.log(`[Download] Streaming: ${filename} from Cloudinary`);
+    logDev('[Download] Streaming file from Cloudinary');
 
     // Use proxyDownload to serve file with proper headers
     await proxyDownload(downloadUrl, filename, mimeType, res);
   } catch (error) {
-    console.error('[Download] Direct download error:', error.message);
+    errorCrit('[Download] Direct download error:', error.message);
     if (!res.headersSent) {
       res.status(500).json({
         success: false,

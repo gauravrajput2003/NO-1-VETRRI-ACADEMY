@@ -6,6 +6,8 @@ import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatFileSize, formatDate } from '../../utils/formatters';
 import { fetchMaterials } from '../../redux/slices/materialsSlice';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 const typeIcons = { pdf: 'document-text', ppt: 'easel', video: 'videocam', image: 'image' };
 const typeColors = { pdf: '#F44336', ppt: '#FF9800', video: '#2196F3', image: '#4CAF50' };
@@ -17,6 +19,8 @@ export default function MaterialsScreen({ navigation }) {
   const isDark = theme === 'dark';
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -90,7 +94,9 @@ export default function MaterialsScreen({ navigation }) {
           data={filteredMaterials}
           keyExtractor={(item) => item._id}
           renderItem={renderMaterial}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="folder-open-outline" size={48} color={Colors.mediumGray} />

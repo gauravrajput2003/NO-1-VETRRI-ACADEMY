@@ -1,3 +1,5 @@
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function VettriAIScreen({ navigation }) {
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState([
@@ -53,10 +57,14 @@ export default function VettriAIScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView 
-      style={[styles.container, { backgroundColor: bgColor }]} 
+      style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <LinearGradient colors={Colors.gradient.primary} style={styles.header}>
+      <LinearGradient 
+        colors={isDark ? ['#0f172a', '#1e1b4b'] : ['#f8fafc', '#eef2ff']} 
+        style={StyleSheet.absoluteFillObject} 
+      />
+      <LinearGradient colors={Colors.gradient.primary} style={[styles.header, { paddingBottom: Math.max(16, bottomPadding) }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
@@ -67,10 +75,10 @@ export default function VettriAIScreen({ navigation }) {
         <View style={{ width: 40 }} />
       </LinearGradient>
 
-      <ScrollView 
+      <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} 
         ref={scrollViewRef}
         style={styles.chatContainer}
-        contentContainerStyle={{ padding: 16, paddingBottom: 20 + insets.bottom }}
+        contentContainerStyle={{ padding: 16, paddingBottom: Math.max(20, bottomPadding) + insets.bottom }}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         {chatHistory.map((msg, index) => (
@@ -107,7 +115,6 @@ export default function VettriAIScreen({ navigation }) {
       </ScrollView>
 
       <View style={[styles.inputContainer, { backgroundColor: cardBg, borderTopColor: borderCol }]}>
-      >
         <TextInput
           style={[styles.input, { color: textColor, backgroundColor: isDark ? Colors.background.dark : Colors.background.light }]}
           placeholder="Ask a question..."

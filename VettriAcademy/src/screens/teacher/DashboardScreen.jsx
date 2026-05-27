@@ -1,144 +1,168 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, FlatList } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '../../utils/colors';
-import { Shadows } from '../../utils/theme';
-import { formatScheduledTime, formatDate } from '../../utils/formatters';
-import { fetchTeacherDashboard } from '../../redux/slices/teacherSlice';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchTeacherDashboard, fetchTeacherMaterials, fetchTeacherStudents } from '../../redux/slices/teacherSlice';
 import { fetchTodayClasses } from '../../redux/slices/classesSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
-import { getAnnouncementsAPI } from '../../services/api';
+import { getActiveAnnouncementsAPI } from '../../services/api';
+import { Colors } from '../../utils/colors';
+import { Shadows } from '../../utils/theme';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import { formatScheduledTime } from '../../utils/formatters';
 
 export default function TeacherDashboard({ navigation }) {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
-  const { dashboard, loading: teacherLoading } = useSelector((s) => s.teacher);
+  const { dashboard, loading: teacherLoading, students, materials } = useSelector((s) => s.teacher);
   const { todayClasses } = useSelector((s) => s.classes);
   const { unreadCount } = useSelector((s) => s.notifications);
-  const theme = useSelector((s) => s.ui.theme);
-  const isDark = theme === 'dark';
-
   const [announcements, setAnnouncements] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-
-  const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
-  const cardBg = isDark ? Colors.card.dark : Colors.card.light;
-  const textColor = isDark ? Colors.text.dark : Colors.text.light;
-  const textSec = isDark ? Colors.textSecondary.dark : Colors.textSecondary.light;
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const loadData = useCallback(async () => {
     dispatch(fetchTeacherDashboard());
+    dispatch(fetchTeacherStudents());
+    dispatch(fetchTeacherMaterials());
     dispatch(fetchTodayClasses());
     dispatch(fetchUnreadNotificationCount());
     try {
-      const { data } = await getAnnouncementsAPI();
+      const { data } = await getActiveAnnouncementsAPI();
       setAnnouncements(data.announcements?.slice(0, 2) || []);
-    } catch {} finally { setRefreshing(false); }
+    } catch {
+      setAnnouncements([]);
+    } finally {
+      setRefreshing(false);
+    }
   }, [dispatch]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const onRefresh = () => { setRefreshing(true); loadData(); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
-  if (teacherLoading && !refreshing) {
-    return <View style={[styles.centered, { backgroundColor: bgColor }]}><ActivityIndicator size="large" color={Colors.primary} /></View>;
-  }
-
-  const db = dashboard || {};
+  const overview = dashboard || {};
+  const studentCount = students?.length || overview.totalStudents || 0;
+  const materialCount = materials?.length || overview.totalMaterials || 0;
+  const classCount = overview.todayClasses?.length || todayClasses?.length || 0;
   const liveClass = todayClasses?.find((c) => c.status === 'live');
   const nextClass = todayClasses?.find((c) => c.status === 'scheduled');
 
+  /* ── Stat Cards (matches Admin 2×2 grid with gradient glow) ── */
+  const statCards = [
+    { symbol: '🎥', value: classCount, label: 'Today Classes', accent: '#2563EB', glow: '#DBEAFE', screen: 'LiveClass' },
+    { symbol: '🎓', value: studentCount, label: 'Students', accent: '#6C5CE7', glow: '#E8E4FF', screen: 'Students' },
+    { symbol: '📁', value: materialCount, label: 'Materials', accent: '#0F766E', glow: '#CCFBF1', screen: 'TeacherMaterials' },
+    { symbol: '✈️', value: overview.pendingLeaves || 0, label: 'Pending Leaves', accent: '#E17055', glow: '#FDE6DC', screen: 'Leave' },
+  ];
+
+  /* ── Quick Actions (matches Admin carousel) ── */
+  const quickActions = useMemo(() => ([
+    { id: 'live', symbol: '🎥', label: 'Live Class', subtitle: `${classCount} today`, screen: 'LiveClass', color: '#2563EB', bgColor: '#DBEAFE', iconBg: '#BFDBFE' },
+    { id: 'grades', symbol: '✏️', label: 'Grades', subtitle: 'Enter marks', screen: 'Grades', color: '#7C3AED', bgColor: '#EDE9FE', iconBg: '#DDD6FE' },
+    { id: 'materials', symbol: '📂', label: 'Materials', subtitle: `${materialCount} files`, screen: 'TeacherMaterials', color: '#0F766E', bgColor: '#CCFBF1', iconBg: '#99F6E4' },
+    { id: 'students', symbol: '👥', label: 'Students', subtitle: `${studentCount} active`, screen: 'Students', color: '#0284C7', bgColor: '#E0F2FE', iconBg: '#BAE6FD' },
+    { id: 'salary', symbol: '💰', label: 'Salary', subtitle: 'Overview', screen: 'Salary', color: '#B45309', bgColor: '#FEF3C7', iconBg: '#FDE68A' },
+    { id: 'leave', symbol: '🏖️', label: 'Leave', subtitle: 'Apply now', screen: 'Leave', color: '#DB2777', bgColor: '#FCE7F3', iconBg: '#FBCFE8' },
+  ]), [classCount, materialCount, studentCount]);
+
+  if (teacherLoading && !refreshing) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: bgColor }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}>
-      {/* Welcome */}
-      <View style={[styles.header, { backgroundColor: Colors.hotPink }] }>
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},</Text>
-            <Text style={styles.headerName}>{user?.displayName || user?.name} 👋</Text>
+    <ScrollView
+      onScroll={onTabBarScroll}
+      scrollEventThrottle={16}
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: bottomPadding + 8 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ═══ Teal Wave Header (identical to Admin) ═══ */}
+      <View style={styles.headerBg}>
+        <LinearGradient colors={['#1A3C40', '#11C5C6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+          <View style={styles.headerContent}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>TEACHER PANEL</Text>
+              <View style={styles.headerNameRow}>
+                <Text style={styles.headerName}>{(user?.displayName || user?.name || '').split(' ')[0]} </Text>
+                <Text style={styles.headerNameAccent}>{(user?.displayName || user?.name || '').split(' ').slice(1).join(' ') || 'Dashboard'}</Text>
+              </View>
+              <Text style={styles.headerDateline} numberOfLines={1}>
+                {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
+                <Ionicons name="sparkles" size={20} color={Colors.gold} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
+                <Ionicons name="notifications-outline" size={22} color={Colors.white} />
+                {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
-              <Ionicons name="sparkles" size={24} color={Colors.gold} />
-              <Text style={styles.aiBtnText}>AI</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
-              <Ionicons name="notifications-outline" size={24} color={Colors.white} />
-              {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
-            </TouchableOpacity>
-          </View>
-        </View>
+        </LinearGradient>
       </View>
 
-      {/* Stats Grid - Premium 4-card layout */}
+      {/* ═══ Stats Grid — Premium 2×2 Horizontal (matches Admin) ═══ */}
       <View style={styles.statsGrid}>
-        {[
-          { icon: 'videocam', color: Colors.pink, value: db.todayClasses || todayClasses?.length || 0, label: 'Today Classes' },
-          { icon: 'people', color: '#00B894', value: db.totalStudents || 0, label: 'Students' },
-          { icon: 'document-text', color: '#0984E3', value: db.totalMaterials || 0, label: 'Materials' },
-          { icon: 'airplane', color: '#FDCB6E', value: db.pendingLeaves || 0, label: 'Pending Leaves' },
-        ].map((s, i) => (
-          <View key={i} style={[styles.statCard, { backgroundColor: Colors.lightGray }]}>
-            <View style={[styles.statIconLarge, { backgroundColor: s.color + '20' }]}>
-              <Ionicons name={s.icon} size={32} color={s.color} />
+        {statCards.map((card, i) => (
+          <TouchableOpacity key={i} style={styles.statCard} onPress={() => navigation.navigate(card.screen)} activeOpacity={0.85}>
+            <LinearGradient colors={[card.glow, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.statSymbolArea}>
+              <View style={[styles.statGlowCircle, { backgroundColor: card.accent + '18' }]} />
+              <View style={styles.statIconLarge}>
+                <Text style={styles.cardSymbol}>{card.symbol}</Text>
+              </View>
+            </LinearGradient>
+            <View style={styles.statTextArea}>
+              <Text style={styles.statValueLarge}>{card.value}</Text>
+              <Text style={styles.statLabelPremium} numberOfLines={2}>{card.label}</Text>
             </View>
-            <Text style={[styles.statValueLarge, { color: Colors.pink }]}>{s.value}</Text>
-            <Text style={[styles.statLabelPremium, { color: Colors.navy }]}>{s.label}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
 
-      {/* Live / Next Class Card */}
-      {liveClass && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>🔴 Currently Live</Text>
-          <TouchableOpacity style={[styles.liveCard, { backgroundColor: Colors.error + '12', borderColor: Colors.error }]} onPress={() => navigation.navigate('LiveClass')}>
-            <View style={styles.liveInfo}>
-              <Text style={[styles.liveSubject, { color: textColor }]}>{liveClass.subject || liveClass.title}</Text>
-              <Text style={[styles.liveTime, { color: textSec }]}>{formatScheduledTime(liveClass.scheduledTime)}</Text>
-            </View>
-            <View style={styles.liveChip}><Text style={styles.liveChipText}>MANAGE →</Text></View>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {nextClass && !liveClass && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>📅 Next Class</Text>
-          <TouchableOpacity style={[styles.nextCard, { backgroundColor: cardBg }]} onPress={() => navigation.navigate('LiveClass')}>
-            <Ionicons name="videocam-outline" size={24} color={Colors.primary} />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[styles.nextSubject, { color: textColor }]}>{nextClass.subject || nextClass.title}</Text>
-              <Text style={[styles.nextTime, { color: textSec }]}>{formatScheduledTime(nextClass.scheduledTime)} • {nextClass.durationMinutes || 60} min</Text>
-            </View>
-            <TouchableOpacity style={styles.goLiveBtn} onPress={() => navigation.navigate('LiveClass', { classToStart: nextClass })}>
-              <Text style={styles.goLiveText}>GO LIVE</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Quick Actions - Premium Carousel */}
+      {/* ═══ Quick Actions Carousel (matches Admin Management) ═══ */}
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Quick Actions</Text>
+        <View style={[styles.sectionHeaderCard, styles.managementHeaderCard]}>
+          <View style={styles.sectionHeaderLeft}>
+            <View style={styles.sectionAccentBar} />
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+          </View>
         </View>
         <FlatList
-          data={[
-            { id: '1', icon: 'videocam-outline', label: 'Live Class', screen: 'LiveClass', color: '#D63031', bgColor: 'rgba(214, 48, 49, 0.12)' },
-            { id: '2', icon: 'calendar-outline', label: 'Schedule', screen: 'Schedule', color: '#6C5CE7', bgColor: 'rgba(108, 92, 231, 0.12)' },
-            { id: '3', icon: 'create-outline', label: 'Enter Grades', screen: 'Grades', color: Colors.pink, bgColor: 'rgba(255, 79, 139, 0.12)' },
-            { id: '4', icon: 'cloud-upload-outline', label: 'Materials', screen: 'TeacherMaterials', color: '#00B894', bgColor: 'rgba(0, 184, 148, 0.12)' },
-            { id: '5', icon: 'people-outline', label: 'Students', screen: 'Students', color: '#0984E3', bgColor: 'rgba(9, 132, 227, 0.12)' },
-            { id: '6', icon: 'cash-outline', label: 'Salary', screen: 'Salary', color: Colors.gold, bgColor: 'rgba(255, 215, 0, 0.12)' },
-          ]}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
+          data={quickActions}
           keyExtractor={(item) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
           snapToInterval={168}
           decelerationRate="fast"
           contentContainerStyle={styles.carouselContent}
@@ -148,86 +172,275 @@ export default function TeacherDashboard({ navigation }) {
               onPress={() => navigation.navigate(item.screen)}
               activeOpacity={0.75}
             >
-              <View style={[styles.carouselIconGlow, { backgroundColor: item.color + '15' }]}>
-                <View style={[styles.carouselIcon, { backgroundColor: item.color + '25' }]}>
-                  <Ionicons name={item.icon} size={36} color={item.color} />
+              <LinearGradient colors={[item.iconBg, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}>
+                <View style={styles.carouselIcon}>
+                  <Text style={styles.carouselSymbol}>{item.symbol}</Text>
                 </View>
-              </View>
-              <Text style={[styles.carouselLabel, { color: Colors.navy }]}>{item.label}</Text>
+              </LinearGradient>
+              <Text style={styles.carouselLabel}>{item.label}</Text>
+              <Text style={styles.carouselSubtitle}>{item.subtitle}</Text>
               <View style={[styles.carouselArrow, { backgroundColor: item.color + '20' }]}>
-                <Ionicons name="arrow-forward" size={14} color={item.color} />
+                <Text style={[styles.cardArrowSmall, { color: item.color }]}>→</Text>
               </View>
             </TouchableOpacity>
           )}
         />
       </View>
 
-      {/* Announcements */}
-      {announcements.length > 0 && (
+      {/* ═══ Live Status (if live class active) ═══ */}
+      {liveClass && (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>📢 Announcements</Text>
-          {announcements.map((a) => (
-            <View key={a._id} style={[styles.annCard, { backgroundColor: cardBg }]}>
-              <Text style={[styles.annTitle, { color: textColor }]}>{a.title}</Text>
-              <Text style={[styles.annText, { color: textSec }]} numberOfLines={2}>{a.content}</Text>
+          <View style={[styles.sectionHeaderCard, styles.liveHeaderCard]}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionAccentBar} />
+              <Text style={styles.sectionTitle}>Live Status</Text>
             </View>
-          ))}
+          </View>
+          <TouchableOpacity style={styles.infoCard} onPress={() => navigation.navigate('LiveClass')} activeOpacity={0.85}>
+            <View style={styles.infoRow}>
+              <View style={[styles.smallIconWrap, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="radio-outline" size={18} color="#2563EB" />
+              </View>
+              <View style={styles.infoTextWrap}>
+                <Text style={styles.infoTitle} numberOfLines={1}>{liveClass.subject || liveClass.title}</Text>
+                <Text style={styles.infoSubtitle} numberOfLines={1}>{formatScheduledTime(liveClass.scheduledTime)}</Text>
+              </View>
+            </View>
+            <Text style={styles.infoAction}>Manage →</Text>
+          </TouchableOpacity>
         </View>
       )}
 
+      {/* ═══ Upcoming Class ═══ */}
+      {nextClass && !liveClass && (
+        <View style={styles.section}>
+          <View style={[styles.sectionHeaderCard, styles.liveHeaderCard]}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionAccentBar} />
+              <Text style={styles.sectionTitle}>Upcoming Class</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.infoCard} onPress={() => navigation.navigate('LiveClass')} activeOpacity={0.85}>
+            <View style={styles.infoRow}>
+              <View style={[styles.smallIconWrap, { backgroundColor: '#EDE9FE' }]}>
+                <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+              </View>
+              <View style={styles.infoTextWrap}>
+                <Text style={styles.infoTitle} numberOfLines={1}>{nextClass.subject || nextClass.title}</Text>
+                <Text style={styles.infoSubtitle} numberOfLines={1}>{formatScheduledTime(nextClass.scheduledTime)} • {nextClass.durationMinutes || 60} min</Text>
+              </View>
+            </View>
+            <Text style={styles.infoAction}>Open →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ═══ Announcements ═══ */}
+      {announcements.length > 0 && (
+        <View style={styles.section}>
+          <View style={[styles.sectionHeaderCard, styles.noticeHeaderCard]}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionAccentBar} />
+              <Text style={styles.sectionTitle}>Announcements</Text>
+            </View>
+          </View>
+          <View style={styles.sectionContent}>
+            {announcements.map((a) => (
+              <View key={a._id} style={styles.noticeCard}>
+                <View style={[styles.smallIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                  <Ionicons name="megaphone-outline" size={18} color="#2563EB" />
+                </View>
+                <View style={styles.noticeTextWrap}>
+                  <Text style={styles.infoTitle} numberOfLines={1}>{a.title}</Text>
+                  <Text style={styles.noticeBody} numberOfLines={2}>{a.content}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Bottom spacer */}
       <View style={{ height: 24 }} />
     </ScrollView>
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STYLES — Mirrors AdminDashboardScreen styles for visual consistency
+   ═══════════════════════════════════════════════════════════════════════════════ */
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { paddingTop: 36, paddingBottom: 20, paddingHorizontal: 20 },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  greeting: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
-  headerName: { fontSize: 24, fontWeight: 'bold', color: Colors.white, marginTop: 2 },
-  aiBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 12 },
-  aiBtnText: { color: Colors.gold, fontWeight: '700', marginLeft: 4, fontSize: 13 },
+  /* ── Layout ── */
+  container: { flex: 1, backgroundColor: Colors.offWhite },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.offWhite },
+
+  /* ── Header (identical to Admin) ── */
+  headerBg: { backgroundColor: Colors.white },
+  headerGradient: { paddingTop: 48, paddingBottom: 22, paddingHorizontal: 18 },
+  headerContent: { flexDirection: 'row', alignItems: 'center' },
+  greeting: { fontSize: 11, color: 'rgba(255,255,255,0.5)', letterSpacing: 3, fontWeight: '700', textTransform: 'uppercase' },
+  headerNameRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 4, flexWrap: 'wrap' },
+  headerName: { fontSize: 26, fontWeight: '900', color: Colors.white, letterSpacing: 0.2 },
+  headerNameAccent: { fontSize: 26, fontWeight: '900', color: '#FF4FA3', letterSpacing: 0.2 },
+  headerDateline: { fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3, fontWeight: '500' },
+  aiBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   notifBtn: { padding: 8, position: 'relative' },
-  badge: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.primary, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center' },
+  badge: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.pink, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center' },
   badgeText: { color: Colors.white, fontSize: 10, fontWeight: 'bold' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingVertical: 12, gap: 12 },
-  statCard: { width: '48%', borderRadius: 24, padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.lightGray, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  statIconLarge: { width: 68, height: 68, borderRadius: 34, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  statValueLarge: { fontSize: 32, fontWeight: '900', marginBottom: 6, letterSpacing: -0.5 },
-  statLabelPremium: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
-  statIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  statValue: { fontSize: 26, fontWeight: 'bold' },
-  statLabel: { fontSize: 12, marginTop: 2 },
-  section: { paddingHorizontal: 16, marginTop: 24 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.navy, letterSpacing: 0.3 },
-  
-  /* Premium Carousel Styles */
-  carouselContent: { paddingHorizontal: 12, paddingRight: 32 },
-  carouselCard: { width: 160, height: 200, borderRadius: 28, marginRight: 12, padding: 16, alignItems: 'center', justifyContent: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 4 },
-  carouselIconGlow: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  carouselIcon: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center' },
-  carouselLabel: { fontSize: 16, fontWeight: '800', textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 },
-  carouselArrow: { position: 'absolute', bottom: 12, right: 12, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  
-  liveCard: { borderRadius: 14, padding: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  liveInfo: {},
-  liveSubject: { fontSize: 17, fontWeight: '700' },
-  liveTime: { fontSize: 13, marginTop: 2 },
-  liveChip: { backgroundColor: Colors.error, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  liveChipText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
-  nextCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 16, ...Shadows.light },
-  nextSubject: { fontSize: 16, fontWeight: '600' },
-  nextTime: { fontSize: 13, marginTop: 2 },
-  goLiveBtn: { backgroundColor: '#00A8AB', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
-  goLiveText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actionCard: { width: '31%', borderRadius: 14, padding: 16, alignItems: 'center', ...Shadows.light },
-  actionIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  actionLabel: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
-  annCard: { borderRadius: 12, padding: 14, marginBottom: 8, ...Shadows.light },
-  annTitle: { fontSize: 15, fontWeight: '600' },
-  annText: { fontSize: 13, marginTop: 4 },
+
+  /* ── Stats Grid — Premium 2×2 (identical to Admin) ── */
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 12, gap: 12 },
+  statCard: {
+    width: '48%',
+    height: 110,
+    borderRadius: 22,
+    flexDirection: 'row',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    overflow: 'hidden',
+    ...Shadows.medium,
+  },
+  statSymbolArea: {
+    width: '50%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  statGlowCircle: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    top: -8,
+    right: -12,
+    opacity: 0.95,
+  },
+  statIconLarge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardSymbol: { fontSize: 26, lineHeight: 30 },
+  statTextArea: { width: '50%', justifyContent: 'center', paddingRight: 12, paddingLeft: 4 },
+  statValueLarge: { fontSize: 32, fontWeight: '900', color: Colors.navy, letterSpacing: -0.7 },
+  statLabelPremium: { fontSize: 12, fontWeight: '700', color: Colors.mediumGray, marginTop: 2, letterSpacing: 0.3 },
+
+  /* ── Section Layout (matches Admin) ── */
+  section: { paddingHorizontal: 16, marginTop: 28 },
+  sectionHeaderCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(31, 45, 61, 0.06)',
+    ...Shadows.light,
+  },
+  managementHeaderCard: { backgroundColor: '#F4FBF7' },
+  liveHeaderCard: { backgroundColor: '#EEF6FF' },
+  noticeHeaderCard: { backgroundColor: '#FFF8E8' },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  sectionAccentBar: { width: 4, height: 26, borderRadius: 999, backgroundColor: '#FF4F8B', marginRight: 10 },
+  sectionTitle: { fontSize: 19, fontWeight: '700', color: '#1F2D3D', letterSpacing: 0.1 },
+  sectionContent: { marginTop: 2 },
+
+  /* ── Carousel Cards (identical to Admin) ── */
+  carouselContent: { paddingHorizontal: 0, paddingRight: 32 },
+  carouselCard: {
+    width: 168,
+    height: 176,
+    borderRadius: 28,
+    marginRight: 12,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  carouselIconGlow: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  carouselIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  carouselSymbol: { fontSize: 30, lineHeight: 34 },
+  carouselLabel: { fontSize: 18, fontWeight: '900', color: Colors.navy, textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 },
+  carouselSubtitle: { fontSize: 12, fontWeight: '600', color: Colors.mediumGray, textAlign: 'center', marginBottom: 12 },
+  cardArrowSmall: { fontSize: 14, fontWeight: '700' },
+  carouselArrow: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  /* ── Info / Live Cards ── */
+  infoCard: {
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    ...Shadows.light,
+  },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  smallIconWrap: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  infoTextWrap: { flex: 1, minWidth: 0 },
+  infoTitle: { fontSize: 15, fontWeight: '700', color: '#1F2D3D', lineHeight: 20 },
+  infoSubtitle: { fontSize: 12, fontWeight: '500', color: Colors.mediumGray, marginTop: 2, lineHeight: 16 },
+  infoAction: { marginTop: 10, fontSize: 13, fontWeight: '700', color: '#FF4F8B', textAlign: 'right' },
+
+  /* ── Notice / Announcement Cards ── */
+  noticeCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    ...Shadows.light,
+  },
+  noticeTextWrap: { flex: 1, minWidth: 0 },
+  noticeBody: { fontSize: 12, fontWeight: '500', color: Colors.mediumGray, marginTop: 4, lineHeight: 18 },
 });

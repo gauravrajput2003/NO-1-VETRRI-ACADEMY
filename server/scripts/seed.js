@@ -6,7 +6,8 @@ const Course = require('../models/Course');
 
 const connectDB = async () => {
   await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/vettri_academy');
-  console.log('✅ MongoDB Connected');
+  const { logDev } = require('../utils/logger');
+  logDev('MongoDB connected (seed script)');
 };
 
 const seedCourses = async () => {
@@ -63,14 +64,14 @@ const seedCourses = async () => {
 
   await Course.deleteMany({});
   const created = await Course.insertMany(courses);
-  console.log(`✅ ${created.length} courses seeded`);
+  logDev(`${created.length} courses seeded`);
   return created;
 };
 
 const seedAdmin = async () => {
   const existingAdmin = await User.findOne({ role: 'admin' });
   if (existingAdmin) {
-    console.log('ℹ️  Admin already exists:', existingAdmin.email);
+    logDev('Admin already exists');
     return existingAdmin;
   }
 
@@ -84,10 +85,7 @@ const seedAdmin = async () => {
     isApproved: true,
   });
 
-  console.log('✅ Admin seeded:');
-  console.log(`   Email: ${admin.email}`);
-  console.log(`   Mobile: ${admin.mobile}`);
-  console.log(`   Password: ${process.env.ADMIN_PASSWORD || 'Admin@123'}`);
+  logDev('Admin seeded (credentials not printed)');
 
   return admin;
 };
@@ -118,7 +116,7 @@ const seedDemoTeachers = async () => {
       isApproved: true,
       profileImage: 'https://i.pravatar.cc/300?img=2',
     },
-    {
+    { 
       name: 'Venkatalakshmi K',
       mobile: '9000000003',
       email: 'venkatalakshmi@no1vettriacademy.com',
@@ -174,10 +172,6 @@ const seed = async () => {
     await seedCourses();
     await seedDemoTeachers();
     console.log('\n🎉 Database seeded successfully!');
-    console.log('\n📋 Login Credentials:');
-    console.log('Admin:   admin@no1vettriacademy.com / Admin@123');
-    console.log('Teacher: preetha@no1vettriacademy.com / Teacher@123');
-    console.log('\nVisit http://localhost:5173 to get started.');
     process.exit(0);
   } catch (error) {
     console.error('❌ Seed error:', error);
