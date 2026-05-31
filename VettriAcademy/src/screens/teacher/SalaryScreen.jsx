@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity as RNTouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -12,6 +12,17 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { API_BASE_URL } from '../../utils/constants';
 import { getToken } from '../../services/storage';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function SalaryScreen() {
   const dispatch = useDispatch();

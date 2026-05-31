@@ -1,7 +1,7 @@
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Platform, FlatList } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity as RNTouchableOpacity, StyleSheet, Modal, ActivityIndicator, Platform, FlatList } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,6 +10,17 @@ import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate } from '../../utils/formatters';
 import { applyStudentLeaveAPI, getStudentLeavesAPI } from '../../services/api';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function StudentLeaveScreen() {
   const bottomPadding = useBottomTabBarPadding();

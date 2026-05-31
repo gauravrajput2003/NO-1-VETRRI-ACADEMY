@@ -4,9 +4,17 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarAnimation } from '../context/TabBarVisibilityContext';
+import ParticleWrapper from './effects/ParticleWrapper';
 
 const PINK = '#FF4FA3';
 const TAB_BAR_HEIGHT = 64;
+const TAB_COLORS = {
+  Home: ['#FFD700', '#FFC300', '#FFEC8B'],
+  Classes: ['#008B8B', '#20B2AA', '#00CED1'],
+  Downloads: ['#FF1493', '#FF69B4', '#FFB6D9'],
+  Scores: ['#2196F3', '#64B5F6', '#BBDEFB'],
+  Profile: ['#9C27B0', '#CE93D8', '#E1BEE7'],
+};
 
 /**
  * CustomTabBar — Premium glassmorphism floating tab bar with auto-hide animation.
@@ -77,21 +85,28 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
             const iconColor = isFocused ? '#FFF' : 'rgba(255,255,255,0.4)';
 
             return (
-              <TouchableOpacity
+              <ParticleWrapper
                 key={route.key}
-                accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={options.tabBarAccessibilityLabel}
-                testID={options.tabBarTestID}
-                onPress={onPress}
-                onLongPress={onLongPress}
-                style={styles.tabButton}
-                activeOpacity={0.7}
+                particleCount={16}
+                durationMs={800}
+                size="small"
+                colors={TAB_COLORS[route.name] || TAB_COLORS.Home}
               >
-                <View style={[styles.iconWrap, isFocused && styles.iconActive]}>
-                  <Ionicons name={iconName} size={22} color={iconColor} />
-                </View>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={isFocused ? { selected: true } : {}}
+                  accessibilityLabel={options.tabBarAccessibilityLabel}
+                  testID={options.tabBarTestID}
+                  onPress={onPress}
+                  onLongPress={onLongPress}
+                  style={styles.tabButton}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.iconWrap, isFocused && styles.iconActive]}>
+                    <Ionicons name={iconName} size={22} color={iconColor} />
+                  </View>
+                </TouchableOpacity>
+              </ParticleWrapper>
             );
           })}
         </View>

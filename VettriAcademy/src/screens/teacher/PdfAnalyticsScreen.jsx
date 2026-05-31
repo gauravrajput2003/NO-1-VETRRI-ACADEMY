@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity as RNTouchableOpacity, RefreshControl,
   ScrollView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,17 @@ import { Colors } from '../../utils/colors';
 import { fetchTeacherAnalytics, fetchMaterialAnalytics } from '../../redux/slices/pdfSlice';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const PERIODS = [
   { key: '7d', label: '7 Days' },

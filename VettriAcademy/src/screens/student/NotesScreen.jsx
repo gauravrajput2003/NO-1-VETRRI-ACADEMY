@@ -1,7 +1,7 @@
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity as RNTouchableOpacity, RefreshControl,
   Alert, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,17 @@ import { fetchAllBookmarks, deleteNote } from '../../redux/slices/pdfSlice';
 import { getAllBookmarksAPI, getMaterialNotesAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import NoteModal from '../../components/NoteModal';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const NOTE_COLOR_MAP = {
   yellow: '#FFF9C4', green: '#C8E6C9', blue: '#BBDEFB', pink: '#F8BBD0', purple: '#E1BEE7',

@@ -100,6 +100,7 @@ function DownloadsStack() {
       <Stack.Screen name="DownloadsMain"  component={DownloadCenterScreen} options={{ ...HEADER_OPTS, title: 'Downloads' }} />
       <Stack.Screen name="NcertViewer"    component={NcertViewerScreen}    options={{ headerShown: false }} />
       <Stack.Screen name="MaterialDetail" component={MaterialDetailScreen} options={{ ...HEADER_OPTS, title: 'Material' }} />
+      <Stack.Screen name="PdfViewer"      component={PdfViewerScreen}      options={{ headerShown: false }} />
       <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );

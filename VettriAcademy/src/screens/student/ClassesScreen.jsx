@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Linking } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -9,6 +9,17 @@ import { formatScheduledTime, formatDate } from '../../utils/formatters';
 import { fetchSchedules, joinClass, clearJoinResult } from '../../redux/slices/classesSlice';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function ClassesScreen({ navigation }) {
   const dispatch = useDispatch();

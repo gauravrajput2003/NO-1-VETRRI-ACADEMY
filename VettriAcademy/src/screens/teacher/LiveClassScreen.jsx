@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
+  View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Modal, Animated, RefreshControl, Keyboard, Platform, StatusBar, SafeAreaView
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -11,6 +11,17 @@ import { Shadows } from '../../utils/theme';
 import { formatScheduledTime, formatDate } from '../../utils/formatters';
 import { fetchTodayClasses, fetchSchedules } from '../../redux/slices/classesSlice';
 import { startLiveClass } from '../../redux/slices/teacherSlice';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const STATUS_TABS = [
   { key: 'all', label: 'All' },

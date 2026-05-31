@@ -1,7 +1,7 @@
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity as RNTouchableOpacity, StyleSheet, ActivityIndicator, Linking, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,17 @@ import { Shadows } from '../../utils/theme';
 import { formatScheduledTime, formatDate } from '../../utils/formatters';
 import { fetchClassDetails, joinClass, clearJoinResult } from '../../redux/slices/classesSlice';
 import { getClassAttendanceAPI } from '../../services/api';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function ClassDetailScreen({ route, navigation }) {
   const { classId } = route.params;

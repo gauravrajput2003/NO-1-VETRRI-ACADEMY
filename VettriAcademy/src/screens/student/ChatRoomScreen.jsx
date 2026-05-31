@@ -1,7 +1,7 @@
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Image, Modal, ActionSheetIOS } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity as RNTouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Image, Modal, ActionSheetIOS } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,6 +12,17 @@ import { formatTime, formatFileSize } from '../../utils/formatters';
 import { fetchMessages, sendMessage, setCurrentConversation, resetMessages, addIncomingMessage, setTyping, markConversationRead } from '../../redux/slices/chatSlice';
 import { onSocketEvent, sendTypingIndicator, joinChatRoom } from '../../services/socket';
 import { sendChatFileAPI } from '../../services/api';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function ChatRoomScreen({ route, navigation }) {
   const { conversationId, otherUser } = route.params;

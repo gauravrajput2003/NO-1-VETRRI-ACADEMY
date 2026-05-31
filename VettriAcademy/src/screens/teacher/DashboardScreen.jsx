@@ -23,6 +23,7 @@ import { Shadows } from '../../utils/theme';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { formatScheduledTime } from '../../utils/formatters';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 export default function TeacherDashboard({ navigation }) {
   const dispatch = useDispatch();
@@ -118,13 +119,17 @@ export default function TeacherDashboard({ navigation }) {
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
-                <Ionicons name="sparkles" size={20} color={Colors.gold} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
-                <Ionicons name="notifications-outline" size={22} color={Colors.white} />
-                {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
-              </TouchableOpacity>
+              <ParticleWrapper particleCount={20} size="small">
+                <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
+                  <Ionicons name="sparkles" size={20} color={Colors.gold} />
+                </TouchableOpacity>
+              </ParticleWrapper>
+              <ParticleWrapper particleCount={20} size="small">
+                <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
+                  <Ionicons name="notifications-outline" size={22} color={Colors.white} />
+                  {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
+                </TouchableOpacity>
+              </ParticleWrapper>
             </View>
           </View>
         </LinearGradient>
@@ -133,7 +138,8 @@ export default function TeacherDashboard({ navigation }) {
       {/* ═══ Stats Grid — Premium 2×2 Horizontal (matches Admin) ═══ */}
       <View style={styles.statsGrid}>
         {statCards.map((card, i) => (
-          <TouchableOpacity key={i} style={styles.statCard} onPress={() => navigation.navigate(card.screen)} activeOpacity={0.85}>
+          <ParticleWrapper key={i} particleCount={24} size="small" style={styles.statCardWrap}>
+          <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate(card.screen)} activeOpacity={0.85}>
             <LinearGradient colors={[card.glow, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.statSymbolArea}>
               <View style={[styles.statGlowCircle, { backgroundColor: card.accent + '18' }]} />
               <View style={styles.statIconLarge}>
@@ -145,6 +151,7 @@ export default function TeacherDashboard({ navigation }) {
               <Text style={styles.statLabelPremium} numberOfLines={2}>{card.label}</Text>
             </View>
           </TouchableOpacity>
+          </ParticleWrapper>
         ))}
       </View>
 
@@ -167,6 +174,7 @@ export default function TeacherDashboard({ navigation }) {
           decelerationRate="fast"
           contentContainerStyle={styles.carouselContent}
           renderItem={({ item }) => (
+            <ParticleWrapper particleCount={24} size="small">
             <TouchableOpacity
               style={[styles.carouselCard, { backgroundColor: item.bgColor }]}
               onPress={() => navigation.navigate(item.screen)}
@@ -183,6 +191,7 @@ export default function TeacherDashboard({ navigation }) {
                 <Text style={[styles.cardArrowSmall, { color: item.color }]}>→</Text>
               </View>
             </TouchableOpacity>
+            </ParticleWrapper>
           )}
         />
       </View>
@@ -196,6 +205,7 @@ export default function TeacherDashboard({ navigation }) {
               <Text style={styles.sectionTitle}>Live Status</Text>
             </View>
           </View>
+          <ParticleWrapper particleCount={24} size="small">
           <TouchableOpacity style={styles.infoCard} onPress={() => navigation.navigate('LiveClass')} activeOpacity={0.85}>
             <View style={styles.infoRow}>
               <View style={[styles.smallIconWrap, { backgroundColor: '#DBEAFE' }]}>
@@ -208,6 +218,7 @@ export default function TeacherDashboard({ navigation }) {
             </View>
             <Text style={styles.infoAction}>Manage →</Text>
           </TouchableOpacity>
+          </ParticleWrapper>
         </View>
       )}
 
@@ -220,6 +231,7 @@ export default function TeacherDashboard({ navigation }) {
               <Text style={styles.sectionTitle}>Upcoming Class</Text>
             </View>
           </View>
+          <ParticleWrapper particleCount={24} size="small">
           <TouchableOpacity style={styles.infoCard} onPress={() => navigation.navigate('LiveClass')} activeOpacity={0.85}>
             <View style={styles.infoRow}>
               <View style={[styles.smallIconWrap, { backgroundColor: '#EDE9FE' }]}>
@@ -232,6 +244,7 @@ export default function TeacherDashboard({ navigation }) {
             </View>
             <Text style={styles.infoAction}>Open →</Text>
           </TouchableOpacity>
+          </ParticleWrapper>
         </View>
       )}
 
@@ -290,8 +303,9 @@ const styles = StyleSheet.create({
 
   /* ── Stats Grid — Premium 2×2 (identical to Admin) ── */
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 12, gap: 12 },
+  statCardWrap: { width: '48%' },
   statCard: {
-    width: '48%',
+    width: '100%',
     height: 110,
     borderRadius: 22,
     flexDirection: 'row',

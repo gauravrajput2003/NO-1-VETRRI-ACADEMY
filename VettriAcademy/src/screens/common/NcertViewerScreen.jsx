@@ -10,11 +10,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity as RNTouchableOpacity, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../utils/colors';
 import { checkBlockedSite } from '../../utils/fileUtils';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 let WebView;
 try { WebView = require('react-native-webview').WebView; } catch (e) { WebView = null; }

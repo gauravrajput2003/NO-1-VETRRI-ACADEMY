@@ -2,13 +2,14 @@ import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Modal, TextInput, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity as RNTouchableOpacity, FlatList, Modal, TextInput, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import {
   getAdminSalaryDashboardAPI,
   processTeacherSalaryAPI,
@@ -17,6 +18,15 @@ import {
   setTeacherSalaryConfigAPI,
   getSalaryReportsAPI,
 } from '../../services/api';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
 
 const emptyConfig = {
   baseSalary: '',

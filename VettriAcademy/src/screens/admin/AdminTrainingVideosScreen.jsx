@@ -2,7 +2,7 @@ import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet,
   TextInput, Alert, Modal, ScrollView, ActivityIndicator,
   Switch, RefreshControl, Image, Platform,
 } from 'react-native';
@@ -12,12 +12,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import {
   getAdminTrainingVideosAPI, uploadTrainingVideoByUrlAPI,
   uploadTrainingVideoFileAPI,
   editTrainingVideoAPI, toggleTrainingVideoStatusAPI,
   deleteAdminTrainingVideoAPI, reorderTrainingVideosAPI,
 } from '../../services/api';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
 
 const CATEGORIES = [
   { key: 'all', label: 'All', icon: 'grid-outline', color: '#6C5CE7' },

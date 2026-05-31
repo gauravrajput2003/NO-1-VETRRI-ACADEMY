@@ -1,6 +1,6 @@
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity as RNTouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../utils/colors';
@@ -8,6 +8,17 @@ import { Shadows } from '../../utils/theme';
 import { formatRelativeTime } from '../../utils/formatters';
 import { fetchConversations } from '../../redux/slices/chatSlice';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function ChatListScreen({ navigation }) {
   const dispatch = useDispatch();

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
+  View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Modal, Animated, Alert, Linking, ScrollView, Platform,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -12,6 +12,17 @@ import { formatRelativeTime, getInitials } from '../../utils/formatters';
 import { endLiveClass, fetchLiveMonitorData, sendLiveClassMessage, applyLiveStudentJoined, applyLiveStudentLeft, clearLiveMonitor } from '../../redux/slices/teacherSlice';
 import { fetchTodayClasses } from '../../redux/slices/classesSlice';
 import { onSocketEvent, joinRoom, leaveRoom, getSocket } from '../../services/socket';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function LiveMonitorScreen({ navigation, route }) {
   const { classId, meetLink, className } = route.params || {};

@@ -1,7 +1,7 @@
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity as RNTouchableOpacity, RefreshControl,
   Alert, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,17 @@ import Toast from 'react-native-toast-message';
 import { Colors } from '../../utils/colors';
 import { fetchAllBookmarks, removeBookmark } from '../../redux/slices/pdfSlice';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function BookmarkScreen({ navigation }) {
   const dispatch = useDispatch();

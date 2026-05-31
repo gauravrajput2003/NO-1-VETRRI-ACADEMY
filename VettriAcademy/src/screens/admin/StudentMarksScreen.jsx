@@ -1,10 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity as RNTouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { getAdminStudentMarksAPI } from '../../services/api';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const getScore = (item) => Number(item.percentage ?? (item.maxMarks ? ((item.marksObtained / item.maxMarks) * 100) : 0));
 
@@ -87,7 +98,7 @@ export default function StudentMarksScreen({ navigation }) {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>All Student Marks</Text>
-          <Text style={styles.subtitle}>Top scorer stays at the top automatically</Text>
+         
         </View>
       </View>
 

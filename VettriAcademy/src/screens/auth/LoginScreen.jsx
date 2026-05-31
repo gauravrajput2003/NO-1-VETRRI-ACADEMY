@@ -15,6 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { loginUser, clearError } from '../../redux/slices/authSlice';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -44,6 +45,12 @@ export default function LoginScreen({ route, navigation }) {
 
   const canSubmit   = identifier.trim().length > 0 && password.trim().length >= 6;
   const accentColor = ROLE_COLORS[role] || C.purple;
+  const roleParticleColors = {
+    student: ['#FFD700', '#FF1493', '#FFB6D9', '#FFFFFF', '#FFC300'],
+    teacher: ['#FFD700', '#008B8B', '#20B2AA', '#FFFFFF', '#FFC300'],
+    admin: ['#FFD700', '#9C27B0', '#CE93D8', '#FFFFFF', '#FFC300'],
+  };
+  const activeColors = roleParticleColors[role] || roleParticleColors.student;
 
   const handleLogin = async () => {
     if (!identifier.trim() || !password.trim()) {
@@ -106,9 +113,11 @@ export default function LoginScreen({ route, navigation }) {
           <View style={st.inner}>
 
             {/* ── Back button ───────────────────────────────────────────── */}
-            <TouchableOpacity style={st.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={20} color={C.dark} />
-            </TouchableOpacity>
+            <ParticleWrapper particleCount={20} size="small" colors={['#FFD700', '#FFEC8B', '#FFC300']}>
+              <TouchableOpacity style={st.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
+                <Ionicons name="arrow-back" size={20} color={C.dark} />
+              </TouchableOpacity>
+            </ParticleWrapper>
 
             {/* ── Hero illustration ─────────────────────────────────────── */}
             <Animated.View style={[st.hero, logoStyle]}>
@@ -166,9 +175,11 @@ export default function LoginScreen({ route, navigation }) {
                   onFocus={() => setFocusedField('pw')}
                   onBlur={() => setFocusedField(null)}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 12 }}>
-                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#AAA" />
-                </TouchableOpacity>
+                <ParticleWrapper particleCount={20} size="small" colors={['#008B8B', '#20B2AA', '#FFFFFF']}>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 12 }}>
+                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#AAA" />
+                  </TouchableOpacity>
+                </ParticleWrapper>
               </View>
 
               {/* Error */}
@@ -181,31 +192,33 @@ export default function LoginScreen({ route, navigation }) {
 
               {/* Sign In button */}
               <Animated.View style={{ transform: [{ scale: btnScale }], marginTop: error ? 8 : 14 }}>
-                <TouchableOpacity
-                  onPress={handleLogin}
-                  onPressIn={onBtnPressIn}
-                  onPressOut={onBtnPressOut}
-                  disabled={loading || !canSubmit}
-                  activeOpacity={0.9}
-                  style={[{ borderRadius: 28, overflow: 'hidden' }, (!canSubmit || loading) && { opacity: 0.65 }]}
-                >
-                  <LinearGradient
-                    colors={[C.purple, C.pink]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={st.btnGrad}
+                <ParticleWrapper particleCount={24} size="large" colors={activeColors}>
+                  <TouchableOpacity
+                    onPress={handleLogin}
+                    onPressIn={onBtnPressIn}
+                    onPressOut={onBtnPressOut}
+                    disabled={loading || !canSubmit}
+                    activeOpacity={0.9}
+                    style={[{ borderRadius: 28, overflow: 'hidden' }, (!canSubmit || loading) && { opacity: 0.65 }]}
                   >
-                    {loading ? (
-                      <ActivityIndicator color="#FFF" size="small" />
-                    ) : (
-                      <>
-                        <Text style={st.btnText}>Sign In</Text>
-                        <View style={st.btnArrow}>
-                          <Ionicons name="arrow-forward" size={16} color={C.purple} />
-                        </View>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <LinearGradient
+                      colors={[C.purple, C.pink]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={st.btnGrad}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#FFF" size="small" />
+                      ) : (
+                        <>
+                          <Text style={st.btnText}>Sign In</Text>
+                          <View style={st.btnArrow}>
+                            <Ionicons name="arrow-forward" size={16} color={C.purple} />
+                          </View>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </ParticleWrapper>
               </Animated.View>
 
               <Text style={st.tagline}>🔒 Secure · 🎓 Trusted · ⚡ Fast</Text>

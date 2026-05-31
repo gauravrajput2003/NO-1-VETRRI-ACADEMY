@@ -5,12 +5,23 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  TouchableOpacity,
+  TouchableOpacity as RNTouchableOpacity,
 } from 'react-native';
 import { StatCard } from '../../components/StatCard';
 import { ListItem } from '../../components/ListItem';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Colors } from '../../utils/colors';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export function TeacherDashboardScreen({ navigation }) {
   const [liveClasses] = useState([

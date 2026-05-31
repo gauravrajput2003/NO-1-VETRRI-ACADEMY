@@ -11,6 +11,7 @@ import { fetchAdminStats } from '../../redux/slices/adminSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
 import { getAdminStudentMarksAPI, getAdminTopRankersAPI } from '../../services/api';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 export default function AdminDashboard({ navigation }) {
   const dispatch = useDispatch();
@@ -33,7 +34,7 @@ export default function AdminDashboard({ navigation }) {
   const loadAdminInsights = useCallback(async () => {
     try {
       const [rankersRes, marksRes] = await Promise.all([
-        getAdminTopRankersAPI({}),
+        getAdminTopRankersAPI({ limit: 3 }),
         getAdminStudentMarksAPI({ limit: 100 }),
       ]);
       setTopRankers(rankersRes.data?.topRankers || []);
@@ -73,6 +74,7 @@ export default function AdminDashboard({ navigation }) {
     });
 
   const topStudentMarks = sortedStudentMarks.slice(0, 4);
+  const previewTopRankers = topRankers.slice(0, 3);
 
   const statCards = [
     { symbol: '🎓', value: s.totalStudents || 0, label: 'Students', accent: '#6C5CE7', glow: '#E8E4FF', screen: 'ManageStudents' },
@@ -108,13 +110,17 @@ export default function AdminDashboard({ navigation }) {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
-                <Ionicons name="sparkles" size={20} color={Colors.gold} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
-                <Ionicons name="notifications-outline" size={22} color={Colors.white} />
-                {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
-              </TouchableOpacity>
+              <ParticleWrapper particleCount={20} size="small">
+                <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
+                  <Ionicons name="sparkles" size={20} color={Colors.gold} />
+                </TouchableOpacity>
+              </ParticleWrapper>
+              <ParticleWrapper particleCount={20} size="small">
+                <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
+                  <Ionicons name="notifications-outline" size={22} color={Colors.white} />
+                  {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
+                </TouchableOpacity>
+              </ParticleWrapper>
             </View>
           </View>
         </LinearGradient>
@@ -123,7 +129,8 @@ export default function AdminDashboard({ navigation }) {
       {/* Stats Grid - 2x2 Horizontal Layout */}
       <View style={styles.statsGrid}>
         {statCards.map((card, i) => (
-          <TouchableOpacity key={i} style={styles.statCard} onPress={() => navigation.navigate(card.screen)} activeOpacity={0.85}>
+          <ParticleWrapper key={i} particleCount={24} size="small" style={styles.statCardWrap}>
+          <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate(card.screen)} activeOpacity={0.85}>
             <LinearGradient colors={[card.glow, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.statSymbolArea}>
               <View style={[styles.statGlowCircle, { backgroundColor: card.accent + '18' }]} />
               <View style={[styles.statIconLarge, { backgroundColor: '#FFFFFF' }]}>
@@ -135,6 +142,7 @@ export default function AdminDashboard({ navigation }) {
               <Text style={[styles.statLabelPremium, { color: Colors.mediumGray }]}>{card.label}</Text>
             </View>
           </TouchableOpacity>
+          </ParticleWrapper>
         ))}
       </View>
 
@@ -155,22 +163,24 @@ export default function AdminDashboard({ navigation }) {
           decelerationRate="fast"
           contentContainerStyle={styles.carouselContent}
           renderItem={({ item, index }) => (
-            <TouchableOpacity
-              style={[styles.carouselCard, { backgroundColor: item.bgColor }]}
-              onPress={() => navigation.navigate(item.screen)}
-              activeOpacity={0.75}
-            >
-              <LinearGradient colors={[item.iconBg, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}> 
-                <View style={[styles.carouselIcon, { backgroundColor: '#FFFFFF' }]}> 
-                  <Text style={styles.carouselSymbol}>{item.symbol}</Text>
+            <ParticleWrapper particleCount={24} size="small">
+              <TouchableOpacity
+                style={[styles.carouselCard, { backgroundColor: item.bgColor }]}
+                onPress={() => navigation.navigate(item.screen)}
+                activeOpacity={0.75}
+              >
+                <LinearGradient colors={[item.iconBg, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}> 
+                  <View style={[styles.carouselIcon, { backgroundColor: '#FFFFFF' }]}> 
+                    <Text style={styles.carouselSymbol}>{item.symbol}</Text>
+                  </View>
+                </LinearGradient>
+                <Text style={[styles.carouselLabel, { color: Colors.navy }]}>{item.label}</Text>
+                <Text style={[styles.carouselSubtitle, { color: Colors.mediumGray }]}>{item.subtitle}</Text>
+                <View style={[styles.carouselArrow, { backgroundColor: item.color + '20' }]}>
+                  <Text style={[styles.cardArrowSmall, { color: item.color }]}>→</Text>
                 </View>
-              </LinearGradient>
-              <Text style={[styles.carouselLabel, { color: Colors.navy }]}>{item.label}</Text>
-              <Text style={[styles.carouselSubtitle, { color: Colors.mediumGray }]}>{item.subtitle}</Text>
-              <View style={[styles.carouselArrow, { backgroundColor: item.color + '20' }]}>
-                <Text style={[styles.cardArrowSmall, { color: item.color }]}>→</Text>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </ParticleWrapper>
           )}
         />
       </View>
@@ -181,19 +191,34 @@ export default function AdminDashboard({ navigation }) {
             <View style={styles.sectionAccentBar} />
             <Text style={styles.sectionTitle}>Monthly Top Rankers</Text>
           </View>
+          <ParticleWrapper particleCount={14} size="small">
+            <TouchableOpacity
+              onPress={() => navigation.navigate('MonthlyTopRankers')}
+              style={styles.viewAllButton}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewAllText}>Show More →</Text>
+            </TouchableOpacity>
+          </ParticleWrapper>
         </View>
         <View style={styles.sectionContent}>
-          {topRankers.length ? topRankers.map((r) => (
-            <View key={r.studentId || `${r.name}-${r.rank}`} style={styles.rankCard}>
-              <View style={styles.rankPill}>
-                <Text style={styles.rankPillText}>#{r.rank}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rankName}>{r.name}</Text>
-                <Text style={styles.rankSub}>Grade {r.grade || 'N/A'}</Text>
-              </View>
-              <Text style={styles.rankPercent}>{r.score}</Text>
-            </View>
+          {previewTopRankers.length ? previewTopRankers.map((r) => (
+            <ParticleWrapper key={r.studentId || `${r.name}-${r.rank}`} particleCount={12} size="small">
+              <TouchableOpacity
+                style={styles.rankCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('MonthlyTopRankers')}
+              >
+                <View style={styles.rankPill}>
+                  <Text style={styles.rankPillText}>#{r.rank}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName}>{r.name}</Text>
+                  <Text style={styles.rankSub}>Grade {r.grade || 'N/A'}</Text>
+                </View>
+                <Text style={styles.rankPercent}>{r.score}</Text>
+              </TouchableOpacity>
+            </ParticleWrapper>
           )) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyCardText}>No ranking data this month</Text>
@@ -208,9 +233,11 @@ export default function AdminDashboard({ navigation }) {
             <View style={styles.sectionAccentBar} />
             <Text style={styles.sectionTitle}>Student Marks</Text>
           </View>
+          <ParticleWrapper particleCount={14} size="small">
           <TouchableOpacity onPress={() => navigation.navigate('StudentMarks')} style={styles.viewAllButton} activeOpacity={0.8}>
             <Text style={styles.viewAllText}>View All →</Text>
           </TouchableOpacity>
+          </ParticleWrapper>
         </View>
         <View style={styles.sectionContent}>
           {topStudentMarks.length ? topStudentMarks.map((m, index) => {
@@ -219,7 +246,8 @@ export default function AdminDashboard({ navigation }) {
           const gradeColor = score >= 80 ? '#00B894' : score >= 60 ? '#FDCB6E' : '#E17055';
 
           return (
-            <TouchableOpacity key={m._id} style={styles.markCard} activeOpacity={0.85} onPress={() => navigation.navigate('StudentMarks')}>
+            <ParticleWrapper key={m._id} particleCount={14} size="small">
+            <TouchableOpacity style={styles.markCard} activeOpacity={0.85} onPress={() => navigation.navigate('StudentMarks')}>
               <View style={styles.markAvatar}>
                 <Text style={styles.markAvatarText}>{(m.student?.displayName || m.student?.name || 'S')?.[0]?.toUpperCase()}</Text>
               </View>
@@ -238,6 +266,7 @@ export default function AdminDashboard({ navigation }) {
                 <Text style={styles.markRankLabel}>#{index + 1}</Text>
               </View>
             </TouchableOpacity>
+            </ParticleWrapper>
           );
           }) : (
             <View style={styles.emptyCard}>
@@ -270,7 +299,8 @@ const styles = StyleSheet.create({
   
   /* Stats Grid - Premium 2x2 Horizontal Layout */
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 12, gap: 12 },
-  statCard: { width: '48%', height: 110, borderRadius: 22, flexDirection: 'row', backgroundColor: Colors.white, borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)', overflow: 'hidden', ...Shadows.medium },
+  statCardWrap: { width: '48%' },
+  statCard: { width: '100%', height: 110, borderRadius: 22, flexDirection: 'row', backgroundColor: Colors.white, borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)', overflow: 'hidden', ...Shadows.medium },
   statSymbolArea: { width: '50%', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', position: 'relative' },
   statGlowCircle: { position: 'absolute', width: 70, height: 70, borderRadius: 35, top: -8, right: -12, opacity: 0.95 },
   statIconLarge: { width: 52, height: 52, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
@@ -344,3 +374,4 @@ const styles = StyleSheet.create({
   emptyCard: { borderRadius: 16, padding: 20, backgroundColor: Colors.lightGray, justifyContent: 'center', alignItems: 'center' },
   emptyCardText: { fontSize: 14, color: Colors.mediumGray, textAlign: 'center' },
 });
+

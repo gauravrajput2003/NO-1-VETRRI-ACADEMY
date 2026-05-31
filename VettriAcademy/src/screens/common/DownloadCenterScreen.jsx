@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, TextInput, Alert, Linking, Platform
 } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -15,6 +15,17 @@ import { API_BASE_URL } from '../../utils/constants';
 import { getToken } from '../../services/storage';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const GRADES = ['All', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 

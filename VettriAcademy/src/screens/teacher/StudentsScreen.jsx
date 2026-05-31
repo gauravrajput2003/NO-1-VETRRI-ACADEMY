@@ -37,7 +37,6 @@ export default function StudentsScreen({ navigation }) {
       <View style={styles.info}>
         <Text style={[styles.name, { color: textColor }]}>{item.displayName || item.name}</Text>
         <Text style={[styles.detail, { color: textSec }]}>Grade {item.grade || 'N/A'} • {item.board || 'N/A'}</Text>
-        {item.mobile && <Text style={[styles.detail, { color: textSec }]}>📞 {item.mobile}</Text>}
       </View>
       <View style={styles.statusDot}>
         <View style={[styles.dot, { backgroundColor: item.isOnline ? Colors.success : Colors.mediumGray }]} />

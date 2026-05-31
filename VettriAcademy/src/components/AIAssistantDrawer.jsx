@@ -88,7 +88,7 @@ export default function AIAssistantDrawer() {
   if (!isAIOpen && slideAnim._value === DRAWER_WIDTH) return null;
 
   return (
-    <View style={styles.overlay} pointerEvents={isAIOpen ? 'auto' : 'none'}>
+    <View style={[styles.overlay, { pointerEvents: isAIOpen ? 'auto' : 'none' }]}>
       {/* Backdrop */}
       {isAIOpen && (
         <TouchableOpacity 

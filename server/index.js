@@ -266,8 +266,10 @@ connectDB().then(() => {
   try {
     const { startWeeklyTopPerformerJob } = require('./jobs/weeklyTopPerformer');
     const { startClassReminderJob } = require('./jobs/classReminder');
+    const { startFeeReminderJob } = require('./jobs/feeReminder');
     startWeeklyTopPerformerJob();
     startClassReminderJob(io);
+    startFeeReminderJob(io);
     logDev('⏰ Cron jobs started');
   } catch (err) {
     warnDev('⚠️ Cron job startup error:', err.message);

@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 // UNCHANGED — all existing imports
 import { formatScheduledTime, formatPercentage } from '../../utils/formatters';
 import { fetchTodayClasses, fetchUpcomingClasses } from '../../redux/slices/classesSlice';
@@ -57,18 +58,22 @@ function SectionCard({ icon, title, color, onPress, children, style }) {
   const onPressOut = () => Animated.spring(sc, { toValue: 1,    useNativeDriver: true }).start();
   return (
     <Animated.View style={[st.sectionCard, style, { transform: [{ scale: sc }] }]}>
+      <ParticleWrapper particleCount={24} size="small">
       <TouchableOpacity onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} activeOpacity={0.9}>
         <View style={st.sectionCardHeader}>
           <View style={[st.sectionIconWrap, { backgroundColor: color + '18' }]}>
             <Text style={{ fontSize: 20 }}>{icon}</Text>
           </View>
           <Text style={[st.sectionCardTitle, { fontWeight: '800' }]}>{title}</Text>
-          <TouchableOpacity style={st.arrowBtn} onPress={onPress}>
-            <Ionicons name="arrow-forward" size={18} color={C.white} />
-          </TouchableOpacity>
+          <ParticleWrapper particleCount={20} size="small">
+            <TouchableOpacity style={st.arrowBtn} onPress={onPress}>
+              <Ionicons name="arrow-forward" size={18} color={C.white} />
+            </TouchableOpacity>
+          </ParticleWrapper>
         </View>
         {children}
       </TouchableOpacity>
+      </ParticleWrapper>
     </Animated.View>
   );
 }
@@ -182,13 +187,17 @@ export default function DashboardScreen({ navigation }) {
         </View>
         <View style={st.headerRight}>
           {/* UNCHANGED — AI button, notification nav */}
-          <TouchableOpacity style={st.aiCircle} onPress={() => dispatch(toggleAI())}>
-            <Ionicons name="sparkles" size={18} color={C.orange} />
-          </TouchableOpacity>
-          <TouchableOpacity style={st.bellCircle} onPress={() => navigation.navigate('Notifications')}>
-            <Ionicons name="notifications-outline" size={20} color={C.dark} />
-            {unreadCount > 0 && <View style={st.notifDot} />}
-          </TouchableOpacity>
+          <ParticleWrapper particleCount={20} size="small" colors={['#FFD700', '#F5A623', '#FFFFFF']}>
+            <TouchableOpacity style={st.aiCircle} onPress={() => dispatch(toggleAI())}>
+              <Ionicons name="sparkles" size={18} color={C.orange} />
+            </TouchableOpacity>
+          </ParticleWrapper>
+          <ParticleWrapper particleCount={20} size="small" colors={['#FFD700', '#FF3B30', '#FFFFFF']}>
+            <TouchableOpacity style={st.bellCircle} onPress={() => navigation.navigate('Notifications')}>
+              <Ionicons name="notifications-outline" size={20} color={C.dark} />
+              {unreadCount > 0 && <View style={st.notifDot} />}
+            </TouchableOpacity>
+          </ParticleWrapper>
         </View>
       </View>
 
@@ -222,13 +231,13 @@ export default function DashboardScreen({ navigation }) {
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.id;
             return (
+              <ParticleWrapper key={cat.id} particleCount={24} size="small" colors={['#FFD700', '#FFA500', '#FFEC8B']}>
               <TouchableOpacity
-                key={cat.id}
                 style={st.catItem}
                 onPress={() => {
                   setActiveCategory(cat.id);
                   // UNCHANGED — navigation logic
-                  if (cat.screen === 'ExamScores') navigation.navigate('Profile', { screen: 'ExamScores' });
+                  if (cat.screen === 'ExamScores') navigation.navigate('Scores', { screen: 'ExamScoresMain' });
                   else navigation.navigate(cat.screen);
                 }}
               >
@@ -237,6 +246,7 @@ export default function DashboardScreen({ navigation }) {
                 </View>
                 <Text style={[st.catLabel, isActive && { color: C.pink }]}>{cat.label}</Text>
               </TouchableOpacity>
+              </ParticleWrapper>
             );
           })}
         </ScrollView>
@@ -249,6 +259,7 @@ export default function DashboardScreen({ navigation }) {
           onPress={() => navigation.navigate('Classes')}
         >
           {todayClass ? (
+            <ParticleWrapper particleCount={14} size="small">
             <TouchableOpacity
               // UNCHANGED — navigation.navigate
               onPress={() => navigation.navigate('ClassDetail', { classId: todayClass._id })}
@@ -268,6 +279,7 @@ export default function DashboardScreen({ navigation }) {
                 )}
               </View>
             </TouchableOpacity>
+            </ParticleWrapper>
           ) : (
             <View style={st.emptyRow}>
               <Ionicons name="sunny-outline" size={28} color={C.orange} />
@@ -302,19 +314,21 @@ export default function DashboardScreen({ navigation }) {
           horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 10, paddingRight: 4 }}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[st.actionChip, { backgroundColor: item.bg }]}
-              onPress={() => {
-                // UNCHANGED — navigation logic
-                if (item.screen === 'ExamScores') navigation.navigate('Profile', { screen: 'ExamScores' });
-                else navigation.navigate(item.screen);
-              }}
-            >
-              <View style={[st.actionIcon, { backgroundColor: item.color + '20' }]}>
-                <Ionicons name={item.icon} size={22} color={item.color} />
-              </View>
-              <Text style={[st.actionLabel, { color: item.color }]}>{item.label}</Text>
-            </TouchableOpacity>
+            <ParticleWrapper particleCount={14} size="small" colors={['#FFD700', '#FFA500', '#FFFFFF']}>
+              <TouchableOpacity
+                style={[st.actionChip, { backgroundColor: item.bg }]}
+                onPress={() => {
+                  // UNCHANGED — navigation logic
+                  if (item.screen === 'ExamScores') navigation.navigate('Scores', { screen: 'ExamScoresMain' });
+                  else navigation.navigate(item.screen);
+                }}
+              >
+                <View style={[st.actionIcon, { backgroundColor: item.color + '20' }]}>
+                  <Ionicons name={item.icon} size={22} color={item.color} />
+                </View>
+                <Text style={[st.actionLabel, { color: item.color }]}>{item.label}</Text>
+              </TouchableOpacity>
+            </ParticleWrapper>
           )}
         />
       </Animated.View>
@@ -338,9 +352,11 @@ export default function DashboardScreen({ navigation }) {
                 </View>
               );
             })}
+            <ParticleWrapper particleCount={14} size="small">
             <TouchableOpacity style={st.viewAllBtn} onPress={() => navigation.navigate('TopPerformers')}>
               <Text style={st.viewAllText}>View Weekly Top Performers →</Text>
             </TouchableOpacity>
+            </ParticleWrapper>
           </SectionCard>
         </Animated.View>
       )}
@@ -442,3 +458,4 @@ const st = StyleSheet.create({
   annTitle:    { fontSize: 14, fontWeight: '700', color: '#1A1A2E' },
   annBody:     { fontSize: 13, color: '#666', marginTop: 4, lineHeight: 19 },
 });
+

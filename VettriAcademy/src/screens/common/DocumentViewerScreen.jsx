@@ -21,17 +21,27 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity as RNTouchableOpacity, ActivityIndicator,
   Platform, Linking, Image, ScrollView, StatusBar, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../utils/colors';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import {
   detectFileType, getPreviewStrategy, checkBlockedSite,
   buildGoogleDocsViewerUrl, downloadFileToCache, downloadAndOpenFile,
   FILE_TYPE_ICONS, getMimeType,
 } from '../../utils/fileUtils';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
 
 let WebView;
 try { WebView = require('react-native-webview').WebView; } catch (e) { WebView = null; }

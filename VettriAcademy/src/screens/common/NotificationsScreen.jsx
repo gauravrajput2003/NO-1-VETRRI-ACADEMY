@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../utils/colors';
@@ -7,6 +7,17 @@ import { Shadows } from '../../utils/theme';
 import { formatRelativeTime } from '../../utils/formatters';
 import { fetchNotifications, markNotificationRead, markAllRead } from '../../redux/slices/notificationsSlice';
 import { NOTIFICATION_TYPES } from '../../utils/constants';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const typeIcons = {
   new_score: 'stats-chart',

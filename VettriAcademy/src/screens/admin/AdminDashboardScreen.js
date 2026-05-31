@@ -5,13 +5,24 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  TouchableOpacity,
+  TouchableOpacity as RNTouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatCard } from '../../components/StatCard';
 import { MgmtCard } from '../../components/MgmtCard';
 import { ListItem } from '../../components/ListItem';
 import { Colors } from '../../utils/colors';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export function AdminDashboardScreen({ navigation }) {
   const [stats, setStats] = useState({

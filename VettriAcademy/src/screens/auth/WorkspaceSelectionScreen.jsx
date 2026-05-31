@@ -6,8 +6,19 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const { width: SW, height: SH } = Dimensions.get('window');
+const useWebNativeDriver = Platform.OS !== 'web';
+const cardShadow = Platform.OS === 'web'
+  ? { boxShadow: '0px 6px 12px rgba(17, 24, 39, 0.08)' }
+  : {
+  shadowColor: '#111827',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
+    };
 
 // ─── Premium Color Palette ─────────────────────────────────────────────────────
 const C = {
@@ -68,7 +79,7 @@ function WorkspaceCard({ workspace, index, onSelectWorkspace }) {
       duration: 500,
       delay: 300 + index * 150,
       easing: Easing.out(Easing.back(1.2)),
-      useNativeDriver: true,
+      useNativeDriver: useWebNativeDriver,
     }).start();
   }, []);
 
@@ -80,35 +91,41 @@ function WorkspaceCard({ workspace, index, onSelectWorkspace }) {
     ],
   };
 
-  const onPressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+  const onPressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: useWebNativeDriver }).start();
+  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: useWebNativeDriver }).start();
 
   return (
     <Animated.View style={[st.cardWrapper, cardStyle]}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={() => onSelectWorkspace(workspace.id)}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={[
-          st.cardInner, 
-          { backgroundColor: workspace.cardBg, borderColor: workspace.borderColor }
-        ]}
+      <ParticleWrapper
+        particleCount={24}
+        size="medium"
+        colors={['#FFD700', '#FFA500', '#FFEC8B', '#FFC300', '#FFFFFF']}
       >
-        <View style={[st.cardIconBox, { backgroundColor: workspace.iconBg, borderColor: workspace.borderColor }]}>
-          <Ionicons name={workspace.icon} size={28} color={workspace.accentColor} />
-        </View>
-        
-        <View style={st.cardBody}>
-          <Text style={[st.cardTitle, { color: C.textNavy }]}>{workspace.title}</Text>
-          <Text style={st.cardDesc}>{workspace.description}</Text>
-          <Text style={[st.cardTagline, { color: workspace.accentColor }]}>{workspace.tagline}</Text>
-        </View>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => onSelectWorkspace(workspace.id)}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          style={[
+            st.cardInner, 
+            { backgroundColor: workspace.cardBg, borderColor: workspace.borderColor }
+          ]}
+        >
+          <View style={[st.cardIconBox, { backgroundColor: workspace.iconBg, borderColor: workspace.borderColor }]}>
+            <Ionicons name={workspace.icon} size={28} color={workspace.accentColor} />
+          </View>
+          
+          <View style={st.cardBody}>
+            <Text style={[st.cardTitle, { color: C.textNavy }]}>{workspace.title}</Text>
+            <Text style={st.cardDesc}>{workspace.description}</Text>
+            <Text style={[st.cardTagline, { color: workspace.accentColor }]}>{workspace.tagline}</Text>
+          </View>
 
-        <View style={st.arrowBox}>
-           <Ionicons name="arrow-forward" size={20} color={workspace.accentColor} />
-        </View>
-      </TouchableOpacity>
+          <View style={st.arrowBox}>
+             <Ionicons name="arrow-forward" size={20} color={workspace.accentColor} />
+          </View>
+        </TouchableOpacity>
+      </ParticleWrapper>
     </Animated.View>
   );
 }
@@ -123,21 +140,21 @@ export default function WorkspaceSelectionScreen({ onSelectWorkspace }) {
   const wordAnim3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(contentAnim, { toValue: 1, duration: 600, delay: 100, useNativeDriver: true }).start();
+    Animated.timing(contentAnim, { toValue: 1, duration: 600, delay: 100, useNativeDriver: useWebNativeDriver }).start();
   }, []);
 
   useEffect(() => {
     const runWordDrop = () => {
       return Animated.sequence([
         Animated.parallel([
-          Animated.timing(wordAnim1, { toValue: 0, duration: 0, useNativeDriver: true }),
-          Animated.timing(wordAnim2, { toValue: 0, duration: 0, useNativeDriver: true }),
-          Animated.timing(wordAnim3, { toValue: 0, duration: 0, useNativeDriver: true }),
+          Animated.timing(wordAnim1, { toValue: 0, duration: 0, useNativeDriver: useWebNativeDriver }),
+          Animated.timing(wordAnim2, { toValue: 0, duration: 0, useNativeDriver: useWebNativeDriver }),
+          Animated.timing(wordAnim3, { toValue: 0, duration: 0, useNativeDriver: useWebNativeDriver }),
         ]),
         Animated.stagger(300, [
-          Animated.timing(wordAnim1, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(wordAnim2, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(wordAnim3, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(wordAnim1, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: useWebNativeDriver }),
+          Animated.timing(wordAnim2, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: useWebNativeDriver }),
+          Animated.timing(wordAnim3, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: useWebNativeDriver }),
         ]),
         Animated.delay(3000),
       ]);
@@ -151,8 +168,8 @@ export default function WorkspaceSelectionScreen({ onSelectWorkspace }) {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(boyAnim, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(boyAnim, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(boyAnim, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.ease), useNativeDriver: useWebNativeDriver }),
+        Animated.timing(boyAnim, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.ease), useNativeDriver: useWebNativeDriver }),
       ])
     ).start();
   }, [boyAnim]);
@@ -417,11 +434,7 @@ heroJourney: {
     gap: 14,
   },
   cardWrapper: {
-    shadowColor: C.ink,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    ...cardShadow,
   },
   cardInner: {
     flexDirection: 'row',

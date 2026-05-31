@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity as RNTouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../utils/colors';
@@ -7,6 +7,17 @@ import { Shadows } from '../../utils/theme';
 import { toggleTheme } from '../../redux/slices/uiSlice';
 import { logoutUser } from '../../redux/slices/authSlice';
 import { APP_VERSION, APP_NAME } from '../../utils/constants';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();

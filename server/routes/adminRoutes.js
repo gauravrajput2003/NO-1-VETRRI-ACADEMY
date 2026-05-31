@@ -107,6 +107,8 @@ router.put('/courses/:id', async (req, res) => {
 router.get('/top-rankers', async (req, res) => {
   try {
     const ExamScore = require('../models/ExamScore');
+    const requestedLimit = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 10)) : 10;
     // fetch recent published scores and compute percentage server-side
     const scores = await ExamScore.find({ isPublished: true })
       .populate('student', 'name displayName')
@@ -121,7 +123,7 @@ router.get('/top-rankers', async (req, res) => {
 
     withPct.sort((a, b) => b.pct - a.pct);
 
-    const top = withPct.slice(0, 10);
+    const top = withPct.slice(0, limit);
 
     res.json({
       success: true,

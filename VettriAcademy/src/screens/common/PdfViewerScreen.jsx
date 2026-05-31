@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  View, StyleSheet, Text, TouchableOpacity, StatusBar,
+  View, StyleSheet, Text, TouchableOpacity as RNTouchableOpacity, StatusBar,
   ActivityIndicator, Animated, Dimensions, Platform, Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -16,6 +16,17 @@ import {
 } from '../../redux/slices/pdfSlice';
 import NoteModal from '../../components/NoteModal';
 import ContinueReadingModal from '../../components/ContinueReadingModal';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 

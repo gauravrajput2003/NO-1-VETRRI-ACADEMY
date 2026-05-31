@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, TextInput, Animated,
 } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -11,6 +11,17 @@ import { Shadows } from '../../utils/theme';
 import { getTrainingVideosAPI, markVideoCompleteAPI, getIncompleteMandatoryCountAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 const CATEGORIES = [
   { key: 'all', label: 'All', icon: 'grid-outline' },

@@ -19,6 +19,7 @@ import EnquiriesScreen from '../screens/admin/EnquiriesScreen';
 import AdminMaterialsScreen from '../screens/admin/AdminMaterialsScreen';
 import AdminTrainingVideosScreen from '../screens/admin/AdminTrainingVideosScreen';
 import StudentMarksScreen from '../screens/admin/StudentMarksScreen';
+import MonthlyTopRankersScreen from '../screens/admin/MonthlyTopRankersScreen';
 
 import NotificationsScreen from '../screens/common/NotificationsScreen';
 import SettingsScreen from '../screens/common/SettingsScreen';
@@ -26,6 +27,7 @@ import ProfileScreen from '../screens/student/ProfileScreen';
 import DownloadCenterScreen from '../screens/common/DownloadCenterScreen';
 import NcertViewerScreen from '../screens/common/NcertViewerScreen';
 import DocumentViewerScreen from '../screens/common/DocumentViewerScreen';
+import PdfViewerScreen from '../screens/common/PdfViewerScreen';
 import HeaderActions from '../components/HeaderActions';
 import CustomTabBar from '../components/CustomTabBar';
 import { TabBarVisibilityProvider } from '../context/TabBarVisibilityContext';
@@ -54,8 +56,10 @@ function HomeStack() {
       <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} options={{ headerShown: true, title: 'Manage Materials' }} />
       <Stack.Screen name="AdminTrainingVideos" component={AdminTrainingVideosScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StudentMarks" component={StudentMarksScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MonthlyTopRankers" component={MonthlyTopRankersScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Downloads" component={DownloadCenterScreen} options={{ headerShown: true, title: 'Download Center' }} />
       <Stack.Screen name="NcertViewer" component={NcertViewerScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PdfViewer" component={PdfViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );

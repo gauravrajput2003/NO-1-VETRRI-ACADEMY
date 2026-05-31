@@ -16,9 +16,9 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity as RNTouchableOpacity,
   Image, ActivityIndicator, Alert, Platform, RefreshControl,
-  Pressable,
+  Pressable as RNPressable,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,26 @@ import { logoutUser } from '../../redux/slices/authSlice';
 import { getDiceBearUrl, APP_VERSION } from '../../utils/constants';
 import { formatDate, getInitials } from '../../utils/formatters';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import ParticleWrapper from '../../components/effects/ParticleWrapper';
+
+const TouchableOpacity = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNTouchableOpacity {...rest} />
+    </ParticleWrapper>
+  );
+};
+
+const Pressable = (props) => {
+  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  return (
+    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
+      <RNPressable {...rest} />
+    </ParticleWrapper>
+  );
+};
+
 
 // --- Design tokens ------------------------------------------------------------
 const C = {
