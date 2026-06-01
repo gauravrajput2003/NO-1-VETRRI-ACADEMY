@@ -97,10 +97,12 @@ const doubtsSlice = createSlice({
     upsertRealtimeReply: (state, action) => {
       const reply = action.payload;
       if (!reply || !reply._id) return;
-      const exists = state.replies.some((r) => r._id === reply._id);
-      if (!exists) {
+      const idx = state.replies.findIndex((r) => String(r._id) === String(reply._id));
+      if (idx === -1) {
         state.replies.push(reply);
         state.replies.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      } else {
+        state.replies[idx] = { ...state.replies[idx], ...reply };
       }
     },
     applyRealtimeStatus: (state, action) => {
@@ -167,9 +169,14 @@ const doubtsSlice = createSlice({
       .addCase(postDoubtReply.fulfilled, (state, action) => {
         state.replying = false;
         const reply = action.payload.reply;
-        if (reply && !state.replies.some((r) => r._id === reply._id)) {
-          state.replies.push(reply);
-          state.replies.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        if (reply) {
+          const idx = state.replies.findIndex((r) => String(r._id) === String(reply._id));
+          if (idx === -1) {
+            state.replies.push(reply);
+            state.replies.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          } else {
+            state.replies[idx] = { ...state.replies[idx], ...reply };
+          }
         }
       })
       .addCase(postDoubtReply.rejected, (state, action) => {

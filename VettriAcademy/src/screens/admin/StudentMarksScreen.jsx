@@ -8,10 +8,10 @@ import { getAdminStudentMarksAPI } from '../../services/api';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const TouchableOpacity = (props) => {
-  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  const { particleCount = 20, size = "small", colors, children, ...rest } = props;
   return (
     <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
-      <RNTouchableOpacity {...rest} />
+      <RNTouchableOpacity {...rest}>{children}</RNTouchableOpacity>
     </ParticleWrapper>
   );
 };

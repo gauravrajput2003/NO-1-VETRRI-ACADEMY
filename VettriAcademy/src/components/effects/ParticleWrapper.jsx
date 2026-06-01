@@ -45,8 +45,27 @@ function ParticleWrapper({
       })
     : child;
 
+  let layoutStyle = {};
+  if (React.isValidElement(child) && child.props?.style) {
+    const childStyle = child.props.style;
+    const flat = Array.isArray(childStyle) ? Object.assign({}, ...childStyle.filter(Boolean)) : childStyle;
+    const layoutKeys = [
+      'flex', 'flexGrow', 'flexShrink', 'flexBasis',
+      'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
+      'margin', 'marginHorizontal', 'marginVertical',
+      'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
+      'position', 'top', 'bottom', 'left', 'right',
+      'alignSelf',
+    ];
+    layoutKeys.forEach((key) => {
+      if (flat && flat[key] !== undefined) {
+        layoutStyle[key] = flat[key];
+      }
+    });
+  }
+
   return (
-    <View style={[styles.wrap, style]}>
+    <View style={[styles.wrap, layoutStyle, style]}>
       {wrappedChild}
       <View pointerEvents="none" style={styles.overlay}>
         {bursts.map((burst) => (

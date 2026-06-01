@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ActivityIndicator, View, StatusBar } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { Colors } from '../utils/colors';
 import { lightTheme, darkTheme } from '../utils/theme';
 import { fetchCurrentUser } from '../redux/slices/authSlice';
@@ -34,6 +35,11 @@ export default function RootNavigator() {
     // Notification listener (Socket.io now, FCM-ready)
     const unsubNotif = onNotification((notif) => {
       dispatch(addNotification(notif));
+      Toast.show({
+        type: 'info',
+        text1: notif.title || 'Notification',
+        text2: notif.message || '',
+      });
     });
 
     // Chat message listener (global — for badge count updates)

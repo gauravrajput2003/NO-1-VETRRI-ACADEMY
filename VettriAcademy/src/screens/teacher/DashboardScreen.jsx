@@ -16,6 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchTeacherDashboard, fetchTeacherMaterials, fetchTeacherStudents } from '../../redux/slices/teacherSlice';
 import { fetchTodayClasses } from '../../redux/slices/classesSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
+import { fetchDoubtMetrics } from '../../redux/slices/doubtsSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
 import { getActiveAnnouncementsAPI } from '../../services/api';
 import { Colors } from '../../utils/colors';
@@ -31,6 +32,7 @@ export default function TeacherDashboard({ navigation }) {
   const { dashboard, loading: teacherLoading, students, materials } = useSelector((s) => s.teacher);
   const { todayClasses } = useSelector((s) => s.classes);
   const { unreadCount } = useSelector((s) => s.notifications);
+  const { metrics } = useSelector((s) => s.doubts);
   const [announcements, setAnnouncements] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const bottomPadding = useBottomTabBarPadding();
@@ -42,6 +44,7 @@ export default function TeacherDashboard({ navigation }) {
     dispatch(fetchTeacherMaterials());
     dispatch(fetchTodayClasses());
     dispatch(fetchUnreadNotificationCount());
+    dispatch(fetchDoubtMetrics());
     try {
       const { data } = await getActiveAnnouncementsAPI();
       setAnnouncements(data.announcements?.slice(0, 2) || []);
@@ -67,6 +70,8 @@ export default function TeacherDashboard({ navigation }) {
   const classCount = overview.todayClasses?.length || todayClasses?.length || 0;
   const liveClass = todayClasses?.find((c) => c.status === 'live');
   const nextClass = todayClasses?.find((c) => c.status === 'scheduled');
+  
+  const doubtCount = metrics?.pendingDoubts ?? metrics?.assignedDoubts ?? 0;
 
   /* ── Stat Cards (matches Admin 2×2 grid with gradient glow) ── */
   const statCards = [
@@ -79,12 +84,13 @@ export default function TeacherDashboard({ navigation }) {
   /* ── Quick Actions (matches Admin carousel) ── */
   const quickActions = useMemo(() => ([
     { id: 'live', symbol: '🎥', label: 'Live Class', subtitle: `${classCount} today`, screen: 'LiveClass', color: '#2563EB', bgColor: '#DBEAFE', iconBg: '#BFDBFE' },
+    { id: 'doubts', symbol: '❓', label: 'Doubts', subtitle: `${doubtCount} pending`, screen: 'DoubtCenter', color: '#EA580C', bgColor: '#FFEDD5', iconBg: '#FED7AA' },
     { id: 'grades', symbol: '✏️', label: 'Grades', subtitle: 'Enter marks', screen: 'Grades', color: '#7C3AED', bgColor: '#EDE9FE', iconBg: '#DDD6FE' },
     { id: 'materials', symbol: '📂', label: 'Materials', subtitle: `${materialCount} files`, screen: 'TeacherMaterials', color: '#0F766E', bgColor: '#CCFBF1', iconBg: '#99F6E4' },
     { id: 'students', symbol: '👥', label: 'Students', subtitle: `${studentCount} active`, screen: 'Students', color: '#0284C7', bgColor: '#E0F2FE', iconBg: '#BAE6FD' },
     { id: 'salary', symbol: '💰', label: 'Salary', subtitle: 'Overview', screen: 'Salary', color: '#B45309', bgColor: '#FEF3C7', iconBg: '#FDE68A' },
     { id: 'leave', symbol: '🏖️', label: 'Leave', subtitle: 'Apply now', screen: 'Leave', color: '#DB2777', bgColor: '#FCE7F3', iconBg: '#FBCFE8' },
-  ]), [classCount, materialCount, studentCount]);
+  ]), [classCount, materialCount, studentCount, doubtCount]);
 
   if (teacherLoading && !refreshing) {
     return (

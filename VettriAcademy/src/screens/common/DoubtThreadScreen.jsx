@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
@@ -123,7 +123,64 @@ export default function DoubtThreadScreen({ route, navigation }) {
   const { currentDoubt, replies, loadingDetail, replying } = useSelector((s) => s.doubts);
   const [message, setMessage] = useState('');
   const [uploading, setUploading] = useState(false);
+  
   const [replyAttachments, setReplyAttachments] = useState([]);
+  const [recordingPaused, setRecordingPaused] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  const recordingDurationSec = Math.floor((recorderState?.durationMillis || 0) / 1000);
+  const recording = Boolean(recorderState?.isRecording || recordingPaused);
+
+  const startRecording = async () => {
+    try {
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Toast.show({ type: 'error', text1: 'Microphone permission required' });
+        return;
+      }
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setRecordingPaused(false);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Unable to start recording' });
+    }
+  };
+
+  const pauseOrResumeRecording = async () => {
+    if (!recording) return;
+    try {
+      if (recordingPaused) {
+        recorder.record();
+        setRecordingPaused(false);
+      } else {
+        recorder.pause();
+        setRecordingPaused(true);
+      }
+    } catch {}
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (uri) {
+        setReplyAttachments((prev) => [
+          ...prev,
+          {
+            uri,
+            name: `voice-${Date.now()}.m4a`,
+            type: 'audio/mp4',
+          },
+        ]);
+      }
+    } catch {
+      Toast.show({ type: 'error', text1: 'Unable to stop recording' });
+    } finally {
+      setRecordingPaused(false);
+    }
+  };
+
   const [teacherQuery, setTeacherQuery] = useState('');
   const [teacherSuggestions, setTeacherSuggestions] = useState([]);
   const [teacherSearchLoading, setTeacherSearchLoading] = useState(false);
@@ -389,7 +446,7 @@ export default function DoubtThreadScreen({ route, navigation }) {
         ) : null}
       </View>
 
-      <View style={styles.composer}>
+      <View style={[styles.composer, { paddingBottom: Math.max(10, bottomPadding) }]}>
         <TextInput
           style={styles.composerInput}
           placeholder="Write reply..."
@@ -399,9 +456,26 @@ export default function DoubtThreadScreen({ route, navigation }) {
           multiline
         />
         <View style={styles.composerRow}>
-          <TouchableOpacity style={styles.iconBtn} onPress={onPickAttachment}>
-            <Ionicons name="attach" size={18} color={Colors.primary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={styles.iconBtn} onPress={onPickAttachment}>
+              <Ionicons name="attach" size={18} color={Colors.primary} />
+            </TouchableOpacity>
+            {!recording ? (
+              <TouchableOpacity style={styles.iconBtn} onPress={startRecording}>
+                <Ionicons name="mic" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TouchableOpacity style={styles.iconBtn} onPress={pauseOrResumeRecording}>
+                  <Ionicons name={recordingPaused ? 'play' : 'pause'} size={18} color={Colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#FDE7F1' }]} onPress={stopRecording}>
+                  <Ionicons name="stop" size={18} color={Colors.pink} />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 12, color: Colors.pink, fontWeight: 'bold' }}>{recordingDurationSec}s</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity style={styles.sendBtn} onPress={onSendReply} disabled={replying || uploading}>
             {replying || uploading ? <ActivityIndicator size="small" color={Colors.white} /> : <Ionicons name="send" size={18} color={Colors.white} />}
           </TouchableOpacity>
