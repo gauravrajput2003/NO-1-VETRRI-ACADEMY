@@ -70,9 +70,8 @@ const parseTeacherIds = (assignedTeachers) => {
 
 const canAccessDoubt = (doubt, user) => {
 	if (!doubt) return false;
-	if (user.role === 'admin') return true;
+	if (user.role === 'admin' || user.role === 'teacher') return true;
 	if (user.role === 'student') return String(doubt.studentId) === String(user._id);
-	if (user.role === 'teacher') return (doubt.assignedTeachers || []).some((t) => String(t) === String(user._id));
 	return false;
 };
 
@@ -81,10 +80,6 @@ const buildDoubtQuery = (user, query) => {
 
 	if (user.role === 'student') {
 		mongoQuery.studentId = user._id;
-	}
-
-	if (user.role === 'teacher') {
-		mongoQuery.assignedTeachers = user._id;
 	}
 
 	if (query.status) {
