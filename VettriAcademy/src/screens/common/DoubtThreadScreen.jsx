@@ -296,7 +296,7 @@ export default function DoubtThreadScreen({ route, navigation }) {
           <View style={styles.replyAttachWrap}>
             {item.attachments.map((att, idx) => (
               <View key={`${att.publicId || idx}-${idx}`}>
-                <AttachmentChip attachment={att} onOpen={() => Linking.openURL(att.url)} />
+                <AttachmentChip attachment={att} onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })} />
                 {att.attachmentType === 'audio' ? <AudioAttachmentPlayer attachment={att} /> : null}
               </View>
             ))}
@@ -362,7 +362,7 @@ export default function DoubtThreadScreen({ route, navigation }) {
               <View style={styles.replyAttachWrap}>
                 {currentDoubt.attachments.map((att, idx) => (
                   <View key={`${att.publicId || idx}-${idx}`}>
-                    <AttachmentChip attachment={att} onOpen={() => Linking.openURL(att.url)} />
+                    <AttachmentChip attachment={att} onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })} />
                     {att.attachmentType === 'audio' ? <AudioAttachmentPlayer attachment={att} /> : null}
                   </View>
                 ))}
