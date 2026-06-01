@@ -71,7 +71,10 @@ const parseTeacherIds = (assignedTeachers) => {
 const canAccessDoubt = (doubt, user) => {
 	if (!doubt) return false;
 	if (user.role === 'admin' || user.role === 'teacher') return true;
-	if (user.role === 'student') return String(doubt.studentId) === String(user._id);
+	if (user.role === 'student') {
+		const studentIdStr = doubt.studentId && doubt.studentId._id ? String(doubt.studentId._id) : String(doubt.studentId);
+		return studentIdStr === String(user._id);
+	}
 	return false;
 };
 
@@ -434,8 +437,10 @@ const addReply = async (req, res) => {
 			metadata: { hasAttachments: attachments.length > 0 },
 		});
 
-		const recipients = [String(doubt.studentId), ...(doubt.assignedTeachers || []).map((t) => String(t))]
-			.filter((id) => id !== String(req.user._id));
+		const studentIdStr = doubt.studentId && doubt.studentId._id ? String(doubt.studentId._id) : String(doubt.studentId);
+		const assignedTeacherIds = (doubt.assignedTeachers || []).map((t) => t && t._id ? String(t._id) : String(t));
+		const recipients = [studentIdStr, ...assignedTeacherIds]
+			.filter((id) => id && id !== String(req.user._id));
 
 		await emitNotificationAndSocket({
 			req,
