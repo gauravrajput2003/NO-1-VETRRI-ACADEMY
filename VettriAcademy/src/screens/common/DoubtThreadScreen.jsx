@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAudioPlayer, useAudioPlayerStatus, useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import Toast from 'react-native-toast-message';
@@ -77,7 +78,7 @@ function AttachmentChip({ attachment, onOpen }) {
 
 function AudioAttachmentPlayer({ attachment }) {
   const player = useAudioPlayer(attachment.url);
-  const playerStatus = useAudioPlayerStatus(player);
+  const playerStatus = useAudioRecorderState ? useAudioPlayerStatus(player) : null;
 
   const togglePlay = async () => {
     try {
@@ -336,7 +337,12 @@ export default function DoubtThreadScreen({ route, navigation }) {
     const roleBadge = ROLE_BADGE[role] || ROLE_BADGE.student;
 
     return (
-      <View style={styles.replyCard}>
+      <View style={[
+        styles.replyCard,
+        role === 'teacher' ? styles.replyCardTeacher :
+        role === 'admin' ? styles.replyCardAdmin :
+        styles.replyCardStudent
+      ]}>
         <View style={styles.replyHead}>
           <View style={styles.replyUserRow}>
             <Text style={styles.replyName}>{item.senderId?.displayName || item.senderId?.name || 'User'}</Text>
@@ -385,11 +391,23 @@ export default function DoubtThreadScreen({ route, navigation }) {
     );
   }
 
+  const priorityColors = {
+    high: { bg: '#FEF2F2', border: '#EF4444' },
+    medium: { bg: '#FFFBEB', border: '#F59E0B' },
+    low: { bg: '#F0FDF4', border: '#10B981' },
+  };
+  const priorityColor = priorityColors[currentDoubt.priority] || priorityColors.medium;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#1A3C40', '#11C5C6']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color={Colors.navy} />
+          <Ionicons name="arrow-back" size={20} color={Colors.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Doubt Thread</Text>
@@ -397,10 +415,10 @@ export default function DoubtThreadScreen({ route, navigation }) {
         </View>
         {canManageAssignments ? (
           <TouchableOpacity style={styles.headerAction} onPress={() => setAssignModalOpen(true)}>
-            <Ionicons name="people" size={18} color={Colors.primary} />
+            <Ionicons name="people" size={18} color={Colors.white} />
           </TouchableOpacity>
         ) : null}
-      </View>
+      </LinearGradient>
 
       <FlatList
         onScroll={onTabBarScroll}
@@ -411,9 +429,9 @@ export default function DoubtThreadScreen({ route, navigation }) {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding + 120 }}
         refreshControl={<RefreshControl refreshing={loadingDetail} onRefresh={loadDetail} colors={[Colors.primary]} />}
         ListHeaderComponent={(
-          <View style={styles.rootCard}>
+          <View style={[styles.rootCard, { backgroundColor: priorityColor.bg, borderLeftColor: priorityColor.border }]}>
             <Text style={styles.rootTitle}>{currentDoubt.title}</Text>
-            <Text style={styles.rootMeta}>Subject: {currentDoubt.subject} • Priority: {currentDoubt.priority}</Text>
+            <Text style={styles.rootMeta}>Subject: {currentDoubt.subject} • Priority: {currentDoubt.priority.toUpperCase()}</Text>
             <Text style={styles.rootDesc}>{currentDoubt.description}</Text>
             {!!currentDoubt.attachments?.length && (
               <View style={styles.replyAttachWrap}>
@@ -565,18 +583,21 @@ export default function DoubtThreadScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.offWhite },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 48, paddingBottom: 12, backgroundColor: Colors.white },
-  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.lightGray, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 20, fontWeight: '800', color: Colors.navy },
-  subtitle: { fontSize: 12, color: Colors.mediumGray, marginTop: 2 },
-  headerAction: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#EAF6FF', alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16 },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.22)', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.white },
+  subtitle: { fontSize: 12, color: 'rgba(255, 255, 255, 0.75)', marginTop: 2 },
+  headerAction: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.22)', alignItems: 'center', justifyContent: 'center' },
 
-  rootCard: { backgroundColor: Colors.white, borderRadius: 14, padding: 14, marginVertical: 12, ...Shadows.light },
+  rootCard: { borderRadius: 16, padding: 16, marginVertical: 12, borderLeftWidth: 5, ...Shadows.medium },
   rootTitle: { fontSize: 17, fontWeight: '800', color: Colors.navy },
   rootMeta: { fontSize: 12, color: Colors.mediumGray, marginTop: 4 },
   rootDesc: { fontSize: 14, color: Colors.navy, marginTop: 8, lineHeight: 20 },
 
-  replyCard: { backgroundColor: Colors.white, borderRadius: 14, padding: 12, marginBottom: 10, ...Shadows.light },
+  replyCard: { borderRadius: 14, padding: 12, marginBottom: 10, ...Shadows.light },
+  replyCardTeacher: { backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#E0DBFF' },
+  replyCardAdmin: { backgroundColor: '#FFF5F2', borderWidth: 1, borderColor: '#FFDEC9' },
+  replyCardStudent: { backgroundColor: Colors.white, borderWidth: 1, borderColor: '#F1F5F9' },
   replyHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   replyUserRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   replyName: { fontSize: 14, fontWeight: '700', color: Colors.navy },
