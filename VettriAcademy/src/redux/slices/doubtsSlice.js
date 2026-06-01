@@ -167,7 +167,7 @@ const doubtsSlice = createSlice({
       .addCase(postDoubtReply.fulfilled, (state, action) => {
         state.replying = false;
         const reply = action.payload.reply;
-        if (reply) {
+        if (reply && !state.replies.some((r) => r._id === reply._id)) {
           state.replies.push(reply);
           state.replies.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         }
