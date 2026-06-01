@@ -11,8 +11,6 @@ import { TabBarVisibilityProvider } from '../context/TabBarVisibilityContext';
 import DashboardScreen       from '../screens/student/DashboardScreen';
 import ClassesScreen         from '../screens/student/ClassesScreen';
 import MaterialsScreen       from '../screens/student/MaterialsScreen';
-import ChatListScreen        from '../screens/student/ChatListScreen';
-import ChatRoomScreen        from '../screens/student/ChatRoomScreen';
 import ProfileScreen         from '../screens/student/ProfileScreen';
 import StudentLeaveScreen    from '../screens/student/LeaveScreen';
 import ExamScoresScreen      from '../screens/student/ExamScoresScreen';
@@ -30,6 +28,7 @@ import PdfViewerScreen       from '../screens/common/PdfViewerScreen';
 import BookmarkScreen        from '../screens/student/BookmarkScreen';
 import NotesScreen           from '../screens/student/NotesScreen';
 import TopPerformersScreen  from '../screens/student/TopPerformersScreen';
+import DoubtThreadScreen     from '../screens/common/DoubtThreadScreen';
 import HeaderActions         from '../components/HeaderActions';
 
 
@@ -74,6 +73,8 @@ function HomeStack() {
       <Stack.Screen name="Bookmarks"        component={BookmarkScreen}        options={{ ...HEADER_OPTS, title: 'My Bookmarks' }} />
       <Stack.Screen name="MyNotes"          component={NotesScreen}           options={{ ...HEADER_OPTS, title: 'My Notes' }} />
       <Stack.Screen name="Discuss"          component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtCenter"      component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail"      component={DoubtThreadScreen}     options={{ headerShown: false }} />
       <Stack.Screen name="Attendance"       component={AttendanceScreen}      options={{ ...HEADER_OPTS, title: 'Attendance' }} />
       <Stack.Screen name="Leave"            component={StudentLeaveScreen}    options={{ ...HEADER_OPTS, title: 'Leave Application' }} />
       <Stack.Screen name="Fees"             component={FeeStatusScreen}       options={{ ...HEADER_OPTS, title: 'Fees & Payments' }} />
@@ -106,10 +107,11 @@ function DownloadsStack() {
   );
 }
 
-function ScoresStack() {
+function DiscussionStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen name="ExamScoresMain" component={ExamScoresScreen} options={{ ...HEADER_OPTS, title: 'Exam Scores' }} />
+      <Stack.Screen name="DoubtCenterMain" component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -123,6 +125,8 @@ function ProfileStack() {
       <Stack.Screen name="Leave"         component={StudentLeaveScreen} options={{ ...HEADER_OPTS, title: 'Leave Application' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ ...HEADER_OPTS, title: 'Notifications' }} />
       <Stack.Screen name="Settings"      component={SettingsScreen}     options={{ ...HEADER_OPTS, title: 'Settings' }} />
+      <Stack.Screen name="DoubtCenter"   component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail"   component={DoubtThreadScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -132,7 +136,7 @@ const TAB_CFG = {
   Home:      { active: 'home',           inactive: 'home-outline'           },
   Classes:   { active: 'calendar',       inactive: 'calendar-outline'       },
   Downloads: { active: 'cloud-download', inactive: 'cloud-download-outline' },
-  Scores:    { active: 'stats-chart',    inactive: 'stats-chart-outline'    },
+  Discussion:{ active: 'chatbubbles',     inactive: 'chatbubbles-outline'    },
   Profile:   { active: 'person',         inactive: 'person-outline'         },
 };
 
@@ -147,7 +151,7 @@ export default function StudentNavigator() {
         <Tab.Screen name="Home"      component={HomeStack}      />
         <Tab.Screen name="Classes"   component={ClassesStack}   />
         <Tab.Screen name="Downloads" component={DownloadsStack} />
-        <Tab.Screen name="Scores"    component={ScoresStack}    />
+        <Tab.Screen name="Discussion" component={DiscussionStack} />
         <Tab.Screen name="Profile"   component={ProfileStack}   />
       </Tab.Navigator>
     </TabBarVisibilityProvider>

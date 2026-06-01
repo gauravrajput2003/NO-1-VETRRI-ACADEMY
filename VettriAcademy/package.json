@@ -24,6 +24,7 @@
     "axios": "^1.15.2",
     "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.34",
+    "expo-av": "^16.0.8",
     "expo-blur": "~15.0.8",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.22",

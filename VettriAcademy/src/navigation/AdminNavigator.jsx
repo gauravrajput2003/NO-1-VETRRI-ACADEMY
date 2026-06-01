@@ -28,6 +28,8 @@ import DownloadCenterScreen from '../screens/common/DownloadCenterScreen';
 import NcertViewerScreen from '../screens/common/NcertViewerScreen';
 import DocumentViewerScreen from '../screens/common/DocumentViewerScreen';
 import PdfViewerScreen from '../screens/common/PdfViewerScreen';
+import DiscussScenarioScreen from '../screens/student/DiscussScenarioScreen';
+import DoubtThreadScreen from '../screens/common/DoubtThreadScreen';
 import HeaderActions from '../components/HeaderActions';
 import CustomTabBar from '../components/CustomTabBar';
 import { TabBarVisibilityProvider } from '../context/TabBarVisibilityContext';
@@ -57,6 +59,8 @@ function HomeStack() {
       <Stack.Screen name="AdminTrainingVideos" component={AdminTrainingVideosScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StudentMarks" component={StudentMarksScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MonthlyTopRankers" component={MonthlyTopRankersScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Downloads" component={DownloadCenterScreen} options={{ headerShown: true, title: 'Download Center' }} />
       <Stack.Screen name="NcertViewer" component={NcertViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="PdfViewer" component={PdfViewerScreen} options={{ headerShown: false }} />
@@ -89,6 +93,8 @@ function ProfileStack() {
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

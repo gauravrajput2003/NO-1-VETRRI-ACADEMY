@@ -30,6 +30,10 @@ const typeIcons = {
   material_unlocked: 'lock-open',
   recording_available: 'videocam',
   new_enquiry: 'mail-outline',
+  doubt_created: 'help-circle',
+  doubt_assigned: 'git-network',
+  doubt_reply: 'chatbox-ellipses',
+  doubt_status: 'checkmark-done-circle',
 };
 
 export default function NotificationsScreen({ navigation }) {
@@ -56,6 +60,11 @@ export default function NotificationsScreen({ navigation }) {
         else if (item.type === 'new_score') navigation.navigate('ExamScores');
         else if (item.type === 'class_reminder') navigation.navigate('Classes');
         else if (item.type === 'new_enquiry' && user?.role === 'admin') navigation.navigate('Enquiries');
+        else if (['doubt_created', 'doubt_assigned', 'doubt_reply', 'doubt_status'].includes(item.type)) {
+          const doubtId = item.metadata?.doubtId || item.metadata?.doubt;
+          if (doubtId) navigation.navigate('DoubtDetail', { doubtId });
+          else navigation.navigate('DoubtCenter');
+        }
       }}
     >
       <View style={[styles.iconBox, { backgroundColor: Colors.primary + '18' }]}>

@@ -272,7 +272,12 @@ const teacherSlice = createSlice({
         state.liveMonitor = null;
       })
       // Lock toggle
-      .addCase(toggleLock.fulfilled, (state) => { /* Refetch in component */ })
+      .addCase(toggleLock.fulfilled, (state, action) => {
+        const updated = action.payload?.material;
+        if (!updated?._id) return;
+        const index = state.materials.findIndex((m) => m._id === updated._id);
+        if (index !== -1) state.materials[index] = updated;
+      })
       // Grading
       .addCase(fetchGrading.fulfilled, (state, action) => { state.grading = action.payload; })
       // Leaves

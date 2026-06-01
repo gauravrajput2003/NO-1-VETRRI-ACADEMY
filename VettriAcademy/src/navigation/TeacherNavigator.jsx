@@ -32,6 +32,8 @@ import NcertViewerScreen from '../screens/common/NcertViewerScreen';
 import DocumentViewerScreen from '../screens/common/DocumentViewerScreen';
 import PdfViewerScreen from '../screens/common/PdfViewerScreen';
 import PdfAnalyticsScreen from '../screens/teacher/PdfAnalyticsScreen';
+import DiscussScenarioScreen from '../screens/student/DiscussScenarioScreen';
+import DoubtThreadScreen from '../screens/common/DoubtThreadScreen';
 import HeaderActions from '../components/HeaderActions';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -67,6 +69,8 @@ function HomeStack() {
       <Stack.Screen name="TeacherMaterials" component={TeacherMaterialsScreen} options={{ title: 'Manage Materials' }} />
       <Stack.Screen name="PdfViewer" component={PdfViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="PdfAnalytics" component={PdfAnalyticsScreen} options={{ title: 'PDF Analytics' }} />
+      <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Students" component={StudentsScreen} options={{ title: 'My Students' }} />
       <Stack.Screen name="Leave" component={LeaveScreen} options={{ title: 'Leave' }} />
       <Stack.Screen name="Grades" component={GradesScreen} options={{ title: 'Grade Entry' }} />
@@ -115,6 +119,8 @@ function ProfileStack() {
       <Stack.Screen name="MonthlyReport" component={MonthlyReportScreen} options={{ title: 'Monthly Report' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

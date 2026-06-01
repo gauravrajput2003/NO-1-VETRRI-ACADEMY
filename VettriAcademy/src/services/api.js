@@ -112,8 +112,16 @@ export const logoutAPI = () =>
 export const getMeAPI = () =>
   api.get('/auth/me');
 
-export const getCoursesMetaAPI = () =>
-  api.get('/auth/courses/meta');
+export const getCoursesMetaAPI = async () => {
+  try {
+    return await api.get('/auth/courses/meta');
+  } catch (err) {
+    if (err?.response?.status === 404) {
+      return api.get('/courses/meta');
+    }
+    throw err;
+  }
+};
 
 export const refreshTokenAPI = (refreshToken) =>
   api.post('/auth/refresh', { refreshToken });
@@ -617,5 +625,70 @@ export const getMaterialAnalyticsAPI = (materialId) =>
 // Signed PDF URL
 export const getSignedPdfUrlAPI = (materialId) =>
   api.get(`/pdf/signed-url/${materialId}`);
+
+// ─── Doubt Resolution Module ─────────────────────────────────────────────────
+
+export const searchDoubtTeachersAPI = (q = '') =>
+  api.get('/doubts/teachers/search', { params: { q } });
+
+export const listDoubtsAPI = (params) =>
+  api.get('/doubts', { params });
+
+export const getDoubtDetailAPI = (id) =>
+  api.get(`/doubts/${id}`);
+
+export const createDoubtAPI = (data) =>
+  api.post('/doubts', data);
+
+export const addDoubtReplyAPI = (id, data) =>
+  api.post(`/doubts/${id}/replies`, data);
+
+export const updateDoubtStatusAPI = (id, status) =>
+  api.patch(`/doubts/${id}/status`, { status });
+
+export const reassignDoubtTeachersAPI = (id, assignedTeachers) =>
+  api.patch(`/doubts/${id}/assign`, { assignedTeachers });
+
+export const deleteDoubtContentAPI = (id, payload) =>
+  api.delete(`/doubts/${id}/content`, { data: payload });
+
+export const getDoubtDashboardMetricsAPI = () =>
+  api.get('/doubts/dashboard/metrics');
+
+export const getDoubtRetentionAPI = () =>
+  api.get('/doubts/admin/retention');
+
+export const updateDoubtRetentionAPI = (retentionDays) =>
+  api.put('/doubts/admin/retention', { retentionDays });
+
+export const exportDoubtsAPI = (params) =>
+  api.get('/doubts/admin/export', { params, responseType: params?.format === 'csv' ? 'blob' : 'json' });
+
+export const uploadDoubtAttachmentAPI = async ({ uri, name, type }) => {
+  const token = await getToken();
+  const formData = new FormData();
+  formData.append('file', {
+    uri,
+    name,
+    type,
+  });
+
+  const response = await fetch(`${API_BASE_URL}/doubts/attachments`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    const err = new Error(data.message || 'Attachment upload failed');
+    err.response = { data, status: response.status };
+    throw err;
+  }
+
+  return { data };
+};
 
 export default api;

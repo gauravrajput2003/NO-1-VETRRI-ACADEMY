@@ -12,6 +12,7 @@ import uiReducer from './slices/uiSlice';
 import teacherReducer from './slices/teacherSlice';
 import adminReducer from './slices/adminSlice';
 import pdfReducer from './slices/pdfSlice';
+import doubtsReducer from './slices/doubtsSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -23,6 +24,7 @@ const rootReducer = combineReducers({
   teacher: teacherReducer,
   admin: adminReducer,
   pdf: pdfReducer,
+  doubts: doubtsReducer,
 });
 
 const persistConfig = {

@@ -12,7 +12,7 @@ const TAB_COLORS = {
   Home: ['#FFD700', '#FFC300', '#FFEC8B'],
   Classes: ['#008B8B', '#20B2AA', '#00CED1'],
   Downloads: ['#FF1493', '#FF69B4', '#FFB6D9'],
-  Scores: ['#2196F3', '#64B5F6', '#BBDEFB'],
+  Discussion: ['#2196F3', '#64B5F6', '#BBDEFB'],
   Profile: ['#9C27B0', '#CE93D8', '#E1BEE7'],
 };
 
