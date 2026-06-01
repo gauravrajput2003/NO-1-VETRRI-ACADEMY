@@ -260,6 +260,37 @@ const uploadDocument = multer({
   },
 });
 
+/**
+ * DOUBT ATTACHMENT UPLOAD
+ * - Memory storage for faster upload and immediate cloud push
+ * - Max 25MB
+ * - Images, PDFs, and audio only
+ */
+const uploadDoubtAttachment = multer({
+  storage: memStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      ...ALLOWED_MIMETYPES.image,
+      'application/pdf',
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/x-wav',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg',
+    ];
+
+    if (!isMimetypeAllowed(file.mimetype, allowed)) {
+      return cb(new Error('Only JPG, PNG, PDF, and audio files are allowed for doubts.'));
+    }
+
+    cb(null, true);
+  },
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 // Legacy Helper (for existing code compatibility)
 // ────────────────────────────────────────────────────────────────────────────
@@ -296,6 +327,7 @@ module.exports = {
   uploadChatFile,
   uploadArchive,
   uploadDocument,
+  uploadDoubtAttachment,
   
   // Helpers
   uploadToCloudinary,

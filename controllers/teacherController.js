@@ -297,9 +297,25 @@ const uploadMaterial = async (req, res) => {
 // @access  Teacher
 const toggleMaterialLock = async (req, res) => {
   try {
-    const { studentId, unlock } = req.body;
+    const { studentId, unlock, lockedForAll } = req.body;
     const material = await StudyMaterial.findOne({ _id: req.params.id, teacher: req.user._id });
     if (!material) return res.status(404).json({ success: false, message: 'Material not found.' });
+
+    const hasLockedForAll = typeof lockedForAll === 'boolean';
+    if (hasLockedForAll) {
+      material.lockedForAll = lockedForAll;
+      if (!lockedForAll) {
+        // Global unlock clears per-student overrides.
+        material.lockedFor = [];
+        material.unlockedFor = [];
+      }
+      await material.save();
+      return res.status(200).json({ success: true, material });
+    }
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'studentId is required for per-student lock changes.' });
+    }
 
     if (unlock) {
       // Add to unlockedFor, remove from lockedFor

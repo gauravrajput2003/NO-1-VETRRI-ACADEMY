@@ -1,12 +1,26 @@
 const cron = require('node-cron');
 
+const CRON_TIMEOUT_MS = 50000;
+const BATCH_SIZE = 100;
+let isFeeReminderRunning = false;
+const feeReminderStats = { runs: 0, skips: 0, errors: 0 };
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+function runWithTimeout(fn, timeoutMs) {
+  return Promise.race([
+    fn(),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Cron job timed out')), timeoutMs);
+    }),
+  ]);
+}
+
 const getMonthContext = (date = new Date()) => {
-  const year = date.getFullYear(); 
+  const year = date.getFullYear();
   const monthNumber = date.getMonth() + 1;
   const monthName = MONTH_NAMES[date.getMonth()];
   return {
@@ -44,93 +58,141 @@ const runFeeReminderCycle = async (io, options = {}) => {
   const Notification = require('../models/Notification');
 
   const context = getMonthContext(today);
-  const students = await User.find({ role: 'student', isActive: true }).select('name email mobile course grade feeAmount feeFrequency feeDueDate');
-  const records = await FeesRecord.find({ monthYear: context.monthYear });
+  const records = await FeesRecord.find({ monthYear: context.monthYear }).lean();
   const recordsByStudentId = new Map(records.map((record) => [record.student.toString(), record]));
 
   const result = { notificationsSent: 0, paid: 0, pending: 0, overdue: 0 };
   const todayStamp = today.toISOString().slice(0, 10);
 
-  for (const student of students) {
-    const record = recordsByStudentId.get(student._id.toString());
-    const dueAmount = Number(record?.dueAmount || record?.amount || student.feeAmount || 0);
-    if (dueAmount <= 0) continue;
+  let skip = 0;
+  let hasMore = true;
 
-    const paidAmount = Number(record?.paidAmount || 0);
-    const dueDate = record?.dueDate || getDueDateForMonth(context.year, context.monthNumber, student.feeDueDate || 1);
-    const remainingAmount = Math.max(dueAmount - paidAmount, 0);
-    const status = record?.status || (remainingAmount === 0 ? 'paid' : paidAmount > 0 ? 'partial' : (today > dueDate ? 'overdue' : 'pending'));
+  while (hasMore) {
+    const students = await User.find({ role: 'student', isActive: true })
+      .select('name email mobile course grade feeAmount feeFrequency feeDueDate')
+      .sort({ _id: 1 })
+      .skip(skip)
+      .limit(BATCH_SIZE)
+      .lean();
 
-    if (record && Array.isArray(record.notificationsSent) && record.notificationsSent.includes(todayStamp)) {
-      continue;
+    if (students.length < BATCH_SIZE) {
+      hasMore = false;
     }
 
-    if (!shouldSendToday(status, currentDay)) {
-      continue;
+    for (const student of students) {
+      const record = recordsByStudentId.get(student._id.toString());
+      const dueAmount = Number(record?.dueAmount || record?.amount || student.feeAmount || 0);
+      if (dueAmount <= 0) continue;
+
+      const paidAmount = Number(record?.paidAmount || 0);
+      const dueDate = record?.dueDate || getDueDateForMonth(context.year, context.monthNumber, student.feeDueDate || 1);
+      const remainingAmount = Math.max(dueAmount - paidAmount, 0);
+      const status = record?.status || (remainingAmount === 0 ? 'paid' : paidAmount > 0 ? 'partial' : (today > dueDate ? 'overdue' : 'pending'));
+
+      if (record && Array.isArray(record.notificationsSent) && record.notificationsSent.includes(todayStamp)) {
+        continue;
+      }
+      if (!shouldSendToday(status, currentDay)) {
+        continue;
+      }
+
+      let title = 'Fee Reminder';
+      let message = `Your fee of Rs.${dueAmount} for ${context.monthYear} is due soon.`;
+      let type = 'fee_reminder';
+
+      if (status === 'paid') {
+        title = 'Fee Payment Received';
+        message = `Your fee payment of Rs.${paidAmount} for ${context.monthYear} has been recorded successfully.`;
+        type = 'fee_paid';
+        result.paid += 1;
+      } else if (status === 'partial') {
+        title = 'Partial Payment Reminder';
+        message = `Rs.${paidAmount} has been received for ${context.monthYear}. Remaining balance: Rs.${remainingAmount}.`;
+        type = 'fee_partial';
+        result.pending += 1;
+      } else if (status === 'overdue') {
+        const overdueBy = Math.max(0, Math.ceil((today.getTime() - new Date(dueDate).getTime()) / 86400000));
+        title = 'Overdue Payment Notice';
+        message = `Your fee of Rs.${dueAmount} for ${context.monthYear} is now ${overdueBy} day(s) overdue.`;
+        type = 'fee_overdue';
+        result.overdue += 1;
+      } else {
+        result.pending += 1;
+      }
+
+      const notification = await Notification.create({
+        recipient: student._id,
+        type,
+        title,
+        message,
+        link: '/student/fees',
+        data: {
+          monthYear: context.monthYear,
+          dueAmount,
+          paidAmount,
+          remainingAmount,
+          status,
+        },
+      });
+
+      result.notificationsSent += 1;
+
+      if (record) {
+        const notificationsSent = Array.isArray(record.notificationsSent) ? record.notificationsSent : [];
+        notificationsSent.push(todayStamp);
+        const overdueBy = status === 'overdue'
+          ? Math.max(0, Math.ceil((today.getTime() - new Date(dueDate).getTime()) / 86400000))
+          : 0;
+
+        await FeesRecord.updateOne(
+          { _id: record._id },
+          {
+            $set: {
+              notificationsSent: [...new Set(notificationsSent)],
+              overdueBy,
+            },
+          }
+        );
+      }
+
+      io?.to(`user:${student._id}`).emit('notification:new', notification);
     }
 
-    let title = 'Fee Reminder';
-    let message = `Your fee of ₹${dueAmount} for ${context.monthYear} is due soon.`;
-    let type = 'fee_reminder';
-
-    if (status === 'paid') {
-      title = 'Fee Payment Received';
-      message = `Your fee payment of ₹${paidAmount} for ${context.monthYear} has been recorded successfully.`;
-      type = 'fee_paid';
-      result.paid += 1;
-    } else if (status === 'partial') {
-      title = 'Partial Payment Reminder';
-      message = `₹${paidAmount} has been received for ${context.monthYear}. Remaining balance: ₹${remainingAmount}.`;
-      type = 'fee_partial';
-      result.pending += 1;
-    } else if (status === 'overdue') {
-      const overdueBy = Math.max(0, Math.ceil((today.getTime() - dueDate.getTime()) / 86400000));
-      title = 'Overdue Payment Notice';
-      message = `Your fee of ₹${dueAmount} for ${context.monthYear} is now ${overdueBy} day(s) overdue.`;
-      type = 'fee_overdue';
-      result.overdue += 1;
-    } else {
-      result.pending += 1;
+    skip += BATCH_SIZE;
+    if (hasMore) {
+      await new Promise((resolve) => setImmediate(resolve));
     }
-
-    const notification = await Notification.create({
-      recipient: student._id,
-      type,
-      title,
-      message,
-      link: '/student/fees',
-      data: {
-        monthYear: context.monthYear,
-        dueAmount,
-        paidAmount,
-        remainingAmount,
-        status,
-      },
-    });
-
-    result.notificationsSent += 1;
-
-    if (record) {
-      const notificationsSent = Array.isArray(record.notificationsSent) ? record.notificationsSent : [];
-      notificationsSent.push(todayStamp);
-      record.notificationsSent = [...new Set(notificationsSent)];
-      record.overdueBy = status === 'overdue' ? Math.max(0, Math.ceil((today.getTime() - dueDate.getTime()) / 86400000)) : 0;
-      await record.save();
-    }
-
-    io?.to(`user:${student._id}`).emit('notification:new', notification);
   }
 
   return result;
 };
 
 const startFeeReminderJob = (io) => {
-  cron.schedule('0 3 * * *', async () => {
-    try {
-      await runFeeReminderCycle(io, { force: false });
-    } catch (error) {
-      // Keep cron silent; the manual endpoint provides direct feedback.
+  cron.schedule('0 3 * * *', () => {
+    if (isFeeReminderRunning) {
+      feeReminderStats.skips += 1;
+      return;
     }
+    isFeeReminderRunning = true;
+
+    setImmediate(async () => {
+      feeReminderStats.runs += 1;
+      const start = Date.now();
+      console.log('[CRON][feeReminder] Job started at', new Date().toISOString());
+      try {
+        await runWithTimeout(() => runFeeReminderCycle(io, { force: false }), CRON_TIMEOUT_MS);
+        const duration = Date.now() - start;
+        console.log(`[CRON][feeReminder] Job completed in ${duration}ms (runs=${feeReminderStats.runs}, skips=${feeReminderStats.skips}, errors=${feeReminderStats.errors})`);
+        if (duration > 30000) {
+          console.warn(`[CRON][feeReminder] SLOW JOB WARNING: took ${duration}ms`);
+        }
+      } catch (error) {
+        feeReminderStats.errors += 1;
+        console.error(`[CRON][feeReminder] Failed or timed out: ${error.message} (runs=${feeReminderStats.runs}, skips=${feeReminderStats.skips}, errors=${feeReminderStats.errors})`);
+      } finally {
+        isFeeReminderRunning = false;
+      }
+    });
   });
 };
 

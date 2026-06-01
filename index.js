@@ -30,6 +30,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const downloadRoutes = require('./routes/downloadRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
 const storageRoutes = require('./routes/storageRoutes');
+const doubtRoutes = require('./routes/doubtRoutes');
 
 
 // ─── Models for Socket.io ──────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/downloads', downloadRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/doubts', doubtRoutes);
 
 
 // ─── Public course listing ─────────────────────────────────────────────────────
@@ -266,8 +268,10 @@ connectDB().then(() => {
   try {
     const { startWeeklyTopPerformerJob } = require('./jobs/weeklyTopPerformer');
     const { startClassReminderJob } = require('./jobs/classReminder');
+    const { startFeeReminderJob } = require('./jobs/feeReminder');
     startWeeklyTopPerformerJob();
     startClassReminderJob(io);
+    startFeeReminderJob(io);
     logDev('⏰ Cron jobs started');
   } catch (err) {
     warnDev('⚠️ Cron job startup error:', err.message);
