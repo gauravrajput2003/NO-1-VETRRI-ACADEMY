@@ -10,6 +10,27 @@ export default function HeaderActions() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { unreadCount } = useSelector((s) => s.notifications);
+  const openNotifications = () => {
+    const currentState = navigation.getState?.();
+    if (currentState?.routeNames?.includes('Notifications')) {
+      navigation.navigate('Notifications');
+      return;
+    }
+
+    const parentNav = navigation.getParent?.();
+    const parentState = parentNav?.getState?.();
+    if (parentState?.routeNames?.includes('Profile')) {
+      parentNav.navigate('Profile', { screen: 'Notifications' });
+      return;
+    }
+    if (parentState?.routeNames?.includes('Home')) {
+      parentNav.navigate('Home', { screen: 'Notifications' });
+      return;
+    }
+    if (parentState?.routeNames?.includes('Notifications')) {
+      parentNav.navigate('Notifications');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -17,7 +38,7 @@ export default function HeaderActions() {
         <Ionicons name="sparkles" size={22} color={Colors.hotPink} />
       </TouchableOpacity>
       
-      <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
+      <TouchableOpacity style={styles.notifBtn} onPress={openNotifications}>
         <Ionicons name="notifications-outline" size={24} color={Colors.hotPink} />
         {unreadCount > 0 && (
           <View style={styles.badge}>

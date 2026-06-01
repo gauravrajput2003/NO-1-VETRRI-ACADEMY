@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatRelativeTime } from '../../utils/formatters';
 import { fetchNotifications, markNotificationRead, markAllRead } from '../../redux/slices/notificationsSlice';
-import { NOTIFICATION_TYPES } from '../../utils/constants';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const TouchableOpacity = (props) => {
@@ -50,6 +49,25 @@ export default function NotificationsScreen({ navigation }) {
 
   useEffect(() => { dispatch(fetchNotifications()); }, []);
 
+  const openDoubtFromNotification = (item) => {
+    const payload = item?.data || item?.metadata || {};
+    const doubtId =
+      payload?.doubtId ||
+      payload?.doubt ||
+      payload?.doubt_id ||
+      payload?.threadId ||
+      payload?.postId;
+    if (doubtId) {
+      navigation.navigate('DoubtDetail', { doubtId: String(doubtId) });
+    } else {
+      navigation.navigate('DoubtCenter');
+    }
+  };
+
+  const teacherAssignedCount = user?.role === 'teacher'
+    ? list.filter((n) => n?.type === 'doubt_assigned').length
+    : 0;
+
   const renderNotification = ({ item }) => (
     <TouchableOpacity
       style={[styles.card, { backgroundColor: cardBg }, !item.isRead && styles.unread]}
@@ -61,9 +79,7 @@ export default function NotificationsScreen({ navigation }) {
         else if (item.type === 'class_reminder') navigation.navigate('Classes');
         else if (item.type === 'new_enquiry' && user?.role === 'admin') navigation.navigate('Enquiries');
         else if (['doubt_created', 'doubt_assigned', 'doubt_reply', 'doubt_status'].includes(item.type)) {
-          const doubtId = item.metadata?.doubtId || item.metadata?.doubt;
-          if (doubtId) navigation.navigate('DoubtDetail', { doubtId });
-          else navigation.navigate('DoubtCenter');
+          openDoubtFromNotification(item);
         }
       }}
     >
@@ -91,6 +107,13 @@ export default function NotificationsScreen({ navigation }) {
         keyExtractor={(item) => item._id}
         renderItem={renderNotification}
         contentContainerStyle={{ padding: 16 }}
+        ListHeaderComponent={user?.role === 'teacher' ? (
+          <View style={[styles.summaryCard, { backgroundColor: cardBg }]}>
+            <Ionicons name="help-circle" size={20} color={Colors.primary} />
+            <Text style={[styles.summaryTitle, { color: textColor }]}>Assigned Doubts</Text>
+            <Text style={[styles.summaryCount, { color: Colors.primary }]}>{teacherAssignedCount}</Text>
+          </View>
+        ) : null}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="notifications-off-outline" size={48} color={Colors.mediumGray} />
@@ -115,6 +138,9 @@ const styles = StyleSheet.create({
   notifMsg: { fontSize: 13, marginTop: 3 },
   notifTime: { fontSize: 11, marginTop: 4 },
   unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  summaryCard: { borderRadius: 14, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.light },
+  summaryTitle: { flex: 1, fontWeight: '700', fontSize: 14 },
+  summaryCount: { fontWeight: '900', fontSize: 20 },
   empty: { alignItems: 'center', marginTop: 60 },
   emptyText: { fontSize: 15, marginTop: 12 },
 });

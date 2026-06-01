@@ -57,6 +57,7 @@ export default function ClassSchedulerScreen() {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [tempTimeDate, setTempTimeDate] = useState(new Date());
   const [teacherStudents, setTeacherStudents] = useState([]);
+  const loggedInTeacherId = user?._id || user?.id || '';
 
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -132,29 +133,55 @@ export default function ClassSchedulerScreen() {
   }, [isTeacher]);
 
   useEffect(() => {
-    if (!isTeacher || !user?._id) return;
-    setForm((prev) => ({ ...prev, teacherId: user._id }));
+    if (!isTeacher || !loggedInTeacherId) return;
+    setForm((prev) => ({ ...prev, teacherId: loggedInTeacherId }));
     setSelectedTeacher({
-      _id: user._id,
+      _id: loggedInTeacherId,
       name: user.displayName || user.name || 'You',
       mobile: user.mobile || '',
     });
-  }, [isTeacher, user?._id]);
+  }, [isTeacher, loggedInTeacherId, user?.displayName, user?.name, user?.mobile]);
+
+  useEffect(() => {
+    if (!showForm || !isTeacher || !loggedInTeacherId) return;
+    setForm((prev) => ({ ...prev, teacherId: prev.teacherId || loggedInTeacherId }));
+    setSelectedTeacher((prev) => prev || {
+      _id: loggedInTeacherId,
+      name: user?.displayName || user?.name || 'You',
+      mobile: user?.mobile || '',
+    });
+  }, [showForm, isTeacher, loggedInTeacherId, user?.displayName, user?.name, user?.mobile]);
 
   const handleCreate = async () => {
-    if (!form.title || !form.teacherId || selectedStudents.length === 0 || !form.course || !form.subject || !form.grade || !form.scheduledDate || !form.scheduledTime) {
+    const teacherIdForPayload = form.teacherId || (isTeacher ? loggedInTeacherId : '');
+    if (!form.title || !teacherIdForPayload || selectedStudents.length === 0 || !form.course || !form.subject || !form.grade || !form.scheduledDate || !form.scheduledTime) {
       Toast.show({ type: 'error', text1: 'Fill required fields' }); return;
     }
     try {
       await createScheduleAPI({
         ...form,
+        teacherId: teacherIdForPayload,
         studentIds: selectedStudents.map((s) => s._id),
         durationMinutes: Number.parseInt(form.durationMinutes, 10) || 60,
       });
-      Toast.show({ type: 'success', text1: 'Class Scheduled ✅' });
+      Toast.show({ type: 'success', text1: 'Class Scheduled ?' });
       setShowForm(false);
-      setForm({ title: '', subject: '', course: '', grade: '', teacherId: '', scheduledDate: '', scheduledTime: '', durationMinutes: '60', notes: '' });
-      setSelectedTeacher(null);
+      setForm({
+        title: '',
+        subject: '',
+        course: '',
+        grade: '',
+        teacherId: isTeacher ? loggedInTeacherId : '',
+        scheduledDate: '',
+        scheduledTime: '',
+        durationMinutes: '60',
+        notes: '',
+      });
+      setSelectedTeacher(isTeacher ? {
+        _id: loggedInTeacherId,
+        name: user?.displayName || user?.name || 'You',
+        mobile: user?.mobile || '',
+      } : null);
       setSelectedStudents([]);
       dispatch(fetchSchedules({}));
     } catch (e) {
@@ -363,43 +390,62 @@ export default function ClassSchedulerScreen() {
       </Modal>
 
       {/* Time Picker */}
-      <Modal visible={showTimePicker} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, maxHeight: '55%', padding: 20 }]}> 
-            <View style={styles.pickerHeader}>
-              <Text style={[styles.modalTitle, { color: textColor, marginBottom: 0 }]}>Select Time</Text>
-              <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                <Text style={styles.pickerCancel}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.timePreview, { color: textSec }]}>{formatDisplayTime(tempTimeDate)}</Text>
-            <DateTimePicker
-              value={tempTimeDate}
-              mode="time"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              is24Hour={false}
-              minuteInterval={5}
-              onChange={(_, selectedDate) => {
-                if (selectedDate) setTempTimeDate(selectedDate);
-              }}
-            />
-            <View style={[styles.modalActions, { marginTop: 12 }]}> 
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowTimePicker(false)}>
-                <Text style={styles.cancelText}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmBtn}
-                onPress={() => {
-                  setForm({ ...form, scheduledTime: formatTimeForPayload(tempTimeDate) });
-                  setShowTimePicker(false);
+      {Platform.OS === 'android' ? (
+        showTimePicker && (
+          <DateTimePicker
+            value={tempTimeDate}
+            mode="time"
+            display="default"
+            is24Hour={false}
+            minuteInterval={5}
+            onChange={(event, selectedDate) => {
+              if (event.type === 'set' && selectedDate) {
+                setTempTimeDate(selectedDate);
+                setForm({ ...form, scheduledTime: formatTimeForPayload(selectedDate) });
+              }
+              setShowTimePicker(false);
+            }}
+          />
+        )
+      ) : (
+        <Modal visible={showTimePicker} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, maxHeight: '55%', padding: 20 }]}> 
+              <View style={styles.pickerHeader}>
+                <Text style={[styles.modalTitle, { color: textColor, marginBottom: 0 }]}>Select Time</Text>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.timePreview, { color: textSec }]}>{formatDisplayTime(tempTimeDate)}</Text>
+              <DateTimePicker
+                value={tempTimeDate}
+                mode="time"
+                display="spinner"
+                is24Hour={false}
+                minuteInterval={5}
+                onChange={(_, selectedDate) => {
+                  if (selectedDate) setTempTimeDate(selectedDate);
                 }}
-              >
-                <Text style={styles.confirmText}>Confirm Time</Text>
-              </TouchableOpacity>
+              />
+              <View style={[styles.modalActions, { marginTop: 12 }]}> 
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.cancelText}>Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.confirmBtn}
+                  onPress={() => {
+                    setForm({ ...form, scheduledTime: formatTimeForPayload(tempTimeDate) });
+                    setShowTimePicker(false);
+                  }}
+                >
+                  <Text style={styles.confirmText}>Confirm Time</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Teacher Picker */}
       <Modal visible={showTeacherPicker} transparent animationType="slide">

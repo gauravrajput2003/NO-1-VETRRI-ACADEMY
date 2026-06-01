@@ -6,7 +6,6 @@
  *  - Logout button has clear red-tinted background and border
  *  - Glassmorphism hero with animated gradient shimmer
  *  - Skeleton loading instead of bare spinner
- *  - Edit Profile shortcut on avatar
  *  - Stats row upgraded to progress-ring style
  *  - Menu items with colored left-accent bars
  *  - Pull-to-refresh
@@ -339,17 +338,6 @@ export default function ProfileScreen({ navigation }) {
 
       <Animated.View style={slide(headerAnim, -10)}>
         <LinearGradient colors={GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.header}>
-          {/* Edit shortcut */}
-          <TouchableOpacity
-            style={st.editBtn}
-            onPress={() => {
-              haptics.impact();
-              navigation.navigate('EditProfile');
-            }}
-          >
-            <Ionicons name="pencil" size={15} color="#FFF" />
-          </TouchableOpacity>
-
           {/* Avatar */}
           <View style={st.avatarRing}>
             {avatarUrl?.includes('dicebear') ? (
@@ -446,15 +434,6 @@ const st = StyleSheet.create({
     backgroundColor: C.pageBg,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-  },
-  editBtn: {
-    position: 'absolute',
-    top: 56, right: 18,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 20,
-    width: 36, height: 36,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
   },
   avatarRing: {
     borderWidth: 3,

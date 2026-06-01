@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
@@ -76,37 +76,15 @@ function AttachmentChip({ attachment, onOpen }) {
 }
 
 function AudioAttachmentPlayer({ attachment }) {
-  const soundRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
-
-  const onPlaybackStatusUpdate = (status) => {
-    if (!status.isLoaded) return;
-    setPosition(status.positionMillis || 0);
-    setDuration(status.durationMillis || 0);
-    setIsPlaying(Boolean(status.isPlaying));
-  };
-
-  const loadIfNeeded = async () => {
-    if (soundRef.current) return soundRef.current;
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: attachment.url },
-      { shouldPlay: false },
-      onPlaybackStatusUpdate
-    );
-    soundRef.current = sound;
-    return sound;
-  };
+  const player = useAudioPlayer(attachment.url);
+  const playerStatus = useAudioPlayerStatus(player);
 
   const togglePlay = async () => {
     try {
-      const sound = await loadIfNeeded();
-      const status = await sound.getStatusAsync();
-      if (status.isPlaying) {
-        await sound.pauseAsync();
+      if (playerStatus?.playing) {
+        player.pause();
       } else {
-        await sound.playAsync();
+        player.play();
       }
     } catch {
       Toast.show({ type: 'error', text1: 'Audio error', text2: 'Unable to play this audio file.' });
@@ -115,20 +93,12 @@ function AudioAttachmentPlayer({ attachment }) {
 
   const seekBy = async (deltaMs) => {
     try {
-      const sound = await loadIfNeeded();
-      const status = await sound.getStatusAsync();
-      const next = Math.max(0, Math.min((status.positionMillis || 0) + deltaMs, status.durationMillis || 0));
-      await sound.setPositionAsync(next);
+      const currentTimeSec = playerStatus?.currentTime || 0;
+      const durationSec = playerStatus?.duration || 0;
+      const nextSec = Math.max(0, Math.min(currentTimeSec + deltaMs / 1000, durationSec));
+      await player.seekTo(nextSec);
     } catch {}
   };
-
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
 
   return (
     <View style={styles.audioPlayer}>
@@ -136,12 +106,12 @@ function AudioAttachmentPlayer({ attachment }) {
         <Ionicons name="play-back" size={18} color={Colors.navy} />
       </TouchableOpacity>
       <TouchableOpacity style={[styles.audioBtn, { backgroundColor: Colors.primary }]} onPress={togglePlay}>
-        <Ionicons name={isPlaying ? 'pause' : 'play'} size={18} color={Colors.white} />
+        <Ionicons name={playerStatus?.playing ? 'pause' : 'play'} size={18} color={Colors.white} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.audioBtn} onPress={() => seekBy(10000)}>
         <Ionicons name="play-forward" size={18} color={Colors.navy} />
       </TouchableOpacity>
-      <Text style={styles.audioTime}>{Math.floor(position / 1000)}s / {Math.floor(duration / 1000)}s</Text>
+      <Text style={styles.audioTime}>{Math.floor(playerStatus?.currentTime || 0)}s / {Math.floor(playerStatus?.duration || 0)}s</Text>
     </View>
   );
 }

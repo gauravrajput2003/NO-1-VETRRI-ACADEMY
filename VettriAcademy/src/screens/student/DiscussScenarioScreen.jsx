@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useDispatch, useSelector } from 'react-redux';
@@ -162,9 +162,11 @@ export default function DiscussScenarioScreen({ navigation }) {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
 
-  const [recording, setRecording] = useState(null);
   const [recordingPaused, setRecordingPaused] = useState(false);
-  const [recordingDurationSec, setRecordingDurationSec] = useState(0);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  const recordingDurationSec = Math.floor((recorderState?.durationMillis || 0) / 1000);
+  const recording = Boolean(recorderState?.isRecording || recordingPaused);
 
   const queryParams = useMemo(() => buildQueryParams({ filter: activeFilter, keyword, role }), [activeFilter, keyword, role]);
 
@@ -219,7 +221,7 @@ export default function DiscussScenarioScreen({ navigation }) {
 
   const onPickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       allowsEditing: false,
       quality: 0.8,
       allowsMultipleSelection: true,
@@ -257,22 +259,13 @@ export default function DiscussScenarioScreen({ navigation }) {
 
   const startRecording = async () => {
     try {
-      const permission = await Audio.requestPermissionsAsync();
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) {
         Toast.show({ type: 'error', text1: 'Microphone permission required' });
         return;
       }
-
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      rec.setOnRecordingStatusUpdate((status) => {
-        if (status.isRecording && typeof status.durationMillis === 'number') {
-          setRecordingDurationSec(Math.floor(status.durationMillis / 1000));
-        }
-      });
-      await rec.startAsync();
-      setRecording(rec);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setRecordingPaused(false);
     } catch {
       Toast.show({ type: 'error', text1: 'Unable to start recording' });
@@ -283,10 +276,10 @@ export default function DiscussScenarioScreen({ navigation }) {
     if (!recording) return;
     try {
       if (recordingPaused) {
-        await recording.startAsync();
+        recorder.record();
         setRecordingPaused(false);
       } else {
-        await recording.pauseAsync();
+        recorder.pause();
         setRecordingPaused(true);
       }
     } catch {}
@@ -295,8 +288,8 @@ export default function DiscussScenarioScreen({ navigation }) {
   const stopRecording = async () => {
     if (!recording) return;
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      await recorder.stop();
+      const uri = recorder.uri;
       if (uri) {
         setAttachments((prev) => [
           ...prev,
@@ -310,9 +303,7 @@ export default function DiscussScenarioScreen({ navigation }) {
     } catch {
       Toast.show({ type: 'error', text1: 'Unable to stop recording' });
     } finally {
-      setRecording(null);
       setRecordingPaused(false);
-      setRecordingDurationSec(0);
     }
   };
 
@@ -342,9 +333,7 @@ export default function DiscussScenarioScreen({ navigation }) {
     setTeacherResults([]);
     setSelectedTeachers([]);
     setAttachments([]);
-    setRecording(null);
     setRecordingPaused(false);
-    setRecordingDurationSec(0);
   };
 
   const onCreateDoubt = async () => {

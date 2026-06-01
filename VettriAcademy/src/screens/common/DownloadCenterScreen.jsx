@@ -245,14 +245,14 @@ export default function DownloadCenterScreen({ navigation }) {
 
       {/* Tab Switcher */}
       <View style={styles.tabRow}>
-        <TouchableOpacity style={[styles.tabBtn, tab === 'ncert' && styles.tabActive]} onPress={() => setTab('ncert')}>
+        <RNTouchableOpacity style={[styles.tabBtn, tab === 'ncert' && styles.tabActive]} onPress={() => setTab('ncert')} activeOpacity={0.85}>
           <Ionicons name="school" size={16} color={tab === 'ncert' ? '#fff' : '#FF4FA3'} />
           <Text style={[styles.tabTxt, tab === 'ncert' && styles.tabActiveTxt]}>NCERT Books</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, tab === 'materials' && styles.tabActive]} onPress={() => setTab('materials')}>
+        </RNTouchableOpacity>
+        <RNTouchableOpacity style={[styles.tabBtn, tab === 'materials' && styles.tabActive]} onPress={() => setTab('materials')} activeOpacity={0.85}>
           <Ionicons name="folder-open" size={16} color={tab === 'materials' ? '#fff' : '#FF4FA3'} />
           <Text style={[styles.tabTxt, tab === 'materials' && styles.tabActiveTxt]}>Materials</Text>
-        </TouchableOpacity>
+        </RNTouchableOpacity>
       </View>
 
       {/* Search */}
@@ -267,9 +267,9 @@ export default function DownloadCenterScreen({ navigation }) {
         style={{ maxHeight: 50, minHeight: 45, flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
         renderItem={({ item: g }) => (
-          <TouchableOpacity style={[styles.gChip, grade === g && styles.gActive]} onPress={() => setGrade(g)}>
+          <RNTouchableOpacity style={[styles.gChip, grade === g && styles.gActive]} onPress={() => setGrade(g)} activeOpacity={0.85}>
             <Text style={[styles.gText, grade === g && styles.gActiveTxt]}>{g === 'All' ? 'All Classes' : `Class ${g}`}</Text>
-          </TouchableOpacity>
+          </RNTouchableOpacity>
         )} />
 
       {/* Content */}
