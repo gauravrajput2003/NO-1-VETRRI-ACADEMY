@@ -107,127 +107,129 @@ export default function LeaveScreen() {
       </ScrollView>
 
       {/* Apply Leave Modal */}
-      <Modal visible={showForm} transparent animationType="slide">
+      <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => setShowForm(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}>
-            <Text style={[styles.modalTitle, { color: textColor }]}>Apply Leave</Text>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, maxHeight: '85%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[styles.modalTitle, { color: textColor }]}>Apply Leave</Text>
 
-            <Text style={[styles.label, { color: textColor }]}>Leave Type</Text>
-            <View style={styles.typeRow}>
-              {leaveTypes.map((t) => (
-                <TouchableOpacity key={t} style={[styles.typeChip, form.leaveType === t && styles.typeActive]} onPress={() => setForm({ ...form, leaveType: t })}>
-                  <Text style={[styles.typeText, form.leaveType === t && { color: Colors.white }]}>{t}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <Text style={[styles.label, { color: textColor }]}>Leave Type</Text>
+              <View style={styles.typeRow}>
+                {leaveTypes.map((t) => (
+                  <TouchableOpacity key={t} style={[styles.typeChip, form.leaveType === t && styles.typeActive]} onPress={() => setForm({ ...form, leaveType: t })}>
+                    <Text style={[styles.typeText, form.leaveType === t && { color: Colors.white }]}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={[styles.label, { color: textColor }]}>From Date *</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.dateInput, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}
-              onPress={() => (Platform.OS === 'web' ? setShowFromPickerWeb(true) : setShowFromPicker(true))}
-            >
-              <Text style={{ color: form.fromDate ? textColor : Colors.mediumGray }}>{form.fromDate || 'Select from date'}</Text>
-              <Ionicons name="calendar-outline" size={18} color={Colors.mediumGray} />
-            </TouchableOpacity>
+              <Text style={[styles.label, { color: textColor }]}>From Date *</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.dateInput, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}
+                onPress={() => (Platform.OS === 'web' ? setShowFromPickerWeb(true) : setShowFromPicker(true))}
+              >
+                <Text style={{ color: form.fromDate ? textColor : Colors.mediumGray }}>{form.fromDate || 'Select from date'}</Text>
+                <Ionicons name="calendar-outline" size={18} color={Colors.mediumGray} />
+              </TouchableOpacity>
 
-            <Text style={[styles.label, { color: textColor }]}>To Date *</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.dateInput, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}
-              onPress={() => (Platform.OS === 'web' ? setShowToPickerWeb(true) : setShowToPicker(true))}
-            >
-              <Text style={{ color: form.toDate ? textColor : Colors.mediumGray }}>{form.toDate || 'Select to date'}</Text>
-              <Ionicons name="calendar-outline" size={18} color={Colors.mediumGray} />
-            </TouchableOpacity>
+              <Text style={[styles.label, { color: textColor }]}>To Date *</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.dateInput, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}
+                onPress={() => (Platform.OS === 'web' ? setShowToPickerWeb(true) : setShowToPicker(true))}
+              >
+                <Text style={{ color: form.toDate ? textColor : Colors.mediumGray }}>{form.toDate || 'Select to date'}</Text>
+                <Ionicons name="calendar-outline" size={18} color={Colors.mediumGray} />
+              </TouchableOpacity>
 
-            {showFromPicker && (
-              <DateTimePicker
-                value={form.fromDate ? new Date(form.fromDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowFromPicker(false);
-                  if (selectedDate) {
-                    const value = toYMD(selectedDate);
-                    setForm((prev) => ({ ...prev, fromDate: value, toDate: prev.toDate && prev.toDate < value ? value : prev.toDate }));
-                  }
-                }}
-              />
-            )}
+              {showFromPicker && (
+                <DateTimePicker
+                  value={form.fromDate ? new Date(form.fromDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowFromPicker(false);
+                    if (selectedDate) {
+                      const value = toYMD(selectedDate);
+                      setForm((prev) => ({ ...prev, fromDate: value, toDate: prev.toDate && prev.toDate < value ? value : prev.toDate }));
+                    }
+                  }}
+                />
+              )}
 
-            {showToPicker && (
-              <DateTimePicker
-                value={form.toDate ? new Date(form.toDate) : (form.fromDate ? new Date(form.fromDate) : new Date())}
-                mode="date"
-                display="default"
-                minimumDate={form.fromDate ? new Date(form.fromDate) : undefined}
-                onChange={(event, selectedDate) => {
-                  setShowToPicker(false);
-                  if (selectedDate) {
-                    setForm((prev) => ({ ...prev, toDate: toYMD(selectedDate) }));
-                  }
-                }}
-              />
-            )}
+              {showToPicker && (
+                <DateTimePicker
+                  value={form.toDate ? new Date(form.toDate) : (form.fromDate ? new Date(form.fromDate) : new Date())}
+                  mode="date"
+                  display="default"
+                  minimumDate={form.fromDate ? new Date(form.fromDate) : undefined}
+                  onChange={(event, selectedDate) => {
+                    setShowToPicker(false);
+                    if (selectedDate) {
+                      setForm((prev) => ({ ...prev, toDate: toYMD(selectedDate) }));
+                    }
+                  }}
+                />
+              )}
 
-            {Platform.OS === 'web' && (
-              <>
-                <Modal visible={showFromPickerWeb} transparent animationType="slide">
-                  <View style={styles.modalOverlay}>
-                    <View style={[styles.pickerModalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}> 
-                      <Text style={[styles.modalTitle, { color: textColor }]}>Select From Date</Text>
-                      <FlatList
-                        data={dateOptions}
-                        keyExtractor={(i) => i.value}
-                        renderItem={({ item }) => (
-                          <TouchableOpacity
-                            style={styles.dateOption}
-                            onPress={() => {
-                              setForm((prev) => ({ ...prev, fromDate: item.value, toDate: prev.toDate && prev.toDate < item.value ? item.value : prev.toDate }));
-                              setShowFromPickerWeb(false);
-                            }}
-                          >
-                            <Text style={[styles.dateOptionLabel, { color: textColor }]}>{item.label}</Text>
-                            <Text style={[styles.dateOptionValue, { color: textSec }]}>{item.value}</Text>
-                          </TouchableOpacity>
-                        )}
-                      />
+              {Platform.OS === 'web' && (
+                <>
+                  <Modal visible={showFromPickerWeb} transparent animationType="slide">
+                    <View style={styles.modalOverlay}>
+                      <View style={[styles.pickerModalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}> 
+                        <Text style={[styles.modalTitle, { color: textColor }]}>Select From Date</Text>
+                        <FlatList
+                          data={dateOptions}
+                          keyExtractor={(i) => i.value}
+                          renderItem={({ item }) => (
+                            <TouchableOpacity
+                              style={styles.dateOption}
+                              onPress={() => {
+                                setForm((prev) => ({ ...prev, fromDate: item.value, toDate: prev.toDate && prev.toDate < item.value ? item.value : prev.toDate }));
+                                setShowFromPickerWeb(false);
+                              }}
+                            >
+                              <Text style={[styles.dateOptionLabel, { color: textColor }]}>{item.label}</Text>
+                              <Text style={[styles.dateOptionValue, { color: textSec }]}>{item.value}</Text>
+                            </TouchableOpacity>
+                          )}
+                        />
+                      </View>
                     </View>
-                  </View>
-                </Modal>
+                  </Modal>
 
-                <Modal visible={showToPickerWeb} transparent animationType="slide">
-                  <View style={styles.modalOverlay}>
-                    <View style={[styles.pickerModalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}> 
-                      <Text style={[styles.modalTitle, { color: textColor }]}>Select To Date</Text>
-                      <FlatList
-                        data={dateOptions.filter((d) => !form.fromDate || d.value >= form.fromDate)}
-                        keyExtractor={(i) => i.value}
-                        renderItem={({ item }) => (
-                          <TouchableOpacity
-                            style={styles.dateOption}
-                            onPress={() => {
-                              setForm((prev) => ({ ...prev, toDate: item.value }));
-                              setShowToPickerWeb(false);
-                            }}
-                          >
-                            <Text style={[styles.dateOptionLabel, { color: textColor }]}>{item.label}</Text>
-                            <Text style={[styles.dateOptionValue, { color: textSec }]}>{item.value}</Text>
-                          </TouchableOpacity>
-                        )}
-                      />
+                  <Modal visible={showToPickerWeb} transparent animationType="slide">
+                    <View style={styles.modalOverlay}>
+                      <View style={[styles.pickerModalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white }]}> 
+                        <Text style={[styles.modalTitle, { color: textColor }]}>Select To Date</Text>
+                        <FlatList
+                          data={dateOptions.filter((d) => !form.fromDate || d.value >= form.fromDate)}
+                          keyExtractor={(i) => i.value}
+                          renderItem={({ item }) => (
+                            <TouchableOpacity
+                              style={styles.dateOption}
+                              onPress={() => {
+                                setForm((prev) => ({ ...prev, toDate: item.value }));
+                                setShowToPickerWeb(false);
+                              }}
+                            >
+                              <Text style={[styles.dateOptionLabel, { color: textColor }]}>{item.label}</Text>
+                              <Text style={[styles.dateOptionValue, { color: textSec }]}>{item.value}</Text>
+                            </TouchableOpacity>
+                          )}
+                        />
+                      </View>
                     </View>
-                  </View>
-                </Modal>
-              </>
-            )}
+                  </Modal>
+                </>
+              )}
 
-            <Text style={[styles.label, { color: textColor }]}>Reason *</Text>
-            <TextInput style={[styles.input, styles.textArea, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Reason for leave..." placeholderTextColor={Colors.mediumGray} multiline value={form.reason} onChangeText={(v) => setForm({ ...form, reason: v })} />
+              <Text style={[styles.label, { color: textColor }]}>Reason *</Text>
+              <TextInput style={[styles.input, styles.textArea, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} placeholder="Reason for leave..." placeholderTextColor={Colors.mediumGray} multiline value={form.reason} onChangeText={(v) => setForm({ ...form, reason: v })} />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowForm(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleSubmit}><Text style={styles.confirmText}>Submit</Text></TouchableOpacity>
-            </View>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowForm(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.confirmBtn} onPress={handleSubmit}><Text style={styles.confirmText}>Submit</Text></TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

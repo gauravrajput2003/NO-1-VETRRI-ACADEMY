@@ -84,13 +84,13 @@ export default function AdminDashboard({ navigation }) {
   ];
 
   const quickActions = [
-    { id: '1', symbol: '🎓', label: 'Students', subtitle: `${s.totalStudents || 0} Active`, screen: 'ManageStudents', color: '#6C5CE7', bgColor: '#EEE9FF', iconBg: '#D8D0FF' },
-    { id: '2', symbol: '👩‍🏫', label: 'Teachers', subtitle: `${s.totalTeachers || 0} Active`, screen: 'ManageTeachers', color: '#00B894', bgColor: '#E2FAF4', iconBg: '#CFF5EC' },
-    { id: '3', symbol: '💳', label: 'Fees', subtitle: 'Manage Payments', screen: 'FeeManagement', color: Colors.pink, bgColor: '#FDE7F1', iconBg: '#FAD0E4' },
-    { id: '4', symbol: '📢', label: 'Notices', subtitle: 'Post Announcements', screen: 'Announcements', color: '#E17055', bgColor: '#FDEEE7', iconBg: '#F7D8CB' },
-    { id: '5', symbol: '💰', label: 'Salary', subtitle: 'Monthly Overview', screen: 'SalaryManagement', color: '#6C5CE7', bgColor: '#EEE9FF', iconBg: '#D8D0FF' },
-    { id: '6', symbol: '📅', label: 'Scheduler', subtitle: `${s.totalClasses || 0} Classes`, screen: 'ClassScheduler', color: '#0984E3', bgColor: '#E7F4FF', iconBg: '#CDE9FF' },
-    { id: '7', symbol: '🎥', label: 'Training', subtitle: 'Onboarding Videos', screen: 'AdminTrainingVideos', color: '#6C5CE7', bgColor: '#EEE9FF', iconBg: '#D8D0FF' },
+    { id: '1', symbol: '🎓', label: 'Students', subtitle: `${s.totalStudents || 0} Active`, screen: 'ManageStudents', color: '#6C5CE7', bgColor: '#6C5CE7', iconBg: '#8A7BFA' },
+    { id: '2', symbol: '👩‍🏫', label: 'Teachers', subtitle: `${s.totalTeachers || 0} Active`, screen: 'ManageTeachers', color: '#00B894', bgColor: '#00B894', iconBg: '#33D1B1' },
+    { id: '3', symbol: '💳', label: 'Fees', subtitle: 'Payments', screen: 'FeeManagement', color: '#FF4F8B', bgColor: '#FF4F8B', iconBg: '#FF7EA8' },
+    { id: '4', symbol: '📢', label: 'Notices', subtitle: 'Announcements', screen: 'Announcements', color: '#E17055', bgColor: '#E17055', iconBg: '#FA9A85' },
+    { id: '5', symbol: '💰', label: 'Salary', subtitle: 'Overview', screen: 'SalaryManagement', color: '#7000FF', bgColor: '#7000FF', iconBg: '#9B51FF' },
+    { id: '6', symbol: '📅', label: 'Scheduler', subtitle: `${s.totalClasses || 0} Scheduled`, screen: 'ClassScheduler', color: '#0984E3', bgColor: '#0984E3', iconBg: '#4FAAFF' },
+    { id: '7', symbol: '🎥', label: 'Training', subtitle: 'Videos', screen: 'AdminTrainingVideos', color: '#B829DB', bgColor: '#B829DB', iconBg: '#D966F2' },
   ];
 
   return (
@@ -169,15 +169,15 @@ export default function AdminDashboard({ navigation }) {
                 onPress={() => navigation.navigate(item.screen)}
                 activeOpacity={0.75}
               >
-                <LinearGradient colors={[item.iconBg, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}> 
+                <LinearGradient colors={[item.iconBg, 'rgba(255,255,255,0.85)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}> 
                   <View style={[styles.carouselIcon, { backgroundColor: '#FFFFFF' }]}> 
                     <Text style={styles.carouselSymbol}>{item.symbol}</Text>
                   </View>
                 </LinearGradient>
-                <Text style={[styles.carouselLabel, { color: Colors.navy }]}>{item.label}</Text>
-                <Text style={[styles.carouselSubtitle, { color: Colors.mediumGray }]}>{item.subtitle}</Text>
-                <View style={[styles.carouselArrow, { backgroundColor: item.color + '20' }]}>
-                  <Text style={[styles.cardArrowSmall, { color: item.color }]}>→</Text>
+                <Text style={[styles.carouselLabel, { color: Colors.white }]}>{item.label}</Text>
+                <Text style={[styles.carouselSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>{item.subtitle}</Text>
+                <View style={[styles.carouselArrow, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                  <Text style={[styles.cardArrowSmall, { color: Colors.white }]}>→</Text>
                 </View>
               </TouchableOpacity>
             </ParticleWrapper>
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   
   /* Premium Carousel Styles */
   carouselContent: { paddingHorizontal: 12, paddingRight: 32 },
-  carouselCard: { width: 168, height: 176, borderRadius: 28, marginRight: 12, padding: 14, alignItems: 'center', justifyContent: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)' },
+  carouselCard: { width: 168, height: 196, borderRadius: 28, marginRight: 12, padding: 14, alignItems: 'center', justifyContent: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)' },
   carouselIconGlow: { width: 92, height: 92, borderRadius: 46, justifyContent: 'center', alignItems: 'center', marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
   carouselIcon: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center' },
   carouselSymbol: { fontSize: 30, lineHeight: 34 },

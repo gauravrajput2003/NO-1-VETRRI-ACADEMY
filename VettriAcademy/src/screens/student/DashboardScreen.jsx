@@ -305,10 +305,10 @@ export default function DashboardScreen({ navigation }) {
         <Text style={st.sectionTitle}>Quick Actions</Text>
         <FlatList
           data={[
-            { id: '1', icon: 'chatbubbles-outline', label: 'Discuss', screen: 'Discuss',   color: '#0984E3', bg: '#EBF5FB' },
-            { id: '2', icon: 'wallet-outline',      label: 'Fees',    screen: 'Fees',      color: C.orange,  bg: '#FFFBEA' },
-            { id: '3', icon: 'chatbubble-outline',  label: 'Chat',    screen: 'Chat',      color: '#A29BFE', bg: '#F9F7FE' },
-            { id: '4', icon: 'stats-chart-outline', label: 'Scores',  screen: 'ExamScores', color: C.pink,   bg: '#FFF0F5' },
+            { id: '1', icon: 'chatbubbles-outline', label: 'Discuss', screen: 'Discuss',   color: '#0984E3', bg: '#0984E3' },
+            { id: '2', icon: 'wallet-outline',      label: 'Fees',    screen: 'Fees',      color: C.orange,  bg: C.orange },
+            { id: '3', icon: 'chatbubble-outline',  label: 'Chat',    screen: 'Chat',      color: '#7B61FF', bg: '#7B61FF' },
+            { id: '4', icon: 'stats-chart-outline', label: 'Scores',  screen: 'ExamScores', color: C.pink,   bg: C.pink },
           ]}
           keyExtractor={(item) => item.id}
           horizontal showsHorizontalScrollIndicator={false}
@@ -323,10 +323,10 @@ export default function DashboardScreen({ navigation }) {
                   else navigation.navigate(item.screen);
                 }}
               >
-                <View style={[st.actionIcon, { backgroundColor: item.color + '20' }]}>
-                  <Ionicons name={item.icon} size={22} color={item.color} />
+                <View style={[st.actionIcon, { backgroundColor: 'rgba(255, 255, 255, 0.25)' }]}>
+                  <Ionicons name={item.icon} size={22} color={C.white} />
                 </View>
-                <Text style={[st.actionLabel, { color: item.color }]}>{item.label}</Text>
+                <Text style={[st.actionLabel, { color: C.white }]}>{item.label}</Text>
               </TouchableOpacity>
             </ParticleWrapper>
           )}

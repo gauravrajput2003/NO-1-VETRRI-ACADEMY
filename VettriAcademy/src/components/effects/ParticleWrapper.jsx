@@ -33,19 +33,9 @@ function ParticleWrapper({
   }, [colors, disabled, durationMs, particleCount, size, triggerParticles]);
 
   const child = React.Children.only(children);
-  const wrappedChild = React.isValidElement(child)
-    ? React.cloneElement(child, {
-        onPress: (...args) => {
-          const evt = args[0];
-          if (evt?.nativeEvent) {
-            triggerFromEvent(evt);
-          }
-          child.props?.onPress?.(...args);
-        },
-      })
-    : child;
 
   let layoutStyle = {};
+  let childStyleCleaned = {};
   if (React.isValidElement(child) && child.props?.style) {
     const childStyle = child.props.style;
     const flat = Array.isArray(childStyle) ? Object.assign({}, ...childStyle.filter(Boolean)) : childStyle;
@@ -57,12 +47,33 @@ function ParticleWrapper({
       'position', 'top', 'bottom', 'left', 'right',
       'alignSelf',
     ];
+    childStyleCleaned = { ...flat };
     layoutKeys.forEach((key) => {
       if (flat && flat[key] !== undefined) {
         layoutStyle[key] = flat[key];
+        delete childStyleCleaned[key];
       }
     });
+
+    // Make sure child fills the wrapper relative container
+    childStyleCleaned.width = '100%';
+    if (layoutStyle.flex !== undefined) {
+      childStyleCleaned.alignSelf = 'stretch';
+    }
   }
+
+  const wrappedChild = React.isValidElement(child)
+    ? React.cloneElement(child, {
+        style: childStyleCleaned,
+        onPress: (...args) => {
+          const evt = args[0];
+          if (evt?.nativeEvent) {
+            triggerFromEvent(evt);
+          }
+          child.props?.onPress?.(...args);
+        },
+      })
+    : child;
 
   return (
     <View style={[styles.wrap, layoutStyle, style]}>

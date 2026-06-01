@@ -83,13 +83,13 @@ export default function TeacherDashboard({ navigation }) {
 
   /* ── Quick Actions (matches Admin carousel) ── */
   const quickActions = useMemo(() => ([
-    { id: 'live', symbol: '🎥', label: 'Live Class', subtitle: `${classCount} today`, screen: 'LiveClass', color: '#2563EB', bgColor: '#DBEAFE', iconBg: '#BFDBFE' },
-    { id: 'doubts', symbol: '❓', label: 'Doubts', subtitle: `${doubtCount} pending`, screen: 'DoubtCenter', color: '#EA580C', bgColor: '#FFEDD5', iconBg: '#FED7AA' },
-    { id: 'grades', symbol: '✏️', label: 'Grades', subtitle: 'Enter marks', screen: 'Grades', color: '#7C3AED', bgColor: '#EDE9FE', iconBg: '#DDD6FE' },
-    { id: 'materials', symbol: '📂', label: 'Materials', subtitle: `${materialCount} files`, screen: 'TeacherMaterials', color: '#0F766E', bgColor: '#CCFBF1', iconBg: '#99F6E4' },
-    { id: 'students', symbol: '👥', label: 'Students', subtitle: `${studentCount} active`, screen: 'Students', color: '#0284C7', bgColor: '#E0F2FE', iconBg: '#BAE6FD' },
-    { id: 'salary', symbol: '💰', label: 'Salary', subtitle: 'Overview', screen: 'Salary', color: '#B45309', bgColor: '#FEF3C7', iconBg: '#FDE68A' },
-    { id: 'leave', symbol: '🏖️', label: 'Leave', subtitle: 'Apply now', screen: 'Leave', color: '#DB2777', bgColor: '#FCE7F3', iconBg: '#FBCFE8' },
+    { id: 'live', symbol: '🎥', label: 'Live Class', subtitle: `${classCount} today`, screen: 'LiveClass', color: '#2563EB', bgColor: '#2563EB', iconBg: '#60A5FA' },
+    { id: 'doubts', symbol: '❓', label: 'Doubts', subtitle: `${doubtCount} pending`, screen: 'DoubtCenter', color: '#EA580C', bgColor: '#EA580C', iconBg: '#F97316' },
+    { id: 'grades', symbol: '✏️', label: 'Grades', subtitle: 'Enter marks', screen: 'Grades', color: '#7C3AED', bgColor: '#7C3AED', iconBg: '#A78BFA' },
+    { id: 'materials', symbol: '📂', label: 'Materials', subtitle: `${materialCount} files`, screen: 'TeacherMaterials', color: '#0F766E', bgColor: '#0F766E', iconBg: '#2DD4BF' },
+    { id: 'students', symbol: '👥', label: 'Students', subtitle: `${studentCount} active`, screen: 'Students', color: '#0284C7', bgColor: '#0284C7', iconBg: '#38BDF8' },
+    { id: 'salary', symbol: '💰', label: 'Salary', subtitle: 'Overview', screen: 'Salary', color: '#B45309', bgColor: '#B45309', iconBg: '#F59E0B' },
+    { id: 'leave', symbol: '🏖️', label: 'Leave', subtitle: 'Apply now', screen: 'Leave', color: '#DB2777', bgColor: '#DB2777', iconBg: '#F472B6' },
   ]), [classCount, materialCount, studentCount, doubtCount]);
 
   if (teacherLoading && !refreshing) {
@@ -117,7 +117,7 @@ export default function TeacherDashboard({ navigation }) {
               <Text style={styles.greeting}>TEACHER PANEL</Text>
               <View style={styles.headerNameRow}>
                 <Text style={styles.headerName}>{(user?.displayName || user?.name || '').split(' ')[0]} </Text>
-                <Text style={styles.headerNameAccent}>{(user?.displayName || user?.name || '').split(' ').slice(1).join(' ') || 'Dashboard'}</Text>
+                <Text style={styles.headerNameAccent}>{(user?.displayName || user?.name || '').split(' ').slice(1).join(' ')}</Text>
               </View>
               <Text style={styles.headerDateline} numberOfLines={1}>
                 {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
@@ -186,15 +186,15 @@ export default function TeacherDashboard({ navigation }) {
               onPress={() => navigation.navigate(item.screen)}
               activeOpacity={0.75}
             >
-              <LinearGradient colors={[item.iconBg, '#FFFFFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}>
+              <LinearGradient colors={[item.iconBg, 'rgba(255,255,255,0.85)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.carouselIconGlow}>
                 <View style={styles.carouselIcon}>
                   <Text style={styles.carouselSymbol}>{item.symbol}</Text>
                 </View>
               </LinearGradient>
-              <Text style={styles.carouselLabel}>{item.label}</Text>
-              <Text style={styles.carouselSubtitle}>{item.subtitle}</Text>
-              <View style={[styles.carouselArrow, { backgroundColor: item.color + '20' }]}>
-                <Text style={[styles.cardArrowSmall, { color: item.color }]}>→</Text>
+              <Text style={[styles.carouselLabel, { color: Colors.white }]}>{item.label}</Text>
+              <Text style={[styles.carouselSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>{item.subtitle}</Text>
+              <View style={[styles.carouselArrow, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                <Text style={[styles.cardArrowSmall, { color: Colors.white }]}>→</Text>
               </View>
             </TouchableOpacity>
             </ParticleWrapper>
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   carouselContent: { paddingHorizontal: 0, paddingRight: 32 },
   carouselCard: {
     width: 168,
-    height: 176,
+    height: 196,
     borderRadius: 28,
     marginRight: 12,
     padding: 14,

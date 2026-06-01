@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
@@ -104,31 +105,75 @@ const buildQueryParams = ({ filter, keyword, role }) => {
 
 function DoubtCard({ item, onPress }) {
   const priorityColor = PRIORITY_COLOR[item.priority] || Colors.primary;
+  const statusColors = {
+    open: '#3B82F6',
+    teacher_responded: '#8B5CF6',
+    waiting_for_student: '#EF4444',
+    resolved: '#10B981',
+    closed: '#6B7280',
+  };
+  const statusColor = statusColors[item.status] || '#6B7280';
+
   return (
     <ParticleWrapper particleCount={12} size="small">
-      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+      <TouchableOpacity 
+        style={[styles.card, { borderLeftWidth: 4, borderLeftColor: priorityColor }]} 
+        onPress={onPress} 
+        activeOpacity={0.85}
+      >
         <View style={styles.cardTop}>
           <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
           <View style={[styles.priorityPill, { backgroundColor: `${priorityColor}1E` }]}>
-            <Text style={[styles.priorityText, { color: priorityColor }]}>{item.priority?.toUpperCase() || 'MEDIUM'}</Text>
+            <Text style={[styles.priorityText, { color: priorityColor }]}>
+              {item.priority?.toUpperCase() || 'MEDIUM'}
+            </Text>
           </View>
         </View>
 
         <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
 
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{item.subject}</Text>
-          <Text style={styles.metaText}>•</Text>
-          <Text style={styles.metaText}>{item.chapter || 'General'}</Text>
-          <Text style={styles.metaText}>•</Text>
-          <Text style={styles.metaText}>{STATUS_LABEL[item.status] || item.status}</Text>
+          <View style={styles.tagBadge}>
+            <Text style={styles.tagText}>{item.subject}</Text>
+          </View>
+          {item.chapter ? (
+            <View style={[styles.tagBadge, { backgroundColor: '#F1F5F9' }]}>
+              <Text style={[styles.tagText, { color: '#475569' }]}>{item.chapter}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}1A` }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {STATUS_LABEL[item.status] || item.status}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.metaRow}>
-          <Text style={styles.subMeta}>Student: {item.studentId?.displayName || item.studentId?.name || 'N/A'}</Text>
-          <Text style={styles.subMeta}>Teachers: {(item.assignedTeachers || []).length}</Text>
+        <View style={styles.divider} />
+
+        <View style={styles.cardFooter}>
+          <View style={styles.authorRow}>
+            <View style={styles.avatarMini}>
+              <Text style={styles.avatarMiniText}>
+                {(item.studentId?.displayName || item.studentId?.name || 'S')?.[0]?.toUpperCase()}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.footerAuthorName}>
+                {item.studentId?.displayName || item.studentId?.name || 'Student'}
+              </Text>
+              <Text style={styles.createdAtText}>
+                Posted: {formatDateTime(item.createdAt || item.updatedAt || item.date)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.teachersBadge}>
+            <Ionicons name="people-outline" size={12} color="#64748B" style={{ marginRight: 3 }} />
+            <Text style={styles.teachersBadgeText}>
+              {(item.assignedTeachers || []).length} {(item.assignedTeachers || []).length === 1 ? 'Teacher' : 'Teachers'}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.createdAtText}>Posted: {formatDateTime(item.createdAt || item.updatedAt || item.date)}</Text>
       </TouchableOpacity>
     </ParticleWrapper>
   );
@@ -417,10 +462,16 @@ export default function DiscussScenarioScreen({ navigation }) {
     return (
       <View style={styles.metricRow}>
         {rows.map((m) => (
-          <View key={m.label} style={styles.metricCard}>
+          <LinearGradient
+            key={m.label}
+            colors={[`${m.color}15`, '#FFFFFF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.metricCard, { borderLeftWidth: 4, borderLeftColor: m.color }]}
+          >
             <Text style={[styles.metricValue, { color: m.color }]}>{m.value}</Text>
             <Text style={styles.metricLabel}>{m.label}</Text>
-          </View>
+          </LinearGradient>
         ))}
       </View>
     );
@@ -428,9 +479,16 @@ export default function DiscussScenarioScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Doubt Resolution</Text>
-        <Text style={styles.headerSub}>Create, track, and resolve academic doubts in one thread</Text>
+      <View style={styles.headerBg}>
+        <LinearGradient
+          colors={['#1A3C40', '#11C5C6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          <Text style={styles.headerTitle}>Doubt Resolution</Text>
+          <Text style={styles.headerSub}>Create, track, and resolve academic doubts in one thread</Text>
+        </LinearGradient>
       </View>
 
       <FlatList
@@ -675,23 +733,24 @@ export default function DiscussScenarioScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.offWhite },
-  header: { paddingTop: 48, paddingHorizontal: 16, paddingBottom: 10, backgroundColor: Colors.white },
-  headerTitle: { fontSize: 24, fontWeight: '900', color: Colors.navy },
-  headerSub: { marginTop: 4, fontSize: 13, color: Colors.mediumGray },
+  headerBg: { backgroundColor: Colors.white },
+  headerGradient: { paddingTop: 54, paddingBottom: 18, paddingHorizontal: 18 },
+  headerTitle: { fontSize: 25, fontWeight: '900', color: Colors.white, letterSpacing: 0.2 },
+  headerSub: { marginTop: 6, fontSize: 13, color: 'rgba(255, 255, 255, 0.75)', fontWeight: '500' },
 
   metricRow: { marginTop: 14, marginBottom: 10, flexDirection: 'row', gap: 10 },
   metricCard: { flex: 1, borderRadius: 12, padding: 12, backgroundColor: Colors.white, ...Shadows.light },
   metricValue: { fontSize: 24, fontWeight: '900' },
-  metricLabel: { marginTop: 4, fontSize: 12, color: Colors.mediumGray, fontWeight: '700' },
+  metricLabel: { marginTop: 4, fontSize: 12, color: Colors.navy, fontWeight: '700' },
 
   searchBox: { marginTop: 8, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 12, backgroundColor: Colors.white, ...Shadows.light },
   searchInput: { flex: 1, fontSize: 14, color: Colors.navy, paddingVertical: 11 },
 
   filterWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   filterChip: { backgroundColor: '#E8EEF5', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  filterChipActive: { backgroundColor: '#DCEEFF', borderWidth: 1, borderColor: '#B5D9FF' },
+  filterChipActive: { backgroundColor: Colors.primary, borderWidth: 1, borderColor: Colors.primary },
   filterText: { fontSize: 12, color: '#4B5563', fontWeight: '700' },
-  filterTextActive: { color: Colors.primary },
+  filterTextActive: { color: Colors.white },
 
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   primaryAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
@@ -699,17 +758,29 @@ const styles = StyleSheet.create({
   secondaryAction: { backgroundColor: '#EEF2F6', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10 },
   secondaryActionText: { color: Colors.navy, fontWeight: '700', fontSize: 12 },
 
-  card: { backgroundColor: Colors.white, borderRadius: 14, padding: 12, marginBottom: 10, ...Shadows.light },
+  card: { backgroundColor: Colors.white, borderRadius: 14, padding: 14, marginBottom: 12, ...Shadows.medium },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
-  cardTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: Colors.navy },
-  cardDesc: { marginTop: 6, fontSize: 13, color: Colors.gray, lineHeight: 18 },
+  cardTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.navy },
+  cardDesc: { marginTop: 8, fontSize: 13, color: '#334155', lineHeight: 18, fontWeight: '500' },
   priorityPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   priorityText: { fontSize: 10, fontWeight: '900' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7, flexWrap: 'wrap' },
-  metaText: { fontSize: 11, color: Colors.mediumGray, fontWeight: '700' },
-  subMeta: { fontSize: 11, color: Colors.gray },
-  createdAtText: { marginTop: 6, fontSize: 11, color: Colors.mediumGray, fontWeight: '600' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  tagBadge: { backgroundColor: '#FF4F8B1A', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  tagText: { fontSize: 11, color: Colors.primary, fontWeight: '700' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 4 },
+  statusText: { fontSize: 11, fontWeight: '700' },
 
+  divider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 12 },
+
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avatarMini: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFF4F7', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#FF4FA330' },
+  avatarMiniText: { color: Colors.primary, fontSize: 11, fontWeight: '800' },
+  footerAuthorName: { fontSize: 12, fontWeight: '700', color: Colors.navy },
+  createdAtText: { fontSize: 10, color: '#64748B', fontWeight: '500', marginTop: 1 },
+  teachersBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  teachersBadgeText: { fontSize: 11, color: '#475569', fontWeight: '600' },
   emptyWrap: { alignItems: 'center', paddingVertical: 30 },
   emptyTitle: { marginTop: 12, fontSize: 16, color: Colors.navy, fontWeight: '800' },
   emptySub: { marginTop: 4, fontSize: 13, color: Colors.mediumGray },
