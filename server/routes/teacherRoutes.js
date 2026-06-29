@@ -9,6 +9,8 @@ const {
   postLiveClass,
   markClassCompleted,
   uploadMaterial,
+  editMaterial,
+  deleteMaterial,
   toggleMaterialLock,
   getTeacherMaterials,
   enterExamScore,
@@ -38,6 +40,8 @@ router.put('/live-class/:id/complete', markClassCompleted);
 router.post('/materials', uploadStudyMaterial.single('file'), uploadMaterial);
 router.get('/materials', getTeacherMaterials);
 router.put('/materials/:id/lock', toggleMaterialLock);
+router.put('/materials/:id', editMaterial);
+router.delete('/materials/:id', deleteMaterial);
 
 // Exam scores
 router.post('/scores', enterExamScore);
