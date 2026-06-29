@@ -1,33 +1,48 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Modal, Animated, RefreshControl, Keyboard, Platform, StatusBar, SafeAreaView
+  ActivityIndicator, Modal, Animated, RefreshControl, Keyboard, Platform, StatusBar,
+  Image, Easing
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
-import { Colors, classStatusColors } from '../../utils/colors';
-import { Shadows } from '../../utils/theme';
-import { formatScheduledTime, formatDate } from '../../utils/formatters';
+
 import { fetchTodayClasses, fetchSchedules } from '../../redux/slices/classesSlice';
 import { startLiveClass } from '../../redux/slices/teacherSlice';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { formatScheduledTime, formatDate } from '../../utils/formatters';
 
-const TouchableOpacity = (props) => {
-  const { particleCount = 20, size = "small", colors, children, ...rest } = props;
-  return (
-    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
-      <RNTouchableOpacity {...rest}>{children}</RNTouchableOpacity>
-    </ParticleWrapper>
-  );
+const ASSETS = {
+  study: require('../../../assets/study.png'),
 };
 
+const T = {
+  pink: '#FF4D8D',
+  pinkLight: '#FF6AA2',
+  teal: '#14C8C4',
+  blue: '#2563EB',
+  orange: '#FF9800',
+  white: '#FFFFFF',
+  title: '#1F2937',
+  subtitle: '#6B7280',
+  gray: '#9CA3AF',
+  green: '#10B981',
+  red: '#EF4444',
+  pageBgTop: '#FFF8FB',
+  pageBgMid: '#F8F7FC',
+  pageBgBot: '#F5FAFF',
+};
+
+// ─── HELPERS ───
 
 const STATUS_TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'scheduled', label: 'Scheduled' },
-  { key: 'live', label: 'Ongoing' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'all', label: 'All', icon: '🏠' },
+  { key: 'scheduled', label: 'Scheduled', icon: '📅' },
+  { key: 'live', label: 'Ongoing', icon: '🔴' },
+  { key: 'completed', label: 'Completed', icon: '✅' },
 ];
 
 const LINK_TYPES = [
@@ -46,57 +61,85 @@ const validateMeetLink = (url) => {
   return { valid: false, error: 'Please use a Google Meet, Zoom, or Jitsi link' };
 };
 
-const Header = ({ onBack }) => (
-  <View style={styles.headerContainer}>
-    <StatusBar barStyle="light-content" backgroundColor="#112B4A" translucent />
-    <View style={styles.headerRow}>
-      <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-        <Ionicons name="arrow-back" size={24} color={Colors.white} />
-      </TouchableOpacity>
-      <View style={styles.headerTitleContainer}>
-        <Text style={styles.headerTitle}>🔴 Go Live</Text>
-        <Text style={styles.headerSubtitle}>Manage your live classes</Text>
-      </View>
-      <View style={styles.headerRightPlaceholder} />
-    </View>
-  </View>
+const getStatusConfig = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'scheduled': return { color: T.blue, bg: 'rgba(37,99,235,0.1)' };
+    case 'live': return { color: T.green, bg: 'rgba(16,185,129,0.15)' };
+    case 'completed': return { color: T.gray, bg: 'rgba(156,163,175,0.15)' };
+    case 'cancelled': return { color: T.red, bg: 'rgba(239,68,68,0.1)' };
+    default: return { color: T.gray, bg: 'rgba(156,163,175,0.1)' };
+  }
+};
+
+
+
+// ─── ANIMATED COMPONENTS ───
+
+const ScaleBtn = ({ onPress, style, children, activeScale = 0.94, disabled, ...rest }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () => {
+    if (!disabled) Animated.timing(scale, { toValue: activeScale, duration: 100, useNativeDriver: true }).start();
+  };
+  const onPressOut = () => {
+    if (!disabled) Animated.timing(scale, { toValue: 1, duration: 100, useNativeDriver: true }).start();
+  };
+  return (
+    <RNTouchableOpacity onPressIn={onPressIn} onPressOut={onPressOut} onPress={onPress} activeOpacity={disabled ? 1 : 0.9} style={style} disabled={disabled} {...rest}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        {children}
+      </Animated.View>
+    </RNTouchableOpacity>
+  );
+};
+
+const FadeSlideView = ({ children, delay = 0, index = 0, style }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 400, delay: delay + index * 100, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 400, delay: delay + index * 100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start();
+  }, []);
+  return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
+};
+
+const PulseView = ({ children, style }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>;
+};
+
+const FloatingView = ({ children, style, amplitude = 6, duration = 3000 }) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, { toValue: amplitude, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: -amplitude, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return <Animated.View style={[style, { transform: [{ translateY }] }]}>{children}</Animated.View>;
+};
+
+const Sparkle = ({ size = 10, color = T.white, opacity = 0.5, style }) => (
+  <View style={[style, { width: size, height: size, borderRadius: size / 2, backgroundColor: color, opacity }]} />
 );
 
-const Tabs = ({ activeTab, onTabChange }) => (
-  <View style={styles.tabsContainer}>
-    {STATUS_TABS.map((tab) => {
-      const isActive = activeTab === tab.key;
-      return (
-        <TouchableOpacity
-          key={tab.key}
-          style={[styles.tab, isActive ? styles.tabActive : styles.tabInactive]}
-          onPress={() => onTabChange(tab.key)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, isActive ? styles.tabTextActive : styles.tabTextInactive]}>{tab.label}</Text>
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-);
-
-const EmptyState = ({ activeTab, isDark }) => (
-  <View style={styles.emptyContainer}>
-    <View style={styles.emptyIconContainer}>
-      <Ionicons name="videocam-off-outline" size={56} color={Colors.mediumGray} />
-    </View>
-    <Text style={[styles.emptyTitle, { color: isDark ? Colors.text.dark : Colors.text.light }]}>No classes found</Text>
-    <Text style={[styles.emptySubtitle, { color: isDark ? Colors.textSecondary.dark : Colors.mediumGray }]}>
-      {activeTab === 'all' ? 'No classes scheduled for today.' : `No ${activeTab} classes available right now.`}
-    </Text>
-  </View>
-);
+// ─── MAIN COMPONENT ───
 
 export default function LiveClassScreen({ navigation, route }) {
   const dispatch = useDispatch();
   const { todayClasses, schedules, loading } = useSelector((s) => s.classes);
-  const theme = useSelector((s) => s.ui.theme);
-  const isDark = theme === 'dark';
+  const insets = useSafeAreaInsets();
 
   const [activeTab, setActiveTab] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -105,24 +148,6 @@ export default function LiveClassScreen({ navigation, route }) {
   const [meetLinkType, setMeetLinkType] = useState('googlemeet');
   const [isStarting, setIsStarting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
-  const cardBg = isDark ? Colors.card.dark : Colors.card.light;
-  const textColor = isDark ? Colors.text.dark : Colors.text.light;
-  const textSec = isDark ? Colors.textSecondary.dark : Colors.textSecondary.light;
-
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.6, duration: 1500, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []);
 
   const loadData = useCallback(async () => {
     await Promise.all([
@@ -196,149 +221,244 @@ export default function LiveClassScreen({ navigation, route }) {
     });
   };
 
-  const getStudentCount = (item) => item.studentIds?.length || item.enrolledStudents?.length || item.students || 0;
-
-  const renderClassCard = ({ item }) => {
+  const renderClassCard = ({ item, index }) => {
     const isLive = item.status === 'live';
-    const statusColor = classStatusColors[item.status] || Colors.mediumGray;
-    const studentCount = getStudentCount(item);
+    const conf = getStatusConfig(item.status);
+    const studentCount = item.studentIds?.length || item.enrolledStudents?.length || item.students || 0;
 
     return (
-      <View style={[styles.card, { backgroundColor: cardBg }, isLive && { borderWidth: 2, borderColor: Colors.primary }]}>
-        <View style={styles.cardHeader}>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-            {isLive ? (
-              <Animated.View style={[styles.statusDot, { backgroundColor: statusColor, opacity: pulseAnim }]} />
-            ) : (
-              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+      <FadeSlideView index={index}>
+        <LinearGradient
+          colors={['#FFFFFF', '#F3FFFC']}
+          style={styles.card}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        >
+          <View style={styles.cardGlass} />
+          <View style={styles.cardDecoTopRight} />
+          <View style={styles.cardDecoBottomLeft} />
+
+          {/* TOP ROW */}
+          <View style={styles.cardHeader}>
+            <View style={[styles.statusBadge, { backgroundColor: conf.bg }]}>
+              {isLive ? (
+                <PulseView>
+                  <View style={[styles.statusDot, { backgroundColor: conf.color, shadowColor: conf.color, shadowOpacity: 0.8, shadowRadius: 4 }]} />
+                </PulseView>
+              ) : (
+                <View style={[styles.statusDot, { backgroundColor: conf.color }]} />
+              )}
+              <Text style={[styles.statusLabel, { color: conf.color }]}>{item.status?.toUpperCase()}</Text>
+            </View>
+            <Text style={styles.dateText}>{formatDate(item.scheduledDate)}</Text>
+          </View>
+
+          {/* SECOND ROW */}
+          <Text style={styles.classTitle} numberOfLines={2}>{item.title || item.subject}</Text>
+
+          {/* THIRD ROW */}
+          <View style={styles.infoPillsRow}>
+            <View style={[styles.infoPill, styles.infoPillBlue]}>
+              <Ionicons name="time" size={14} color={T.blue} />
+              <Text style={[styles.infoPillText, { color: T.blue }]}>{formatScheduledTime(item.scheduledTime)}</Text>
+            </View>
+            <View style={[styles.infoPill, styles.infoPillTeal]}>
+              <Ionicons name="people" size={14} color={T.teal} />
+              <Text style={[styles.infoPillText, { color: T.teal }]}>{studentCount}</Text>
+            </View>
+            {item.course && (
+              <View style={[styles.infoPill, styles.infoPillOrange]}>
+                <Ionicons name="book" size={14} color={T.orange} />
+                <Text style={[styles.infoPillText, { color: T.orange }]}>{item.course}</Text>
+              </View>
             )}
-            <Text style={[styles.statusLabel, { color: statusColor }]}>{item.status?.toUpperCase()}</Text>
           </View>
-          <Text style={[styles.dateText, { color: textSec }]}>{formatDate(item.scheduledDate)}</Text>
-        </View>
 
-        <Text style={[styles.classTitle, { color: textColor }]}>{item.title || item.subject}</Text>
+          {/* BUTTON */}
+          {item.status === 'scheduled' && (
+            <ParticleWrapper>
+              <ScaleBtn activeScale={0.96} onPress={() => handleGoLive(item)}>
+                <LinearGradient colors={['#FF4D8D', '#FF6AA2']} style={styles.goLiveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <View style={styles.btnIconCircle}>
+                    <Ionicons name="videocam" size={18} color={T.pink} />
+                  </View>
+                  <Text style={styles.goLiveBtnText}>GO LIVE</Text>
+                  <Ionicons name="arrow-forward" size={18} color={T.white} style={{ position: 'absolute', right: 20 }} />
+                </LinearGradient>
+              </ScaleBtn>
+            </ParticleWrapper>
+          )}
 
-        <View style={styles.infoRow}>
-          <Ionicons name="time-outline" size={14} color={textSec} />
-          <Text style={[styles.infoText, { color: textSec }]}>
-            {formatScheduledTime(item.scheduledTime)} • {item.durationMinutes || 60} min
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="people-outline" size={14} color={textSec} />
-          <Text style={[styles.infoText, { color: textSec }]}>{studentCount} students enrolled</Text>
-        </View>
-        {item.course && (
-          <View style={styles.infoRow}>
-            <Ionicons name="book-outline" size={14} color={textSec} />
-            <Text style={[styles.infoText, { color: textSec }]}>{item.course} {item.grade ? `- ${item.grade}` : ''}</Text>
-          </View>
-        )}
-
-        {item.status === 'scheduled' && (
-          <TouchableOpacity style={styles.goLiveBtn} onPress={() => handleGoLive(item)} activeOpacity={0.8}>
-            <Ionicons name="videocam" size={18} color={Colors.white} />
-            <Text style={styles.goLiveBtnText}>🔴 GO LIVE</Text>
-          </TouchableOpacity>
-        )}
-        {isLive && (
-          <TouchableOpacity style={[styles.goLiveBtn, { backgroundColor: Colors.error }]} onPress={() => handleManageLive(item)} activeOpacity={0.8}>
-            <Ionicons name="pulse" size={18} color={Colors.white} />
-            <Text style={styles.goLiveBtnText}>MANAGE LIVE CLASS</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {isLive && (
+            <ParticleWrapper>
+              <ScaleBtn activeScale={0.96} onPress={() => handleManageLive(item)}>
+                <LinearGradient colors={['#10B981', '#34D399']} style={styles.goLiveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <View style={styles.btnIconCircle}>
+                    <Ionicons name="pulse" size={18} color={T.green} />
+                  </View>
+                  <Text style={styles.goLiveBtnText}>MANAGE LIVE CLASS</Text>
+                  <Ionicons name="arrow-forward" size={18} color={T.white} style={{ position: 'absolute', right: 20 }} />
+                </LinearGradient>
+              </ScaleBtn>
+            </ParticleWrapper>
+          )}
+        </LinearGradient>
+      </FadeSlideView>
     );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
-      <Header onBack={() => navigation.goBack()} />
-      <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
+    <View style={styles.container}>
+      <LinearGradient colors={['#FFF7FB', '#F8F7FC', '#F5FCFF', '#F0FFFC']} style={StyleSheet.absoluteFillObject} />
 
+      {/* Background Decor */}
+      <View style={styles.bgBlobPink} />
+      <View style={styles.bgBlobTeal} />
+      <View style={styles.bgBlobBlue} />
+      
+      <View style={styles.bgBubble1} />
+      <View style={styles.bgBubble2} />
+      
+      <Sparkle size={12} color={T.pink} opacity={0.10} style={{ position: 'absolute', top: 250, left: 60 }} />
+      <Sparkle size={18} color={T.teal} opacity={0.10} style={{ position: 'absolute', top: 450, right: 40 }} />
+      <Sparkle size={10} color={T.blue} opacity={0.10} style={{ position: 'absolute', top: 650, left: 80 }} />
+      <Sparkle size={14} color={T.orange} opacity={0.10} style={{ position: 'absolute', top: 800, right: 60 }} />
+
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      {/* HERO HEADER */}
+      <View style={[styles.headerWrap, { height: Math.max(180, insets.top + 140) }]}>
+        <LinearGradient colors={['#C2185B', '#D81B60', '#FF5D9E']} style={StyleSheet.absoluteFillObject}>
+          <FloatingView amplitude={15} duration={8000} style={styles.headerCircle1} />
+          <FloatingView amplitude={20} duration={10000} style={styles.headerCircle2} />
+          <View style={styles.headerGlassBubble} />
+          <Sparkle size={14} color={T.white} opacity={0.3} style={{ position: 'absolute', top: 80, right: 40 }} />
+          <Sparkle size={10} color={T.white} opacity={0.4} style={{ position: 'absolute', bottom: 30, left: 60 }} />
+        </LinearGradient>
+
+        <View style={[styles.headerTopBar, { top: Math.max(insets.top, 16) }]}>
+          <ScaleBtn onPress={() => navigation.goBack()} style={styles.glassCircleBtn}>
+            <Ionicons name="arrow-back" size={24} color={T.white} />
+          </ScaleBtn>
+          <View style={[styles.glassCircleBtn, { opacity: 0 }]} />
+        </View>
+
+        <View style={styles.headerContent}>
+          <FadeSlideView delay={100}>
+            <Text style={styles.headerTitle}>🔴 Go Live</Text>
+          </FadeSlideView>
+          <FadeSlideView delay={200}>
+            <Text style={styles.headerSubtitle}>Manage your online classes</Text>
+          </FadeSlideView>
+        </View>
+      </View>
+
+      {/* FILTER CHIPS */}
+      <View style={styles.tabsContainer}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={STATUS_TABS}
+          keyExtractor={t => t.key}
+          contentContainerStyle={{ paddingHorizontal: 18, gap: 10, paddingVertical: 12 }}
+          renderItem={({ item }) => {
+            const isActive = activeTab === item.key;
+            return (
+              <ScaleBtn activeScale={0.94} onPress={() => setActiveTab(item.key)}>
+                {isActive ? (
+                  <LinearGradient colors={['#FF4D8D', '#FF6AA2']} style={styles.chipActive} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <Text style={styles.chipIcon}>{item.icon}</Text>
+                    <Text style={styles.chipTextActive}>{item.label}</Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={styles.chipInactive}>
+                    <Text style={styles.chipIcon}>{item.icon}</Text>
+                    <Text style={styles.chipTextInactive}>{item.label}</Text>
+                  </View>
+                )}
+              </ScaleBtn>
+            );
+          }}
+        />
+      </View>
+
+      {/* CONTENT LIST */}
       {loading && !refreshing ? (
-        <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={T.pink} style={{ marginTop: 60 }} />
       ) : (
         <FlatList
           data={filteredClasses}
           keyExtractor={(item) => item._id}
           renderItem={renderClassCard}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[Colors.primary]} />}
-          ListEmptyComponent={<EmptyState activeTab={activeTab} isDark={isDark} />}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[T.pink]} />}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <FloatingView amplitude={10} duration={3000}>
+                <Image source={ASSETS.study} style={styles.emptyImage} resizeMode="contain" />
+              </FloatingView>
+              <Text style={styles.emptyTitle}>No Classes Found</Text>
+              <Text style={styles.emptySubtitle}>
+                {activeTab === 'all' ? "You don't have any classes scheduled for today.\nTake a break! 😊" : `No ${activeTab} classes available right now.`}
+              </Text>
+            </View>
+          }
         />
       )}
 
-      {/* ═══ Go Live Modal ═══ */}
+      {/* ═══ GO LIVE MODAL ═══ */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); setMeetLink(''); }}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#152238' : Colors.white }]}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalDragHandle} />
+
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: textColor }]}>🔴 Start Live Class</Text>
-              <TouchableOpacity onPress={() => { setShowModal(false); setMeetLink(''); }} style={styles.modalClose}>
-                <Ionicons name="close" size={24} color={textSec} />
-              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Start Live Class</Text>
+              <ScaleBtn onPress={() => { setShowModal(false); setMeetLink(''); }} style={styles.modalClose}>
+                <Ionicons name="close" size={24} color={T.subtitle} />
+              </ScaleBtn>
             </View>
 
-            <View style={[styles.classInfoCard, { backgroundColor: isDark ? Colors.card.dark : Colors.offWhite }]}>
-              <Text style={[styles.classInfoTitle, { color: textColor }]}>{selectedClass?.title || selectedClass?.subject}</Text>
-              <View style={styles.classInfoRow}>
-                <Ionicons name="time-outline" size={14} color={textSec} />
-                <Text style={[styles.classInfoText, { color: textSec }]}>{formatScheduledTime(selectedClass?.scheduledTime)}</Text>
-              </View>
-              <View style={styles.classInfoRow}>
-                <Ionicons name="people-outline" size={14} color={textSec} />
-                <Text style={[styles.classInfoText, { color: textSec }]}>{getStudentCount(selectedClass || {})} students</Text>
+            <View style={styles.modalSubjectCard}>
+              <Text style={styles.modalSubjectTitle} numberOfLines={2}>{selectedClass?.title || selectedClass?.subject}</Text>
+              <View style={styles.modalSubjectInfoRow}>
+                <Ionicons name="time" size={14} color={T.blue} />
+                <Text style={styles.modalSubjectInfoText}>{formatScheduledTime(selectedClass?.scheduledTime)}</Text>
               </View>
             </View>
 
-            <View style={styles.instructionsBox}>
-              <Text style={[styles.instructionsTitle, { color: textColor }]}>How to start:</Text>
-              {[
-                'Open Google Meet on your laptop',
-                'Create or start a meeting',
-                'Copy the meeting link',
-                'Paste it below and tap START CLASS',
-                'Students will be notified immediately!',
-              ].map((step, i) => (
-                <Text key={i} style={[styles.instructionStep, { color: textSec }]}>{i + 1}. {step}</Text>
-              ))}
-            </View>
-
-            <Text style={[styles.inputLabel, { color: textColor }]}>Platform</Text>
+            <Text style={styles.inputLabel}>Platform</Text>
             <View style={styles.platformRow}>
               {LINK_TYPES.map((lt) => (
-                <TouchableOpacity
+                <ScaleBtn
                   key={lt.key}
-                  style={[styles.platformChip, meetLinkType === lt.key && styles.platformChipActive]}
+                  activeScale={0.92}
+                  style={[styles.modalPlatformChip, meetLinkType === lt.key && styles.modalPlatformChipActive]}
                   onPress={() => setMeetLinkType(lt.key)}
                 >
-                  <Ionicons name={lt.icon} size={14} color={meetLinkType === lt.key ? Colors.white : Colors.primary} />
-                  <Text style={[styles.platformChipText, meetLinkType === lt.key && { color: Colors.white }]}>{lt.label}</Text>
-                </TouchableOpacity>
+                  <Ionicons name={lt.icon} size={14} color={meetLinkType === lt.key ? T.white : T.pink} />
+                  <Text style={[styles.modalPlatformChipText, meetLinkType === lt.key && { color: T.white }]}>{lt.label}</Text>
+                </ScaleBtn>
               ))}
             </View>
 
-            <Text style={[styles.inputLabel, { color: textColor }]}>Meeting Link *</Text>
-            <View style={[styles.inputContainer, { borderColor: meetLink ? (linkValidation.valid ? Colors.success : Colors.error) : (isDark ? Colors.navyLight : Colors.gray) }]}>
+            <Text style={styles.inputLabel}>Meeting Link</Text>
+            <View style={[styles.inputContainer, { borderColor: meetLink ? (linkValidation.valid ? T.green : T.red) : '#E5E7EB' }]}>
               <TextInput
-                style={[styles.textInput, { color: textColor }]}
-                placeholder="https://meet.google.com/abc-defg-hij"
-                placeholderTextColor={Colors.mediumGray}
+                style={styles.textInput}
+                placeholder="https://meet.google.com/..."
+                placeholderTextColor={T.gray}
                 value={meetLink}
                 onChangeText={setMeetLink}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
               />
-              {meetLink.length > 0 && linkValidation.valid && (
-                <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
-              )}
+              {meetLink.length > 0 && linkValidation.valid && <Ionicons name="checkmark-circle" size={22} color={T.green} />}
               {meetLink.length > 0 && !linkValidation.valid && (
-                <TouchableOpacity onPress={() => setMeetLink('')}>
-                  <Ionicons name="close-circle" size={22} color={Colors.error} />
-                </TouchableOpacity>
+                <RNTouchableOpacity onPress={() => setMeetLink('')}>
+                  <Ionicons name="close-circle" size={22} color={T.red} />
+                </RNTouchableOpacity>
               )}
             </View>
             {meetLink.length > 0 && !linkValidation.valid && linkValidation.error !== '' && (
@@ -346,24 +466,26 @@ export default function LiveClassScreen({ navigation, route }) {
             )}
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowModal(false); setMeetLink(''); }}>
+              <ScaleBtn style={styles.cancelBtn} onPress={() => { setShowModal(false); setMeetLink(''); }}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.startBtn, (!meetLink.trim() || !linkValidation.valid || isStarting) && styles.startBtnDisabled]}
+              </ScaleBtn>
+              <ScaleBtn
+                activeScale={(!meetLink.trim() || !linkValidation.valid || isStarting) ? 1 : 0.96}
+                style={[styles.startBtnWrap, (!meetLink.trim() || !linkValidation.valid || isStarting) && { opacity: 0.5 }]}
                 onPress={confirmGoLive}
                 disabled={!meetLink.trim() || !linkValidation.valid || isStarting}
-                activeOpacity={0.8}
               >
-                {isStarting ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
-                ) : (
-                  <>
-                    <Ionicons name="videocam" size={18} color={Colors.white} />
-                    <Text style={styles.startBtnText}>🔴 START CLASS</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                <LinearGradient colors={['#FF4D8D', '#FF6AA2']} style={styles.startBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  {isStarting ? (
+                    <ActivityIndicator size="small" color={T.white} />
+                  ) : (
+                    <>
+                      <Ionicons name="videocam" size={18} color={T.white} />
+                      <Text style={styles.startBtnText}>START CLASS</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </ScaleBtn>
             </View>
           </View>
         </View>
@@ -374,135 +496,106 @@ export default function LiveClassScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  bgBlobPink: {
+    position: 'absolute', width: 300, height: 300, borderRadius: 150,
+    backgroundColor: '#EC4899', opacity: 0.06, top: 150, left: -100, filter: 'blur(50px)'
+  },
+  bgBlobTeal: {
+    position: 'absolute', width: 250, height: 250, borderRadius: 125,
+    backgroundColor: '#14B8A6', opacity: 0.05, top: 450, right: -80, filter: 'blur(60px)'
+  },
+  bgBlobBlue: {
+    position: 'absolute', width: 350, height: 350, borderRadius: 175,
+    backgroundColor: '#3B82F6', opacity: 0.05, top: 700, left: -150, filter: 'blur(70px)'
+  },
+  bgBubble1: {
+    position: 'absolute', width: 60, height: 60, borderRadius: 30,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)',
+    top: 280, right: 50, opacity: 0.08
+  },
+  bgBubble2: {
+    position: 'absolute', width: 40, height: 40, borderRadius: 20,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)',
+    top: 550, left: 40, opacity: 0.08
+  },
+  
   // Header
-  headerContainer: {
-    backgroundColor: '#112B4A',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 48,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.white,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
-  },
-  headerRightPlaceholder: {
-    width: 40,
-  },
-  // Tabs
-  tabsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  tab: {
-    flex: 1,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 14,
-    marginHorizontal: 4,
-  },
-  tabActive: {
-    backgroundColor: '#FF4D8D',
-  },
-  tabInactive: {
-    backgroundColor: 'rgba(255, 77, 141, 0.08)',
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: Colors.white,
-  },
-  tabTextInactive: {
-    color: Colors.mediumGray,
-  },
+  headerWrap: { position: 'relative', overflow: 'hidden', borderBottomLeftRadius: 42, borderBottomRightRadius: 42, elevation: 8, shadowColor: T.pink, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20 },
+  headerCircle1: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(255,255,255,0.06)', top: -100, right: -50 },
+  headerCircle2: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.05)', bottom: -50, left: -50 },
+  headerGlassBubble: { position: 'absolute', width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', top: 60, left: '50%' },
+  headerTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, zIndex: 10 },
+  glassCircleBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.20)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center' },
+  headerContent: { position: 'absolute', bottom: 24, left: 24, right: 24 },
+  headerTitle: { fontSize: 32, fontWeight: '900', color: T.white, marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
+
+  // Chips
+  tabsContainer: { marginTop: 10 },
+  chipActive: { height: 42, borderRadius: 21, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: T.pink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  chipInactive: { height: 42, borderRadius: 21, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)' },
+  chipIcon: { fontSize: 14 },
+  chipTextActive: { fontSize: 13, fontWeight: '800', color: T.white },
+  chipTextInactive: { fontSize: 13, fontWeight: '700', color: T.subtitle },
+
   // List
-  listContent: {
-    padding: 16,
-    paddingBottom: 120, // Avoid bottom nav overlapping
-    flexGrow: 1,
-  },
-  // Empty State
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 60,
-  },
-  emptyIconContainer: {
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  // Cards
-  card: { borderRadius: 16, padding: 18, marginBottom: 14, ...Shadows.medium },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, gap: 6 },
+  listContent: { padding: 18, paddingTop: 10, paddingBottom: 140 },
+  
+  // Card
+  card: { borderRadius: 24, padding: 22, marginBottom: 18, shadowColor: '#14C8C6', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 8, overflow: 'hidden' },
+  cardGlass: { position: 'absolute', top: 0, left: 0, right: 0, height: 40, backgroundColor: 'rgba(255,255,255,0.5)' },
+  cardDecoTopRight: { position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: T.teal, opacity: 0.05, top: -40, right: -40 },
+  cardDecoBottomLeft: { position: 'absolute', width: 80, height: 80, borderRadius: 40, backgroundColor: T.teal, opacity: 0.05, bottom: -20, left: -20 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusLabel: { fontSize: 11, fontWeight: '700' },
-  dateText: { fontSize: 12 },
-  classTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  infoText: { fontSize: 13 },
-  goLiveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FF4D8D', borderRadius: 12, paddingVertical: 14, marginTop: 16 },
-  goLiveBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  dateText: { fontSize: 12, fontWeight: '700', color: T.subtitle },
+  classTitle: { fontSize: 20, fontWeight: '800', color: T.title, marginBottom: 14 },
+  infoPillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  infoPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  infoPillBlue: { backgroundColor: '#E0F2FE', shadowColor: T.blue, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  infoPillTeal: { backgroundColor: '#CCFBF1', shadowColor: T.teal, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  infoPillOrange: { backgroundColor: '#FFEDD5', shadowColor: T.orange, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  infoPillText: { fontSize: 13, fontWeight: '700' },
+
+  // Buttons
+  goLiveBtn: { height: 52, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, shadowColor: T.pink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  btnIconCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: T.white, justifyContent: 'center', alignItems: 'center' },
+  goLiveBtnText: { fontSize: 16, fontWeight: '800', color: T.white },
+
+  // Empty
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
+  emptyImage: { width: 220, height: 220, marginBottom: 16 },
+  emptyTitle: { fontSize: 22, fontWeight: '900', color: T.title, marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, fontWeight: '600', color: T.subtitle, textAlign: 'center', lineHeight: 22 },
+
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '92%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold' },
-  modalClose: { padding: 4 },
-  classInfoCard: { borderRadius: 14, padding: 14, marginBottom: 16 },
-  classInfoTitle: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  classInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
-  classInfoText: { fontSize: 13 },
-  instructionsBox: { marginBottom: 16, paddingVertical: 10 },
-  instructionsTitle: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
-  instructionStep: { fontSize: 13, lineHeight: 20 },
-  inputLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 4 },
-  platformRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  platformChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,20,147,0.1)' },
-  platformChipActive: { backgroundColor: Colors.primary },
-  platformChipText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4, marginBottom: 4, gap: 8 },
-  textInput: { flex: 1, fontSize: 15, paddingVertical: 12 },
-  errorText: { fontSize: 12, color: Colors.error, marginTop: 2, marginBottom: 8, marginLeft: 4 },
-  modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: 'rgba(158,158,158,0.15)' },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: Colors.mediumGray },
-  startBtn: { flex: 2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, backgroundColor: '#FF4D8D' },
-  startBtnDisabled: { opacity: 0.4 },
-  startBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: T.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
+  modalDragHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: T.title },
+  modalClose: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  modalSubjectCard: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#F3F4F6' },
+  modalSubjectTitle: { fontSize: 16, fontWeight: '800', color: T.title, marginBottom: 8 },
+  modalSubjectInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  modalSubjectInfoText: { fontSize: 13, fontWeight: '600', color: T.subtitle },
+  
+  inputLabel: { fontSize: 14, fontWeight: '800', color: T.title, marginBottom: 12 },
+  platformRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  modalPlatformChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: 'rgba(255,77,141,0.08)', borderWidth: 1, borderColor: 'rgba(255,77,141,0.1)' },
+  modalPlatformChipActive: { backgroundColor: T.pink, borderColor: T.pink },
+  modalPlatformChipText: { fontSize: 13, fontWeight: '700', color: T.pink },
+  
+  inputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 4, backgroundColor: '#F9FAFB' },
+  textInput: { flex: 1, fontSize: 15, paddingVertical: 14, fontWeight: '500', color: T.title },
+  errorText: { fontSize: 12, fontWeight: '600', color: T.red, marginTop: 6, marginLeft: 4 },
+
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 32 },
+  cancelBtn: { flex: 1, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#F3F4F6' },
+  cancelBtnText: { fontSize: 16, fontWeight: '700', color: T.subtitle },
+  startBtnWrap: { flex: 2 },
+  startBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingVertical: 16, borderRadius: 16 },
+  startBtnText: { fontSize: 16, fontWeight: '800', color: T.white },
 });

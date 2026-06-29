@@ -1,12 +1,10 @@
-// ─── No.1 Vettri Academy — Design System Colors (Premium EdTech SaaS) ──────
+
 
 export const Colors = {
-  // Premium Brand Colors — Teal + Vibrant Pink
   teal: '#11C5C6',
   tealdark: '#08AEEA',
   pink: '#FF4F8B',
   
-  // Legacy aliases for compatibility
   hotPink: '#FF4F8B',
   brightPink: '#FF4F8B',
   lightPink: '#FFF4F7',
@@ -21,21 +19,24 @@ export const Colors = {
   secondary: '#11C5C6',
   secondaryLight: '#08AEEA',
 
-  // Navy/Dark
-  navy: '#24324A',           // Premium dark text
-  navyLight: '#1E3A5F',     // Dark card backgrounds (dark mode)
+  
+  navy: '#1E293B',          
+  navyLight: '#1E3A5F',     
 
   // Gold
-  gold: '#FFD700',           // Tertiary accents, badges, streaks
+  gold: '#FFD700',           
 
   // Neutrals
   white: '#FFFFFF',
   offWhite: '#F8FAFC',
   lightGray: '#FFF4F7',
-  gray: '#E8E8E8',
+ gray: '#64748B',
   mediumGray: '#B0B0B0',
   darkGray: '#616161',
   black: '#000000',
+  cardPink: '#FFE3ED',
+cardTeal: '#DDF8F5',
+cardGold: '#FFF4D6',
 
   // Status Colors
   success: '#4CAF50',

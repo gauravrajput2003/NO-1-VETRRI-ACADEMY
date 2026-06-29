@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarAnimation } from '../context/TabBarVisibilityContext';
 import ParticleWrapper from './effects/ParticleWrapper';
 
-const PINK = '#FF4FA3';
+const PINK = '#FF4D8D';
+const PINK_LIGHT = '#FF7EB3';
 const TAB_BAR_HEIGHT = 64;
 const TAB_COLORS = {
   Home: ['#FFD700', '#FFC300', '#FFEC8B'],
@@ -35,7 +37,7 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
       style={[
         styles.container,
         {
-          bottom: safeBottom,
+          bottom: Math.max(insets.bottom, 16),
           transform: [{ translateY }],
           opacity,
         },
@@ -45,10 +47,7 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
       <View style={styles.barWrapper}>
         {/* Blur background */}
         <View style={styles.blurContainer}>
-          <BlurView tint="dark" intensity={80} style={styles.blur} />
-          {/* Top glare line */}
-          <View style={styles.glareLine} />
-          {/* Border ring */}
+          <BlurView tint="light" intensity={90} style={styles.blur} />
           <View style={styles.borderRing} />
         </View>
 
@@ -81,9 +80,6 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
                 : iconConfig[route.name].inactive;
             }
 
-            // Get icon color
-            const iconColor = isFocused ? '#FFF' : 'rgba(255,255,255,0.4)';
-
             return (
               <ParticleWrapper
                 key={route.key}
@@ -102,8 +98,19 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
                   style={styles.tabButton}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.iconWrap, isFocused && styles.iconActive]}>
-                    <Ionicons name={iconName} size={22} color={iconColor} />
+                  <View style={styles.iconWrap}>
+                    {isFocused ? (
+                      <LinearGradient
+                        colors={[PINK, PINK_LIGHT]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.iconActive}
+                      >
+                        <Ionicons name={iconName} size={22} color="#FFF" />
+                      </LinearGradient>
+                    ) : (
+                      <Ionicons name={iconName} size={22} color="#9CA3AF" />
+                    )}
                   </View>
                 </TouchableOpacity>
               </ParticleWrapper>
@@ -125,25 +132,23 @@ const styles = StyleSheet.create({
   },
   barWrapper: {
     flex: 1,
-    borderRadius: 32,
+    borderRadius: 35,
     overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    shadowColor: 'rgba(255,77,141,0.35)',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 25,
+    elevation: 12,
   },
   blurContainer: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
+    borderRadius: 35,
     overflow: 'hidden',
   },
   blur: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-  },
-  glareLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.96)',
   },
   borderRing: {
     position: 'absolute',
@@ -151,9 +156,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    borderRadius: 32,
+    borderRadius: 35,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,77,141,0.10)',
   },
   tabRow: {
     flex: 1,
@@ -177,11 +182,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   iconActive: {
-    backgroundColor: PINK,
+    width: 46,
+    height: 46,
     borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: PINK,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.45,
     shadowRadius: 10,
     elevation: 8,
   },

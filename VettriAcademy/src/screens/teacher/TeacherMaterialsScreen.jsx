@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '../../utils/colors';
@@ -11,22 +12,51 @@ import { fetchTeacherMaterials, toggleLock, uploadMaterial, deleteMaterial, edit
 import { getCoursesMetaAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
-const TouchableOpacity = (props) => {
-  const { particleCount = 20, size = "small", colors, children, ...rest } = props;
+const ScaleBtn = ({ onPress, children, activeScale = 0.96, style, disabled }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const handlePressIn = () => Animated.spring(scale, { toValue: activeScale, useNativeDriver: true }).start();
+  const handlePressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
   return (
-    <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
-      <RNTouchableOpacity {...rest}>{children}</RNTouchableOpacity>
-    </ParticleWrapper>
+    <TouchableOpacity activeOpacity={1} onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={onPress} disabled={disabled} style={style}>
+      <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>
+    </TouchableOpacity>
   );
 };
 
+const FadeSlideView = ({ children, index = 0, style }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: 400, delay: index * 100, useNativeDriver: true }).start();
+  }, [anim, index]);
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
+  return <Animated.View style={[{ opacity: anim, transform: [{ translateY }] }, style]}>{children}</Animated.View>;
+};
 
-const typeIcons = { pdf: 'document-text', ppt: 'easel', video: 'videocam', image: 'image' };
-const typeColors = { pdf: '#F44336', ppt: '#FF9800', video: '#2196F3', image: '#4CAF50' };
+const Sparkle = ({ size, color, opacity, style }) => (
+  <View style={[style, { width: size, height: size, backgroundColor: color, opacity, borderRadius: size / 2, transform: [{ rotate: '45deg' }] }]} />
+);
 
-export default function TeacherMaterialsScreen() {
+const getTypeConfig = (type) => {
+  if (type === 'pdf') return { color: '#EF4444', bg: '#FEE2E2', icon: 'document-text' };
+  if (type === 'image') return { color: '#22C55E', bg: '#DCFCE7', icon: 'image' };
+  if (type === 'video') return { color: '#A855F7', bg: '#F3E8FF', icon: 'videocam' };
+  if (type === 'ppt' || type?.includes('presentation')) return { color: '#F97316', bg: '#FFEDD5', icon: 'easel' };
+  return { color: '#3B82F6', bg: '#DBEAFE', icon: 'document' };
+};
+
+const FILTER_ICONS = {
+  'All': '📚',
+  'PDF': '📄',
+  'Images': '🖼',
+  'Videos': '🎥',
+  'Locked': '🔒',
+  'Unlocked': '🔓'
+};
+
+export default function TeacherMaterialsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { materials, loading } = useSelector((s) => s.teacher);
   const theme = useSelector((s) => s.ui.theme);
@@ -60,6 +90,11 @@ export default function TeacherMaterialsScreen() {
   const [uploading, setUploading] = useState(false);
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
+  const insets = useSafeAreaInsets();
+  
+  useEffect(() => {
+    if (navigation) navigation.setOptions({ headerShown: false });
+  }, [navigation]);
 
   useEffect(() => { 
     dispatch(fetchTeacherMaterials());
@@ -221,98 +256,175 @@ export default function TeacherMaterialsScreen() {
 
   const filteredMaterials = materials.filter(m => {
     const matchesSearch = (m.title || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSubject = filterSubject === 'All' || m.subject === filterSubject;
-    return matchesSearch && matchesSubject;
+    let matchesFilter = true;
+    if (filterSubject === 'All') matchesFilter = true;
+    else if (filterSubject === 'PDF') matchesFilter = m.type === 'pdf';
+    else if (filterSubject === 'Images') matchesFilter = m.type === 'image';
+    else if (filterSubject === 'Videos') matchesFilter = m.type === 'video';
+    else if (filterSubject === 'Locked') matchesFilter = m.lockedForAll === true;
+    else if (filterSubject === 'Unlocked') matchesFilter = m.lockedForAll === false;
+    else matchesFilter = m.subject === filterSubject;
+    return matchesSearch && matchesFilter;
   });
 
-  const renderMaterial = ({ item }) => (
-    <View style={[styles.card, { backgroundColor: cardBg }]}>
-      <View style={[styles.iconBox, { backgroundColor: (typeColors[item.type] || Colors.primary) + '18' }]}>
-        <Ionicons name={typeIcons[item.type] || 'document'} size={24} color={typeColors[item.type] || Colors.primary} />
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>{item.title}</Text>
-        <Text style={[styles.sub, { color: textSec }]}>{item.subject} • {item.grade} • {formatFileSize(item.fileSize)}</Text>
-        <View style={styles.metaRow}>
-          <Text style={[styles.date, { color: textSec }]}>{formatDate(item.createdAt)}</Text>
-          {item.lockedForAll ? (
-             <Text style={[styles.statusText, { color: Colors.error }]}>🔒 Locked</Text>
-          ) : (
-             <Text style={[styles.statusText, { color: Colors.success }]}>🔓 Unlocked</Text>
-          )}
-        </View>
-      </View>
-      <View style={styles.actionCol}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: item.lockedForAll ? Colors.error + '14' : Colors.success + '14' }]} onPress={() => handleToggleLock(item)}>
-          <Ionicons name={item.lockedForAll ? 'lock-closed' : 'lock-open'} size={18} color={item.lockedForAll ? Colors.error : Colors.success} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.pink + '14', marginTop: 8 }]} onPress={() => openEditModal(item)}>
-          <Ionicons name="pencil" size={18} color={Colors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.error + '14', marginTop: 8 }]} onPress={() => handleDelete(item)}>
-          <Ionicons name="trash" size={18} color={Colors.error} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const filterTabs = ['All', 'PDF', 'Images', 'Videos', 'Locked', 'Unlocked', ...availableSubjects];
+
+  const renderMaterial = ({ item, index }) => {
+    const tConf = getTypeConfig(item.type);
+    return (
+      <FadeSlideView index={index}>
+        <ScaleBtn activeScale={0.97} onPress={() => {}}>
+          <ParticleWrapper>
+            <View style={styles.card}>
+              <LinearGradient colors={['#FFFFFF', '#F9FFFF']} style={StyleSheet.absoluteFillObject} />
+              
+              {/* Glass Highlights & Decos */}
+              <View style={styles.cardGlass} />
+              <View style={styles.cardDecoCircle1} />
+              <View style={styles.cardDecoCircle2} />
+
+              <View style={styles.cardInner}>
+                {/* Left Side: Thumbnail */}
+                <View style={[styles.thumbnail, { backgroundColor: tConf.bg }]}>
+                  <Ionicons name={tConf.icon} size={32} color={tConf.color} />
+                </View>
+
+                {/* Center Content */}
+                <View style={styles.cardContent}>
+                  <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+                  
+                  <View style={styles.chipRow}>
+                    <View style={[styles.infoChip, { backgroundColor: '#E0F2FE' }]}><Text style={[styles.infoChipText, { color: '#0284C7' }]}>{item.subject}</Text></View>
+                    <View style={[styles.infoChip, { backgroundColor: '#CCFBF1' }]}><Text style={[styles.infoChipText, { color: '#0F766E' }]}>{item.grade}</Text></View>
+                    <View style={[styles.infoChip, { backgroundColor: '#FFEDD5' }]}><Text style={[styles.infoChipText, { color: '#C2410C' }]}>{formatFileSize(item.fileSize)}</Text></View>
+                  </View>
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
+                    {item.lockedForAll ? (
+                      <View style={[styles.statusPill, { backgroundColor: '#FFF7ED' }]}><Text style={[styles.statusPillText, { color: '#EA580C' }]}>🔒 Locked</Text></View>
+                    ) : (
+                      <View style={[styles.statusPill, { backgroundColor: '#F0FDF4' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>🔓 Unlocked</Text></View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Right Side: Action Column */}
+                <View style={styles.actionCol}>
+                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => handleToggleLock(item)}>
+                    <Ionicons name={item.lockedForAll ? 'lock-open' : 'lock-closed'} size={18} color="#16A34A" />
+                  </ScaleBtn>
+                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => openEditModal(item)}>
+                    <Ionicons name="pencil" size={18} color="#EC4899" />
+                  </ScaleBtn>
+                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => handleDelete(item)}>
+                    <Ionicons name="trash" size={18} color="#EF4444" />
+                  </ScaleBtn>
+                </View>
+              </View>
+            </View>
+          </ParticleWrapper>
+        </ScaleBtn>
+      </FadeSlideView>
+    );
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
-      {/* Upload Button */}
-      <View style={[styles.topBar, { borderBottomColor: borderCol }]}>
-        <TouchableOpacity style={styles.uploadBtn} onPress={() => setUploadModalVisible(true)}>
-          <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.uploadBtnText}>UPLOAD MATERIAL</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      <LinearGradient colors={['#FFF8FB', '#F8F7FC', '#F5FCFF', '#F2FFFC']} style={StyleSheet.absoluteFillObject} />
+      
+      {/* Background Decor */}
+      <View style={styles.bgBlobPink} />
+      <View style={styles.bgBlobTeal} />
+      <View style={styles.bgBubble1} />
+      <View style={styles.bgBubble2} />
+      <Sparkle size={12} color="#EC4899" opacity={0.06} style={{ position: 'absolute', top: 250, left: 60 }} />
+      <Sparkle size={18} color="#14B8A6" opacity={0.05} style={{ position: 'absolute', top: 450, right: 40 }} />
+      
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-      {/* Search & Filter */}
-      <View style={styles.filterSection}>
-        <View style={[styles.searchBox, { backgroundColor: cardBg, borderColor: borderCol }]}>
-          <Ionicons name="search" size={20} color={textSec} />
-          <TextInput
-            style={[styles.searchInput, { color: textColor }]}
-            placeholder="Search materials..."
-            placeholderTextColor={textSec}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+      {/* COMPACT PREMIUM HEADER */}
+      <View style={[styles.headerWrap, { height: Math.max(90, insets.top + 50), paddingTop: insets.top }]}>
+        <ScaleBtn style={styles.glassCircleBtn} onPress={() => navigation?.goBack()}><Ionicons name="arrow-back" size={24} color="#1F2937" /></ScaleBtn>
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>Manage Materials</Text>
+          <Text style={styles.headerSubtitle}>Upload and manage study materials</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-          {['All', ...availableSubjects].map((sub) => (
-            <TouchableOpacity 
-              key={sub} 
-              style={[styles.chip, filterSubject === sub ? { backgroundColor: Colors.primary } : { backgroundColor: cardBg, borderColor: borderCol, borderWidth: 1 }]}
-              onPress={() => setFilterSubject(sub)}
-            >
-              <Text style={[styles.chipText, filterSubject === sub ? { color: '#fff' } : { color: textColor }]}>{sub}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={{ width: 46 }} />
       </View>
 
-      {/* List */}
-      {loading && !uploading ? (
-        <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList
-          data={filteredMaterials}
-          keyExtractor={(item) => item._id}
-          renderItem={renderMaterial}
-          contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="document-text-outline" size={64} color={Colors.mediumGray} />
-              <Text style={[styles.emptyText, { color: textSec }]}>No materials found</Text>
-              <Text style={[styles.emptyHint, { color: textSec }]}>Tap upload to add a new study material</Text>
+      <View style={styles.contentContainer}>
+        {/* Upload Button */}
+        <ParticleWrapper>
+          <ScaleBtn activeScale={0.96} onPress={() => setUploadModalVisible(true)} style={styles.uploadBtnWrap}>
+            <LinearGradient colors={['#FF4D8D', '#FF6EA8']} style={styles.uploadBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <View style={styles.uploadIconCircle}>
+                <Ionicons name="cloud-upload" size={20} color="#FF4D8D" />
+              </View>
+              <Text style={styles.uploadBtnText}>UPLOAD MATERIAL</Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ position: 'absolute', right: 20 }} />
+            </LinearGradient>
+          </ScaleBtn>
+        </ParticleWrapper>
+
+        {/* Search & Filter */}
+        <View style={styles.filterSection}>
+          <View style={styles.searchBox}>
+            <View style={styles.searchIconWrap}>
+              <Ionicons name="search" size={18} color="#EC4899" />
             </View>
-          }
-          refreshing={loading && !uploading}
-          onRefresh={() => dispatch(fetchTeacherMaterials())}
-          onScroll={onTabBarScroll}
-          scrollEventThrottle={16}
-        />
-      )}
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by title, subject or class"
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={{ paddingRight: 18 }}>
+            {filterTabs.map((sub) => {
+              const isActive = filterSubject === sub;
+              const icon = FILTER_ICONS[sub];
+              return (
+                <TouchableOpacity key={sub} style={[styles.chip, isActive && styles.chipActive]} onPress={() => setFilterSubject(sub)}>
+                  {isActive && <LinearGradient colors={['#FF4D8D', '#FF6EA8']} style={StyleSheet.absoluteFillObject} borderRadius={20} />}
+                  <Text style={[styles.chipText, isActive ? { color: '#FFF' } : { color: '#4B5563' }]}>
+                    {icon ? `${icon} ${sub}` : sub}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* List */}
+        {loading && !uploading ? (
+          <ActivityIndicator size="large" color="#FF4D8D" style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={filteredMaterials}
+            keyExtractor={(item) => item._id}
+            renderItem={renderMaterial}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <View style={styles.emptyIllustrationBox}>
+                  <Ionicons name="book" size={48} color="#FF4D8D" style={{ position: 'absolute', top: 10, left: 10 }} />
+                  <Ionicons name="laptop" size={64} color="#14B8A6" style={{ position: 'absolute', top: 30, right: 10 }} />
+                  <Ionicons name="folder-open" size={56} color="#3B82F6" style={{ position: 'absolute', bottom: 10, left: 30 }} />
+                </View>
+                <Text style={styles.emptyText}>No materials found</Text>
+                <Text style={styles.emptyHint}>Tap upload to add a new study material</Text>
+              </View>
+            }
+            refreshing={loading && !uploading}
+            onRefresh={() => dispatch(fetchTeacherMaterials())}
+            onScroll={onTabBarScroll}
+            scrollEventThrottle={16}
+          />
+        )}
+      </View>
 
       {/* Upload Modal */}
       <Modal visible={isUploadModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeUploadModal}>
@@ -448,33 +560,60 @@ export default function TeacherMaterialsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topBar: { padding: 16, borderBottomWidth: 1, backgroundColor: Colors.primary + '10' },
-  uploadBtn: { backgroundColor: Colors.pink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, ...Shadows.light },
-  uploadBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  filterSection: { paddingHorizontal: 16, paddingTop: 16 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 46, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 15 },
+  bgBlobPink: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: '#EC4899', opacity: 0.05, top: 150, left: -100, filter: 'blur(60px)' },
+  bgBlobTeal: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: '#14B8A6', opacity: 0.04, top: 500, right: -80, filter: 'blur(70px)' },
+  bgBubble1: { position: 'absolute', width: 60, height: 60, borderRadius: 30, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', backgroundColor: 'rgba(255,255,255,0.2)', top: 280, right: 50, opacity: 0.08 },
+  bgBubble2: { position: 'absolute', width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', backgroundColor: 'rgba(255,255,255,0.2)', top: 550, left: 40, opacity: 0.08 },
+
+  headerWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, zIndex: 10 },
+  glassCircleBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center' },
+  headerTitles: { flex: 1, alignItems: 'center' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937' },
+  headerSubtitle: { fontSize: 13, fontWeight: '500', color: '#EC4899', marginTop: 2 },
+
+  contentContainer: { flex: 1 },
+  
+  uploadBtnWrap: { marginHorizontal: 18, marginTop: 18, marginBottom: 12, zIndex: 10 },
+  uploadBtn: { height: 56, borderRadius: 18, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, shadowColor: '#FF4D8D', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
+  uploadIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  uploadBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
+  filterSection: { paddingHorizontal: 18, paddingTop: 4 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginBottom: 16, paddingHorizontal: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  searchIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(236, 72, 153, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 15, color: '#1F2937', fontWeight: '500' },
+  
   chipScroll: { paddingBottom: 8 },
-  chipScrollForm: { marginBottom: 16 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
-  chipText: { fontSize: 14, fontWeight: '500' },
-  emptyMetaWrap: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10 },
-  emptyMetaText: { fontSize: 12, fontWeight: '500' },
+  chip: { height: 40, paddingHorizontal: 16, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginRight: 10, justifyContent: 'center' },
+  chipActive: { borderWidth: 0, shadowColor: '#FF4D8D', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  chipText: { fontSize: 14, fontWeight: '700' },
+
+  listContent: { padding: 18, paddingBottom: 140 },
   
-  card: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 12, ...Shadows.light },
-  iconBox: { width: 50, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  card: { borderRadius: 24, marginBottom: 18, shadowColor: '#1E293B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 8, overflow: 'hidden' },
+  cardInner: { flexDirection: 'row', alignItems: 'center', padding: 20 },
+  cardGlass: { position: 'absolute', top: 0, left: 0, right: 0, height: 40, backgroundColor: 'rgba(255,255,255,0.4)' },
+  cardDecoCircle1: { position: 'absolute', width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(255,255,255,0.4)', top: -20, right: -20 },
+  cardDecoCircle2: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.5)', top: 20, right: 40 },
+  
+  thumbnail: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   cardContent: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  sub: { fontSize: 13, marginBottom: 4 },
+  title: { fontSize: 18, fontWeight: '800', color: '#1F2937', marginBottom: 8, lineHeight: 22 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  infoChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  infoChipText: { fontSize: 11, fontWeight: '700' },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  date: { fontSize: 12 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  actionCol: { marginLeft: 10, alignItems: 'center' },
-  actionBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  dateText: { fontSize: 12, fontWeight: '600', color: '#9CA3AF' },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusPillText: { fontSize: 12, fontWeight: '700' },
   
-  empty: { alignItems: 'center', marginTop: 60 },
-  emptyText: { fontSize: 16, marginTop: 12, fontWeight: '600' },
-  emptyHint: { fontSize: 14, marginTop: 6, textAlign: 'center' },
+  actionCol: { marginLeft: 16, alignItems: 'center', gap: 10 },
+  actionCircleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  
+  empty: { alignItems: 'center', marginTop: 40 },
+  emptyIllustrationBox: { width: 140, height: 140, marginBottom: 20, position: 'relative' },
+  emptyText: { fontSize: 18, fontWeight: '800', color: '#1F2937' },
+  emptyHint: { fontSize: 14, fontWeight: '500', color: '#9CA3AF', marginTop: 8 },
 
   // Modal
   modalContainer: { flex: 1 },

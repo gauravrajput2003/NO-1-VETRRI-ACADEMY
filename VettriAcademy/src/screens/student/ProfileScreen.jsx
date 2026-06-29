@@ -1,40 +1,32 @@
 /**
- * ProfileScreen.jsx - Enhanced EdTech Profile
- *
- * Key improvements over original:
- *  - Email / long text truncated with expandable tap (no more hidden text)
- *  - Logout button has clear red-tinted background and border
- *  - Glassmorphism hero with animated gradient shimmer
- *  - Skeleton loading instead of bare spinner
- *  - Stats row upgraded to progress-ring style
- *  - Menu items with colored left-accent bars
- *  - Pull-to-refresh
- *  - Section headers between grouped items
- *  - Responsive email/text: wraps gracefully, no overflow
+ * ProfileScreen.jsx — Premium EdTech Student Profile
+ * UI redesign only — all APIs, Redux, navigation & logic preserved.
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity as RNTouchableOpacity,
-  Image, ActivityIndicator, Alert, Platform, RefreshControl,
-  Pressable as RNPressable,
+  Image, Alert, Platform, RefreshControl,
+  Pressable as RNPressable, StatusBar,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { getProfileAPI } from '../../services/api';
 import { logoutUser } from '../../redux/slices/authSlice';
 import { getDiceBearUrl, APP_VERSION } from '../../utils/constants';
-import { formatDate, getInitials } from '../../utils/formatters';
+import { formatDate } from '../../utils/formatters';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { Sparkle } from './BadgeIcons';
 
 const TouchableOpacity = (props) => {
-  const { particleCount = 20, size = "small", colors, children, ...rest } = props;
+  const { particleCount = 20, size = 'small', colors, children, ...rest } = props;
   return (
     <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
       <RNTouchableOpacity {...rest}>{children}</RNTouchableOpacity>
@@ -43,7 +35,7 @@ const TouchableOpacity = (props) => {
 };
 
 const Pressable = (props) => {
-  const { particleCount = 20, size = "small", colors, ...rest } = props;
+  const { particleCount = 20, size = 'small', colors, ...rest } = props;
   return (
     <ParticleWrapper particleCount={particleCount} size={size} colors={colors}>
       <RNPressable {...rest} />
@@ -51,42 +43,54 @@ const Pressable = (props) => {
   );
 };
 
-
-// --- Design tokens ------------------------------------------------------------
-const C = {
-  primary:     '#D81B60',   // deep rose
-  primaryLight:'#F06292',   // medium rose
-  primaryGhost:'#FCE4EC',   // very light rose bg
-  accent:      '#FF6F00',   // amber accent
-  accentLight: '#FFF3E0',
-  teal:        '#00897B',
-  tealLight:   '#E0F2F1',
-  purple:      '#5E35B1',
-  purpleLight: '#EDE7F6',
-  blue:        '#1565C0',
-  blueLight:   '#E3F2FD',
-  dark:        '#1A1A2E',
-  mid:         '#5C5C7A',
-  muted:       '#9E9EB8',
-  border:      '#EDE8F5',
-  cardBg:      '#FFFFFF',
-  pageBg:      '#F7F3FC',
-  white:       '#FFFFFF',
-  error:       '#C62828',
-  errorBg:     '#FFEBEE',
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  pink: '#FF4D8D',
+  pinkLight: '#FF7EB3',
+  teal: '#14C8C4',
+  tealLight: '#6EE7E5',
+  gold: '#FFC83D',
+  purple: '#8B5CF6',
+  orange: '#FF9F43',
+  white: '#FFFFFF',
+  pageBg: '#F8F6FB',
+  title: '#1F2937',
+  subtitle: '#6B7280',
+  error: '#C62828',
+  errorBg: '#FFEBEE',
   errorBorder: '#FFCDD2',
-  success:     '#2E7D32',
-  successBg:   '#E8F5E9',
 };
 
-const GRADIENT = ['#880E4F', '#C2185B', '#E91E63'];
+const STUDENT_FEATURES = [
+  {
+    screen: 'ExamScores',
+    title: 'Exam Scores',
+    description: 'View your exam performance',
+    icon: 'stats-chart',
+    illustration: 'bar-chart',
+    gradient: ['#8B5CF6', '#A78BFA'],
+  },
+  {
+    screen: 'Attendance',
+    title: 'Attendance',
+    description: 'Check your attendance records',
+    icon: 'calendar',
+    illustration: 'calendar',
+    gradient: [T.teal, T.tealLight],
+  },
+  {
+    screen: 'Leave',
+    title: 'Leave Application',
+    description: 'Apply for leave or view status',
+    icon: 'paper-plane',
+    illustration: 'airplane',
+    gradient: [T.orange, '#FFB347'],
+  },
+];
 
-const haptics = {
-  impact: () => {},
-  notify: () => {},
-};
+const haptics = { impact: () => {}, notify: () => {} };
 
-// --- Skeleton loader ----------------------------------------------------------
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonBlock({ width = '100%', height = 18, radius = 8, style }) {
   const pulse = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
@@ -98,34 +102,28 @@ function SkeletonBlock({ width = '100%', height = 18, radius = 8, style }) {
     ).start();
   }, []);
   return (
-    <Animated.View
-      style={[{ width, height, borderRadius: radius, backgroundColor: '#E8D8EE', opacity: pulse }, style]}
-    />
+    <Animated.View style={[{ width, height, borderRadius: radius, backgroundColor: '#E8D8EE', opacity: pulse }, style]} />
   );
 }
 
 function ProfileSkeleton() {
   return (
-    <View style={{ flex: 1, backgroundColor: C.pageBg }}>
-      <LinearGradient colors={GRADIENT} style={[st.header, { paddingBottom: 36 }]}>
-        <SkeletonBlock width={88} height={88} radius={44} style={{ marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.3)' }} />
-        <SkeletonBlock width={140} height={20} radius={10} style={{ marginBottom: 10, backgroundColor: 'rgba(255,255,255,0.3)' }} />
-        <SkeletonBlock width={80} height={24} radius={12} style={{ backgroundColor: 'rgba(255,255,255,0.25)' }} />
-      </LinearGradient>
-      <View style={{ padding: 16, gap: 12 }}>
-        <SkeletonBlock height={110} radius={18} />
+    <View style={{ flex: 1, backgroundColor: T.pageBg }}>
+      <LinearGradient colors={[T.pink, T.pinkLight, T.teal]} style={{ height: 320, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }} />
+      <View style={{ padding: 16, marginTop: -40, gap: 14 }}>
+        <SkeletonBlock height={180} radius={30} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <SkeletonBlock height={80} radius={14} style={{ flex: 1 }} />
-          <SkeletonBlock height={80} radius={14} style={{ flex: 1 }} />
-          <SkeletonBlock height={80} radius={14} style={{ flex: 1 }} />
+          <SkeletonBlock height={110} radius={24} style={{ flex: 1 }} />
+          <SkeletonBlock height={110} radius={24} style={{ flex: 1 }} />
+          <SkeletonBlock height={110} radius={24} style={{ flex: 1 }} />
         </View>
-        {[1,2,3,4].map(i => <SkeletonBlock key={i} height={58} radius={14} />)}
+        {[1, 2, 3].map((i) => <SkeletonBlock key={i} height={120} radius={28} />)}
       </View>
     </View>
   );
 }
 
-// --- InfoRow with expand support ---------------------------------------------
+// ─── InfoRow ──────────────────────────────────────────────────────────────────
 function InfoRow({ icon, label, value, expandable }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = expandable && value && value.length > 28;
@@ -133,108 +131,105 @@ function InfoRow({ icon, label, value, expandable }) {
   return (
     <Pressable
       style={st.infoRow}
-      onPress={canExpand ? () => setExpanded(e => !e) : undefined}
-      android_ripple={canExpand ? { color: C.primaryGhost } : undefined}
+      onPress={canExpand ? () => setExpanded((e) => !e) : undefined}
+      android_ripple={canExpand ? { color: 'rgba(255,77,141,0.08)' } : undefined}
     >
       <View style={st.infoIconWrap}>
-        <Ionicons name={icon} size={16} color={C.primary} />
+        <Ionicons name={icon} size={22} color={T.pink} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={st.infoLabel}>{label}</Text>
-        <Text
-          style={st.infoValue}
-          numberOfLines={expanded ? undefined : 1}
-          ellipsizeMode="tail"
-        >
+        <Text style={st.infoValue} numberOfLines={expanded ? undefined : 2} ellipsizeMode="tail">
           {value}
         </Text>
       </View>
-      {canExpand && (
-        <Ionicons
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={14}
-          color={C.muted}
-          style={{ marginLeft: 6 }}
-        />
-      )}
+      <Ionicons
+        name={canExpand ? (expanded ? 'chevron-up' : 'chevron-down') : 'chevron-forward'}
+        size={18}
+        color={T.subtitle}
+      />
     </Pressable>
   );
 }
 
-// --- StatBox -----------------------------------------------------------------
-function StatBox({ label, value, icon, color, bgColor }) {
+// ─── StatCard ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, emoji, accentColor }) {
   return (
-    <View style={[st.statBox, { borderTopColor: color, borderTopWidth: 3 }]}>
-      <Text style={[st.statNum, { color }]}>{value}</Text>
+    <View style={[st.statCard, { borderTopColor: accentColor }]}>
+      <Text style={st.statEmoji}>{emoji}</Text>
+      <Text style={[st.statNum, { color: accentColor }]}>{value}</Text>
       <Text style={st.statLbl}>{label}</Text>
+      <View style={[st.statWave, { backgroundColor: accentColor + '22' }]} />
     </View>
   );
 }
 
-// --- SectionHeader ------------------------------------------------------------
-function SectionHeader({ title }) {
+// ─── FeatureCard ──────────────────────────────────────────────────────────────
+function FeatureCard({ item, onPress }) {
   return (
-    <Text style={st.sectionHeader}>{title}</Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88}>
+      <LinearGradient
+        colors={item.gradient || [T.pink, T.pinkLight]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={st.featureCard}
+      >
+        <View style={st.featureLeft}>
+          <View style={st.featureIconGlass}>
+            <Ionicons name={item.icon} size={28} color={T.white} />
+          </View>
+          <View style={st.featureCopy}>
+            <Text style={st.featureTitle}>{item.title}</Text>
+            <Text style={st.featureDesc}>{item.description || item.label}</Text>
+          </View>
+        </View>
+        <View style={st.featureRight}>
+          <Ionicons name={item.illustration || item.icon} size={52} color="rgba(255,255,255,0.28)" />
+          <View style={st.featureArrow}>
+            <Ionicons name="arrow-forward" size={18} color={T.white} />
+          </View>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }
 
-// --- MenuItem ----------------------------------------------------------------
-function MenuItem({ item, onPress }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const press = () => {
-    haptics.impact();
-    Animated.sequence([
-      Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 80, useNativeDriver: true }),
-    ]).start(() => onPress());
-  };
+// ─── Secondary menu item ──────────────────────────────────────────────────────
+function SecondaryMenuItem({ item, onPress }) {
   return (
-    <Animated.View style={{ transform: [{ scale }], marginBottom: 8 }}>
-      <TouchableOpacity style={st.menuItem} onPress={press} activeOpacity={1}>
-        <View style={[st.menuAccent, { backgroundColor: item.color }]} />
-        <View style={[st.menuIconWrap, { backgroundColor: item.color + '18' }]}>
-          <Ionicons name={item.icon} size={20} color={item.color} />
-        </View>
-        <Text style={st.menuLabel}>{item.label}</Text>
-        <View style={st.menuChevron}>
-          <Ionicons name="chevron-forward" size={15} color={C.muted} />
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity style={st.secondaryItem} onPress={onPress} activeOpacity={0.85}>
+      <View style={[st.secondaryIcon, { backgroundColor: (item.color || T.pink) + '14' }]}>
+        <Ionicons name={item.icon} size={20} color={item.color || T.pink} />
+      </View>
+      <Text style={st.secondaryLabel}>{item.label}</Text>
+      <Ionicons name="chevron-forward" size={18} color={T.subtitle} />
+    </TouchableOpacity>
   );
 }
 
 function LogoutButton({ onPress }) {
   return (
-    <TouchableOpacity
-      style={st.logoutBtn}
-      onPress={() => {
-        haptics.notify();
-        onPress();
-      }}
-      activeOpacity={0.85}
-    >
+    <TouchableOpacity style={st.logoutBtn} onPress={() => { haptics.notify(); onPress(); }} activeOpacity={0.85}>
       <View style={st.logoutIconWrap}>
-        <Ionicons name="log-out-outline" size={20} color={C.error} />
+        <Ionicons name="log-out-outline" size={20} color={T.error} />
       </View>
       <Text style={st.logoutText}>Logout</Text>
-      <Ionicons name="chevron-forward" size={15} color={C.error} style={{ marginLeft: 'auto' }} />
+      <Ionicons name="chevron-forward" size={18} color={T.error} />
     </TouchableOpacity>
   );
 }
 
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
-
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
-
-  const [profile, setProfile]     = useState(null);
-  const [loading, setLoading]     = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Animations - always at top
   const anim1 = useRef(new Animated.Value(0)).current;
   const anim2 = useRef(new Animated.Value(0)).current;
   const anim3 = useRef(new Animated.Value(0)).current;
@@ -299,30 +294,40 @@ export default function ProfileScreen({ navigation }) {
 
   if (loading) return <ProfileSkeleton />;
 
-  const p         = profile || user;
-  const avatarUrl = p?.profilePic || getDiceBearUrl(p?._id);
-  const role      = p?.role;
+  const p = profile || user;
+  const avatarUrl = p?.profilePicture || p?.profilePic || getDiceBearUrl(p?._id);
+  const role = p?.role;
 
   const menuByRole = {
     student: [
-      { icon: 'stats-chart-outline',    label: 'Exam Scores',      screen: 'ExamScores',    color: C.purple },
-      { icon: 'calendar-outline',       label: 'Attendance',       screen: 'Attendance',    color: C.teal   },
-      { icon: 'airplane-outline',       label: 'Leave Application',screen: 'Leave',         color: C.accent },
-      { icon: 'notifications-outline',  label: 'Notifications',    screen: 'Notifications', color: C.primary},
-      { icon: 'settings-outline',       label: 'Settings',         screen: 'Settings',      color: C.mid    },
+      { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
+      { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
     ],
     teacher: [
-      { icon: 'document-text-outline',  label: 'Manage Materials', screen: 'TeacherMaterials', color: C.purple },
-      { icon: 'bar-chart-outline',      label: 'Monthly Report',   screen: 'MonthlyReport',    color: C.teal   },
-      { icon: 'notifications-outline',  label: 'Notifications',    screen: 'Notifications',    color: C.primary},
-      { icon: 'settings-outline',       label: 'Settings',         screen: 'Settings',         color: C.mid    },
+      { icon: 'document-text-outline', label: 'Manage Materials', screen: 'TeacherMaterials', color: T.purple, description: 'Upload and manage study files', gradient: [T.purple, '#A78BFA'], illustration: 'folder-open' },
+      { icon: 'bar-chart-outline', label: 'Monthly Report', screen: 'MonthlyReport', color: T.teal, description: 'View class performance reports', gradient: [T.teal, T.tealLight], illustration: 'analytics' },
+      { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
+      { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
     ],
     admin: [
-      { icon: 'notifications-outline',  label: 'Notifications',    screen: 'Notifications', color: C.primary},
-      { icon: 'settings-outline',       label: 'Settings',         screen: 'Settings',      color: C.mid    },
+      { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
+      { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
     ],
   };
-  const menuItems = menuByRole[role] || menuByRole.student;
+
+  const secondaryItems = menuByRole[role] || menuByRole.student;
+  const featureItems = role === 'student'
+    ? STUDENT_FEATURES
+    : secondaryItems.filter((i) => i.gradient).map((i) => ({
+      ...i,
+      title: i.label,
+      icon: i.icon.replace('-outline', ''),
+    }));
+  const menuExtras = role === 'student'
+    ? secondaryItems
+    : secondaryItems.filter((i) => !i.gradient);
+
+  const displayName = (p?.displayName || p?.name || 'Student').toLowerCase();
 
   return (
     <ScrollView
@@ -330,62 +335,79 @@ export default function ProfileScreen({ navigation }) {
       scrollEventThrottle={16}
       style={st.root}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: bottomPadding }}
+      contentContainerStyle={{ paddingBottom: bottomPadding + 16 }}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.pink} colors={[T.pink]} />
       }
     >
+      <StatusBar barStyle="light-content" backgroundColor={T.pink} />
 
+      {/* ── HERO ── */}
       <Animated.View style={slide(headerAnim, -10)}>
-        <LinearGradient colors={GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.header}>
-          {/* Avatar */}
-          <View style={st.avatarRing}>
-            {avatarUrl?.includes('dicebear') ? (
-              <View style={st.avatarPlaceholder}>
-                <Text style={st.initials}>{getInitials(p?.name)}</Text>
+        <View style={st.heroWrap}>
+          <LinearGradient
+            colors={[T.pink, T.pinkLight, T.teal]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={st.heroGradient}
+          >
+            <View style={st.heroBlob1} />
+            <View style={st.heroBlob2} />
+            <View style={st.heroBlob3} />
+            <View style={st.heroSpark1}><Sparkle size={14} color="#FFFFFF" opacity={0.12} /></View>
+            <View style={st.heroSpark2}><Sparkle size={11} color="#FFFFFF" opacity={0.10} /></View>
+            <Text style={st.heroStar1}>⭐</Text>
+            <Text style={st.heroStar2}>✨</Text>
+            <Text style={st.heroConfetti}>🎉</Text>
+          </LinearGradient>
+
+          {/* Avatar + details */}
+          <View style={[st.heroContent, { paddingTop: insets.top + 16 }]}>
+            <View style={st.avatarGlow}>
+              <View style={st.avatarRing}>
+                <Image source={{ uri: avatarUrl }} style={st.avatar} />
+                <View style={st.avatarBadge}>
+                  <Text style={st.avatarBadgeText}>★</Text>
+                </View>
               </View>
-            ) : (
-              <Image source={{ uri: avatarUrl }} style={st.avatar} />
+            </View>
+
+            <Text style={st.name}>{displayName}</Text>
+
+            <View style={st.rolePill}>
+              <Ionicons
+                name={role === 'teacher' ? 'school-outline' : role === 'admin' ? 'shield-outline' : 'person-outline'}
+                size={13}
+                color={T.white}
+              />
+              <Text style={st.rolePillText}>{(p?.role || 'student').toUpperCase()}</Text>
+            </View>
+
+            {p?.grade && (
+              <Text style={st.gradeText}>
+                Grade {p.grade}{p?.board ? ` · ${p.board}` : ''}
+              </Text>
             )}
           </View>
-
-          <Text style={st.name}>{p?.displayName || p?.name}</Text>
-
-          {/* Role pill */}
-          <View style={st.rolePill}>
-            <Ionicons
-              name={role === 'teacher' ? 'school-outline' : role === 'admin' ? 'shield-outline' : 'person-outline'}
-              size={12}
-              color="#FFF"
-              style={{ marginRight: 4 }}
-            />
-            <Text style={st.rolePillText}>{p?.role?.toUpperCase()}</Text>
-          </View>
-
-          {p?.grade && (
-            <Text style={st.grade}>Grade {p.grade}  ·  {p?.board || 'N/A'}</Text>
-          )}
-
-          {/* Bottom wave */}
-          <View style={st.waveCutout} />
-        </LinearGradient>
+        </View>
       </Animated.View>
 
       <View style={st.body}>
-
-        {/* -- Info card -------------------------------------------------- */}
-        <Animated.View style={[st.card, slide(anim1)]}>
+        {/* ── CONTACT INFO ── */}
+        <Animated.View style={[st.contactCard, slide(anim1)]}>
           <View style={st.cardHeader}>
-            <Ionicons name="person-circle-outline" size={18} color={C.primary} />
+            <View style={st.cardHeaderIcon}>
+              <Ionicons name="person-circle" size={22} color={T.pink} />
+            </View>
             <Text style={st.cardTitle}>Contact Info</Text>
           </View>
-          <InfoRow icon="call-outline"  label="Mobile" value={p?.mobile || 'Not set'} />
+          <InfoRow icon="call-outline" label="Mobile" value={p?.mobile || 'Not set'} />
           <View style={st.divider} />
-          <InfoRow icon="mail-outline"  label="Email"  value={p?.email  || 'Not set'} expandable />
+          <InfoRow icon="mail-outline" label="Email" value={p?.email || 'Not set'} expandable />
           {p?.bio && (
             <>
               <View style={st.divider} />
-              <InfoRow icon="pencil-outline" label="Bio" value={p.bio} expandable />
+              <InfoRow icon="document-text-outline" label="Bio" value={p.bio} expandable />
             </>
           )}
           {p?.joinedAt && (
@@ -395,173 +417,221 @@ export default function ProfileScreen({ navigation }) {
             </>
           )}
         </Animated.View>
+
+        {/* ── STATISTICS ── */}
         <Animated.View style={[st.statsRow, slide(anim2)]}>
-          <StatBox label="Day Streak"  value={`🔥 ${p?.loginStreak    || 0}`} color={C.purple}  />
-          <StatBox label="Best Streak" value={`🏆 ${p?.longestStreak  || 0}`} color={C.accent}  />
-          <StatBox label="Total Days"  value={`📅 ${p?.totalLoginDays || 0}`} color={C.teal}    />
+          <StatCard label="Day Streak" value={p?.loginStreak || 0} emoji="🔥" accentColor={T.purple} />
+          <StatCard label="Best Streak" value={p?.longestStreak || 0} emoji="🏆" accentColor={T.orange} />
+          <StatCard label="Total Days" value={p?.totalLoginDays || 0} emoji="📅" accentColor={T.teal} />
         </Animated.View>
+
+        {/* ── QUICK ACCESS ── */}
         <Animated.View style={slide(anim3)}>
-          <SectionHeader title="Quick Access" />
-          {menuItems.map(item => (
-            <MenuItem key={item.label} item={item} onPress={() => navigation.navigate(item.screen)} />
+          <View style={st.sectionTitleRow}>
+            <Text style={st.sectionTitle}>QUICK ACCESS</Text>
+            <Text style={st.sectionStar1}>✨</Text>
+            <Text style={st.sectionStar2}>⭐</Text>
+          </View>
+
+          {featureItems.map((item) => (
+            <FeatureCard
+              key={item.screen}
+              item={item}
+              onPress={() => { haptics.impact(); navigation.navigate(item.screen); }}
+            />
           ))}
 
-          <SectionHeader title="Account" />
-          <LogoutButton onPress={handleLogout} />
+          {menuExtras.map((item) => (
+            <SecondaryMenuItem
+              key={item.label}
+              item={item}
+              onPress={() => { haptics.impact(); navigation.navigate(item.screen); }}
+            />
+          ))}
 
+          <Text style={st.accountLabel}>ACCOUNT</Text>
+          <LogoutButton onPress={handleLogout} />
           <Text style={st.version}>v{APP_VERSION}</Text>
         </Animated.View>
-
       </View>
     </ScrollView>
   );
 }
 
 const st = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: C.pageBg },
+  root: { flex: 1, backgroundColor: T.pageBg },
 
-  // Hero
-  header: {
-    paddingTop: 64,
-    paddingBottom: 48,
-    alignItems: 'center',
+  // ── HERO ──
+  heroWrap: { position: 'relative', marginBottom: 0 },
+  heroGradient: {
+    height: 320,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
   },
-  waveCutout: {
-    position: 'absolute',
-    bottom: -1,
-    left: 0, right: 0,
-    height: 28,
-    backgroundColor: C.pageBg,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+  heroBlob1: {
+    position: 'absolute', width: 220, height: 220, borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.12)', top: -70, right: -50,
+  },
+  heroBlob2: {
+    position: 'absolute', width: 150, height: 150, borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.10)', bottom: 30, left: -40,
+  },
+  heroBlob3: {
+    position: 'absolute', width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)', top: 60, right: 80,
+  },
+  heroSpark1: { position: 'absolute', top: 80, left: 30, opacity: 0.12 },
+  heroSpark2: { position: 'absolute', bottom: 90, right: 40, opacity: 0.10 },
+  heroStar1: { position: 'absolute', top: 100, right: 24, fontSize: 16, opacity: 0.12 },
+  heroStar2: { position: 'absolute', top: 140, left: 20, fontSize: 14, opacity: 0.10 },
+  heroConfetti: { position: 'absolute', bottom: 70, right: 60, fontSize: 16, opacity: 0.12 },
+  heroContent: { alignItems: 'center', marginTop: -280, paddingBottom: 52, zIndex: 2 },
+  avatarGlow: {
+    shadowColor: T.pink, shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55, shadowRadius: 18, elevation: 10, marginBottom: 16,
   },
   avatarRing: {
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 50,
-    padding: 3,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
+    width: 110, height: 110, borderRadius: 55,
+    borderWidth: 5, borderColor: T.white,
+    overflow: 'visible', position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.20)',
   },
-  avatar:            { width: 84, height: 84, borderRadius: 42 },
-  avatarPlaceholder: {
-    width: 84, height: 84, borderRadius: 42,
-    backgroundColor: 'rgba(255,255,255,0.28)',
+  avatar: { width: 100, height: 100, borderRadius: 50 },
+  avatarBadge: {
+    position: 'absolute', right: 2, bottom: 2,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: T.gold, borderWidth: 2.5, borderColor: T.white,
     justifyContent: 'center', alignItems: 'center',
   },
-  initials:     { fontSize: 30, fontWeight: '800', color: '#FFF' },
-  name:         { fontSize: 22, fontWeight: '800', color: '#FFF', marginBottom: 10, letterSpacing: 0.2 },
-  rolePill: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 14, paddingVertical: 5,
-    borderRadius: 20, marginBottom: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  avatarBadgeText: { fontSize: 11, fontWeight: '900', color: T.white },
+  name: {
+    fontSize: 32, fontWeight: '900', color: T.white,
+    textAlign: 'center', letterSpacing: -0.5,
+    textTransform: 'lowercase', paddingHorizontal: 20,
   },
-  rolePillText: { fontSize: 11, fontWeight: '700', color: '#FFF', letterSpacing: 1.4 },
-  grade:        { fontSize: 13, color: 'rgba(255,255,255,0.72)', marginTop: 2 },
+  rolePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 12, paddingHorizontal: 16, paddingVertical: 7,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+  },
+  rolePillText: { fontSize: 11, fontWeight: '800', color: T.white, letterSpacing: 1.2 },
+  gradeText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.90)', marginTop: 8 },
 
-  body: { paddingHorizontal: 16, paddingTop: 4, gap: 12 },
+  body: { paddingHorizontal: 16, gap: 16 },
 
-  // Generic card
-  card: {
-    backgroundColor: C.cardBg,
-    borderRadius: 18,
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    elevation: 4,
+  // ── CONTACT CARD ──
+  contactCard: {
+    marginTop: -40,
+    backgroundColor: T.white,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 8,
     overflow: 'hidden',
   },
   cardHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: C.border,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  cardTitle: { fontSize: 13, fontWeight: '700', color: C.dark, letterSpacing: 0.3 },
-
-  // InfoRow
+  cardHeaderIcon: {
+    width: 40, height: 40, borderRadius: 14,
+    backgroundColor: 'rgba(255,77,141,0.10)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  cardTitle: { fontSize: 17, fontWeight: '900', color: T.title },
   infoRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12, gap: 12,
+    paddingHorizontal: 20, paddingVertical: 16, gap: 14,
   },
   infoIconWrap: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: C.primaryGhost,
-    justifyContent: 'center', alignItems: 'center',
-    flexShrink: 0,
+    width: 48, height: 48, borderRadius: 16,
+    backgroundColor: 'rgba(255,77,141,0.10)',
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
-  infoLabel: { fontSize: 11, color: C.muted, fontWeight: '600', marginBottom: 2, letterSpacing: 0.2 },
-  infoValue: { fontSize: 14, fontWeight: '600', color: C.dark },
-  divider:   { height: 1, backgroundColor: C.border, marginHorizontal: 16 },
+  infoLabel: { fontSize: 11, color: T.subtitle, fontWeight: '700', marginBottom: 4, letterSpacing: 0.3 },
+  infoValue: { fontSize: 15, fontWeight: '700', color: T.title, lineHeight: 20 },
+  divider: { height: 1, backgroundColor: '#F3F4F6', marginHorizontal: 20 },
 
-  // Stats
+  // ── STATS ──
   statsRow: { flexDirection: 'row', gap: 10 },
-  statBox: {
-    flex: 1, backgroundColor: C.cardBg, borderRadius: 14,
-    padding: 14, alignItems: 'center',
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  statCard: {
+    flex: 1, height: 110, backgroundColor: T.white, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center', paddingTop: 8,
+    borderTopWidth: 4, overflow: 'hidden', position: 'relative',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10, shadowRadius: 14, elevation: 6,
   },
-  statNum: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  statLbl: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 0.4, textAlign: 'center' },
-
-  // Section header
-  sectionHeader: {
-    fontSize: 11, fontWeight: '700', color: C.muted,
-    letterSpacing: 0.8, textTransform: 'uppercase',
-    marginBottom: 8, marginTop: 4, marginLeft: 4,
+  statEmoji: { fontSize: 22, marginBottom: 4 },
+  statNum: { fontSize: 24, fontWeight: '900' },
+  statLbl: { fontSize: 10, fontWeight: '700', color: T.subtitle, marginTop: 2, textAlign: 'center' },
+  statWave: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 6,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
   },
 
-  // Menu item
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.cardBg,
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-    minHeight: 58,
+  // ── QUICK ACCESS ──
+  sectionTitleRow: { position: 'relative', marginTop: 4, marginBottom: 4 },
+  sectionTitle: { fontSize: 13, fontWeight: '900', color: T.subtitle, letterSpacing: 1.2 },
+  sectionStar1: { position: 'absolute', top: -4, right: 28, fontSize: 12, opacity: 0.45 },
+  sectionStar2: { position: 'absolute', top: 2, right: 8, fontSize: 10, opacity: 0.35 },
+  featureCard: {
+    height: 120, borderRadius: 28, marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 18, paddingVertical: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14, shadowRadius: 16, elevation: 7,
   },
-  menuAccent:   { width: 4, alignSelf: 'stretch' },
-  menuIconWrap: {
-    width: 38, height: 38, borderRadius: 12,
+  featureLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14 },
+  featureIconGlass: {
+    width: 52, height: 52, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
     justifyContent: 'center', alignItems: 'center',
-    marginLeft: 12, marginRight: 4,
-    flexShrink: 0,
   },
-  menuLabel:   { flex: 1, fontSize: 15, fontWeight: '600', color: C.dark, paddingHorizontal: 4 },
-  menuChevron: {
-    width: 32, height: 32, justifyContent: 'center', alignItems: 'center',
-    marginRight: 8,
+  featureCopy: { flex: 1 },
+  featureTitle: { fontSize: 17, fontWeight: '900', color: T.white },
+  featureDesc: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.88)', marginTop: 4, lineHeight: 16 },
+  featureRight: { alignItems: 'flex-end', justifyContent: 'center', position: 'relative', width: 72 },
+  featureArrow: {
+    position: 'absolute', bottom: -8, right: 0,
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center', alignItems: 'center',
   },
 
-  // Logout
+  secondaryItem: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: T.white, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+  },
+  secondaryIcon: {
+    width: 42, height: 42, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  secondaryLabel: { flex: 1, fontSize: 15, fontWeight: '700', color: T.title },
+
+  accountLabel: {
+    fontSize: 13, fontWeight: '900', color: T.subtitle,
+    letterSpacing: 1.2, marginTop: 8, marginBottom: 10,
+  },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.errorBg,
-    borderRadius: 14,
-    borderWidth: 1.5, borderColor: C.errorBorder,
-    paddingVertical: 15, paddingHorizontal: 16,
-    gap: 12, marginBottom: 8,
+    backgroundColor: T.errorBg, borderRadius: 20,
+    borderWidth: 1.5, borderColor: T.errorBorder,
+    paddingVertical: 16, paddingHorizontal: 16, gap: 12,
   },
   logoutIconWrap: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: '#FFCDD2',
-    justifyContent: 'center', alignItems: 'center',
-    flexShrink: 0,
+    width: 40, height: 40, borderRadius: 14,
+    backgroundColor: '#FFCDD2', justifyContent: 'center', alignItems: 'center',
   },
-  logoutText: { fontSize: 15, fontWeight: '700', color: C.error, flex: 1 },
-
-  version: {
-    textAlign: 'center', fontSize: 12,
-    color: C.muted, marginTop: 12, marginBottom: 24,
-  },
+  logoutText: { flex: 1, fontSize: 15, fontWeight: '800', color: T.error },
+  version: { textAlign: 'center', fontSize: 12, color: T.subtitle, marginTop: 16, marginBottom: 8 },
 });

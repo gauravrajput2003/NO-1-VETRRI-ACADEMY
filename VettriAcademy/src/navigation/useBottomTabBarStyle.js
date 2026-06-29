@@ -21,12 +21,18 @@ export function useBottomTabBarStyle({
     return {
       tabBarStyle: {
         backgroundColor,
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        bottom: 16,
+        borderRadius: 35,
         borderTopColor,
         borderTopWidth: 0,
         height: BASE_TAB_BAR_HEIGHT + bottomInset,
         paddingTop: TAB_BAR_TOP_PADDING,
         paddingBottom: bottomInset,
-        paddingHorizontal: 2,
+        paddingHorizontal: 10,
+        overflow: 'hidden',
         ...shadowStyle,
       },
       tabBarItemStyle: {
