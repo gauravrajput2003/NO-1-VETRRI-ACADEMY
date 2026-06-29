@@ -292,6 +292,41 @@ const uploadMaterial = async (req, res) => {
   }
 };
 
+// @desc    Edit a material
+// @route   PUT /api/teacher/materials/:id
+// @access  Teacher
+const editMaterial = async (req, res) => {
+  try {
+    const material = await StudyMaterial.findOneAndUpdate(
+      { _id: req.params.id, teacher: req.user._id },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!material) {
+      return res.status(404).json({ success: false, message: 'Material not found.' });
+    }
+    res.status(200).json({ success: true, material });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete a material
+// @route   DELETE /api/teacher/materials/:id
+// @access  Teacher
+const deleteMaterial = async (req, res) => {
+  try {
+    const material = await StudyMaterial.findOneAndDelete({ _id: req.params.id, teacher: req.user._id });
+    if (!material) {
+      return res.status(404).json({ success: false, message: 'Material not found.' });
+    }
+    res.status(200).json({ success: true, message: 'Material deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 // @desc    Toggle material lock for student
 // @route   PUT /api/teacher/materials/:id/lock
 // @access  Teacher
@@ -520,6 +555,8 @@ module.exports = {
   postLiveClass,
   markClassCompleted,
   uploadMaterial,
+  editMaterial,
+  deleteMaterial,
   toggleMaterialLock,
   getTeacherMaterials,
   enterExamScore,
