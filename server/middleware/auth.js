@@ -76,7 +76,8 @@ const verifyToken = async (req, res, next) => {
           $inc: { totalLoginDays: 1 },
           isOnline: true,
         });
-      } 
+
+      }  
     } catch (logErr) {
       // Silent — don't block the request on log failure
       console.warn('Login log error:', logErr.message);
