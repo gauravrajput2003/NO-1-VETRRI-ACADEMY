@@ -243,14 +243,16 @@ export default function TeacherMaterialsScreen({ navigation }) {
   const handleDelete = (material) => {
     Alert.alert('Delete Material?', `Are you sure you want to delete "${material.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        const result = await dispatch(deleteMaterial(material._id));
-        if (deleteMaterial.fulfilled.match(result)) {
-          Toast.show({ type: 'success', text1: 'Material deleted' });
-        } else {
-          Toast.show({ type: 'error', text1: 'Delete failed', text2: result.payload });
+      { 
+        text: 'Delete', onPress: async () => {
+          const result = await dispatch(deleteMaterial(material._id));
+          if (deleteMaterial.fulfilled.match(result)) {
+            Toast.show({ type: 'success', text1: 'Material deleted' });
+          } else {
+            Toast.show({ type: 'error', text1: 'Delete failed', text2: result.payload });
+          }
         }
-      }},
+      },
     ]);
   };
 
