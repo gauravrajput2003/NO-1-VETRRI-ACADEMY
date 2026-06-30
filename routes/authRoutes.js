@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, logout, getMe, refreshAccessToken } = require('../controllers/authController');
+const { register, login, logout, getMe, refreshAccessToken, getCoursesMeta } = require('../controllers/authController');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
@@ -31,5 +31,8 @@ router.get('/me', verifyToken, getMe);
 
 // POST /api/auth/refresh
 router.post('/refresh', refreshAccessToken);
+
+// GET /api/auth/courses/meta
+router.get('/courses/meta', getCoursesMeta);
 
 module.exports = router;
