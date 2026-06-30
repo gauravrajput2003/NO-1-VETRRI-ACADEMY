@@ -4,6 +4,7 @@ const LoginLog = require('../models/LoginLog');
 const { generateToken, generateRefreshToken, setCookieToken, clearCookieToken } = require('../utils/generateToken');
 const { sendWelcomeEmail } = require('../utils/email');
 const jwt = require('jsonwebtoken');
+const Course = require('../models/Course');
 
 const normalizeBoard = (value) => {
   if (!value) return '';
@@ -247,6 +248,35 @@ const refreshAccessToken = async (req, res) => {
   }
 };
 
-// Register logically handles both Student and Teacher now
+// @desc    Get courses meta (subjects and grades)
+// @route   GET /api/auth/courses/meta
+// @access  Public
+const getCoursesMeta = async (req, res) => {
+  try {
+    const courses = await Course.find({ isActive: true });
+    const gradesSet = new Set();
+    const subjectsSet = new Set();
+    
+    courses.forEach(c => {
+      if (c.grades) c.grades.forEach(g => gradesSet.add(g));
+      if (c.subjects) c.subjects.forEach(s => subjectsSet.add(s));
+    });
+    
+    // Defaults if empty
+    const grades = gradesSet.size > 0 ? Array.from(gradesSet).sort() : ['6th', '7th', '8th', '9th', '10th', '11th', '12th'];
+    const subjects = subjectsSet.size > 0 ? Array.from(subjectsSet).sort() : ['Mathematics', 'Science', 'English', 'History'];
+    
+    res.json({ success: true, grades, subjects });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-module.exports = { register, login, logout, getMe, refreshAccessToken };
+module.exports = {
+  register,
+  login,
+  logout,
+  getMe,
+  refreshAccessToken,
+  getCoursesMeta,
+};
