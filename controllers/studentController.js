@@ -332,10 +332,10 @@ const downloadMaterialDirect = async (req, res) => {
     const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
     const mimeType = material.mimeType || 'application/octet-stream';
 
-    logDev('[Download] Streaming file from Cloudinary');
+    logDev('[Download] Redirecting to file URL');
 
-    // Use proxyDownload to serve file with proper headers
-    await proxyDownload(downloadUrl, filename, mimeType, res);
+    // Redirect to the actual file URL so the browser handles the download/viewing directly.
+    res.redirect(downloadUrl);
   } catch (error) {
     errorCrit('[Download] Direct download error:', error.message);
     if (!res.headersSent) {

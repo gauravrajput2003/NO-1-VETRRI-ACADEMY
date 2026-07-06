@@ -257,14 +257,22 @@ app.set('onlineUsers', onlineUsers);
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
+let cronJobsStarted = false;
 
-connectDB().then(() => {
-  server.listen(PORT, () => {
-    infoProd(`🚀 Server running on http://localhost:${PORT}`);
-    infoProd(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  });
+server.on('error', (err) => {
+  if (err?.code === 'EADDRINUSE') {
+    errorCrit(`❌ Port ${PORT} is already in use. Another backend instance is running.`);
+    warnDev(`Stop the other process using port ${PORT} and restart the server.`);
+    process.exitCode = 1;
+    return;
+  }
 
-  // ─── Start Cron Jobs ────────────────────────────────────────────────────────
+  throw err;
+});
+
+const startCronJobs = () => {
+  if (cronJobsStarted) return;
+
   try {
     const { startWeeklyTopPerformerJob } = require('./jobs/weeklyTopPerformer');
     const { startClassReminderJob } = require('./jobs/classReminder');
@@ -272,10 +280,19 @@ connectDB().then(() => {
     startWeeklyTopPerformerJob();
     startClassReminderJob(io);
     startFeeReminderJob(io);
+    cronJobsStarted = true;
     logDev('⏰ Cron jobs started');
   } catch (err) {
     warnDev('⚠️ Cron job startup error:', err.message);
   }
+};
+
+connectDB().then(() => {
+  server.listen(PORT, () => {
+    infoProd(`🚀 Server running on http://localhost:${PORT}`);
+    infoProd(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    startCronJobs();
+  });
 });
 
 module.exports = { app, io };
