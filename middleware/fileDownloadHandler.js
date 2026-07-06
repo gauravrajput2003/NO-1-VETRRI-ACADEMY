@@ -1,72 +1,81 @@
 /**
  * File Download Handler Middleware
- * 
- * Handles file downloads with proper Content-Disposition headers
- * Supports both direct Cloudinary URLs and S3 presigned URLs
+ *
+ * Handles file downloads with proper Content-Disposition headers.
+ * Supports Cloudinary and S3 URLs, and follows HTTP redirects automatically.
  */
 
 const https = require('https');
-const http = require('http');
+const http  = require('http');
 
 /**
- * Download file from URL and serve to client with proper headers
- * @param {string} fileUrl - URL to download file from (Cloudinary or S3)
- * @param {string} filename - Filename for download
- * @param {string} mimeType - MIME type for file
- * @param {Object} res - Express response object
+ * Fetch a URL following any HTTP redirects (up to maxRedirects hops).
+ */
+function fetchFollowingRedirects(url, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects < 0) return reject(new Error('Too many redirects'));
+
+    const protocol = url.startsWith('https') ? https : http;
+
+    protocol.get(url, (res) => {
+      const { statusCode, headers } = res;
+
+      // Follow 3xx redirects
+      if (statusCode >= 300 && statusCode < 400 && headers.location) {
+        res.resume(); // discard body
+        const nextUrl = headers.location.startsWith('http')
+          ? headers.location
+          : new URL(headers.location, url).toString();
+        return fetchFollowingRedirects(nextUrl, maxRedirects - 1)
+          .then(resolve)
+          .catch(reject);
+      }
+
+      resolve(res);
+    }).on('error', reject);
+  });
+}
+
+/**
+ * Download file from URL and serve to client with proper headers.
+ * Follows redirects automatically.
+ * @param {string} fileUrl   - Source URL (Cloudinary / S3 / signed URL)
+ * @param {string} filename  - Filename to present to the client
+ * @param {string} mimeType  - MIME type
+ * @param {Object} res       - Express response object
  */
 async function proxyDownload(fileUrl, filename, mimeType, res) {
-  return new Promise((resolve, reject) => {
-    try {
-      console.log(`[Download] Proxy fetching: ${filename} from ${fileUrl.substring(0, 50)}...`);
+  console.log(`[Download] Proxy fetching: ${filename} from ${fileUrl.substring(0, 80)}...`);
 
-      // Determine protocol
-      const protocol = fileUrl.startsWith('https') ? https : http;
+  const remoteResponse = await fetchFollowingRedirects(fileUrl);
 
-      // Fetch the file
-      protocol
-        .get(fileUrl, (remoteResponse) => {
-          // Check if remote server returned an error
-          if (remoteResponse.statusCode !== 200) {
-            console.error(`[Download] Remote returned: ${remoteResponse.statusCode}`);
-            res.status(remoteResponse.statusCode).send('Failed to fetch file');
-            return reject(new Error(`Remote status: ${remoteResponse.statusCode}`));
-          }
-
-          // Set download headers BEFORE piping
-          res.set({
-            'Content-Type': mimeType || 'application/octet-stream',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-            'Cache-Control': 'public, max-age=86400',
-            'X-Content-Type-Options': 'nosniff',
-          });
-
-          console.log(`[Download] Serving: ${filename} (${mimeType})`);
-
-          // Pipe remote response to client
-          remoteResponse.pipe(res);
-
-          remoteResponse.on('error', (err) => {
-            console.error('[Download] Stream error:', err.message);
-            res.status(500).send('Download error');
-            reject(err);
-          });
-
-          res.on('finish', () => {
-            console.log(`[Download] Completed: ${filename}`);
-            resolve();
-          });
-        })
-        .on('error', (err) => {
-          console.error('[Download] Request error:', err.message);
-          res.status(500).send('Download failed');
-          reject(err);
-        });
-    } catch (error) {
-      console.error('[Download] Proxy error:', error.message);
-      res.status(500).send('Download error');
-      reject(error);
+  if (remoteResponse.statusCode !== 200) {
+    console.error(`[Download] Remote returned: ${remoteResponse.statusCode}`);
+    if (!res.headersSent) {
+      res.status(remoteResponse.statusCode).send(`Failed to fetch file (upstream ${remoteResponse.statusCode})`);
     }
+    throw new Error(`Remote status: ${remoteResponse.statusCode}`);
+  }
+
+  // Set download headers
+  res.set({
+    'Content-Type': mimeType || remoteResponse.headers['content-type'] || 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+    'Cache-Control': 'public, max-age=86400',
+    'X-Content-Type-Options': 'nosniff',
+  });
+
+  if (remoteResponse.headers['content-length']) {
+    res.set('Content-Length', remoteResponse.headers['content-length']);
+  }
+
+  console.log(`[Download] Serving: ${filename} (${mimeType})`);
+
+  return new Promise((resolve, reject) => {
+    remoteResponse.pipe(res);
+    remoteResponse.on('error', reject);
+    res.on('finish', resolve);
+    res.on('error', reject);
   });
 }
 
