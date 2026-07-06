@@ -324,18 +324,36 @@ const downloadMaterialDirect = async (req, res) => {
 
     logDev('[Download] Direct download requested');
 
-    // Use the plain file URL (no fl_attachment - that only works for image/video, not raw)
-    const fileUrl = material.fileUrl.startsWith('https://')
-      ? material.fileUrl
-      : material.fileUrl.replace('http://', 'https://');
-
     const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
-    const mimeType = material.mimeType || 'application/octet-stream';
+    const mimeType  = material.mimeType || 'application/octet-stream';
+    const resourceType = material.resourceType || 'raw';
 
-    logDev(`[Download] Proxying: ${filename}`);
+    let downloadUrl;
 
-    // Proxy the file through our server — most reliable approach for raw Cloudinary files
-    await proxyDownload(fileUrl, filename, mimeType, res);
+    // Use Cloudinary signed URL if publicId exists — bypasses all 401 access restrictions
+    if (material.publicId) {
+      const cloudinary = require('../config/cloudinary');
+      const expiresAt  = Math.floor(Date.now() / 1000) + 3600; // valid 1 hour
+      downloadUrl = cloudinary.utils.private_download_url(
+        material.publicId,
+        material.extension || 'pdf',
+        {
+          resource_type: resourceType,
+          expires_at: expiresAt,
+          attachment: true,
+        }
+      );
+      logDev(`[Download] Using signed URL for: ${filename}`);
+    } else {
+      // Fallback to plain URL if publicId not stored
+      downloadUrl = material.fileUrl.startsWith('https://')
+        ? material.fileUrl
+        : material.fileUrl.replace('http://', 'https://');
+      logDev(`[Download] Falling back to plain URL for: ${filename}`);
+    }
+
+    // Proxy through our server so the student gets a proper download with correct filename
+    await proxyDownload(downloadUrl, filename, mimeType, res);
   } catch (error) {
     errorCrit('[Download] Direct download error:', error.message);
     if (!res.headersSent) {

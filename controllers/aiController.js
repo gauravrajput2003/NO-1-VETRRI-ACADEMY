@@ -4,7 +4,7 @@ const ALLOWED_ROLES = new Set(['student', 'teacher', 'admin']);
 const normalizeModelName = (value) => {
   if (!value) return '';
   return String(value).trim().replace(/^models\//, '');
-};
+}; 
 
 const parseAnswer = (providerData) => {
   return providerData?.candidates?.[0]?.content?.parts
