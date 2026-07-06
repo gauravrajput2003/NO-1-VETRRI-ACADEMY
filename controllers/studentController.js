@@ -324,19 +324,18 @@ const downloadMaterialDirect = async (req, res) => {
 
     logDev('[Download] Direct download requested');
 
-    const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
-    const mimeType  = material.mimeType || 'application/octet-stream';
+    if (!material.fileUrl) {
+      return res.status(404).json({ success: false, message: 'File URL not found.' });
+    }
 
-    // Use the plain secure Cloudinary URL — works once "Restrict raw delivery" is
-    // disabled in Cloudinary Dashboard → Settings → Security → Restricted media types
     const fileUrl = material.fileUrl.startsWith('https://')
       ? material.fileUrl
       : material.fileUrl.replace('http://', 'https://');
 
-    logDev(`[Download] Proxying: ${filename} from ${fileUrl.substring(0, 60)}`);
+    logDev(`[Download] Redirecting to: ${fileUrl.substring(0, 80)}`);
 
-    // Proxy through our backend → student gets proper Content-Disposition header
-    await proxyDownload(fileUrl, filename, mimeType, res);
+    // Files are stored with access_mode: public — redirect directly to Cloudinary CDN
+    return res.redirect(302, fileUrl);
   } catch (error) {
     errorCrit('[Download] Direct download error:', error.message);
     if (!res.headersSent) {

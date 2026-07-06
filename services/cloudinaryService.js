@@ -75,11 +75,9 @@ class CloudinaryService {
       const uploadOptions = {
         folder,
         resource_type: resourceType,
-        type: 'upload',            // Ensure public delivery (not authenticated)
-        access_mode: 'public',     // Make file publicly accessible
-        // Preserve original filename exactly as public_id so Cloudinary serves it with the correct extension
+        type: 'upload',
+        access_mode: 'public',
         public_id: filename,
-        // Store filename for download URL generation
         context: `filename=${filename}`,
         ...options,
       };
@@ -137,8 +135,8 @@ class CloudinaryService {
       const uploadOptions = {
         folder,
         resource_type: resourceType,
-        type: 'upload',            // Ensure public delivery (not authenticated)
-        access_mode: 'public',     // Make file publicly accessible
+        type: 'upload',
+        access_mode: 'public',
         public_id: filename,
         context: `filename=${filename}`,
         ...options,
