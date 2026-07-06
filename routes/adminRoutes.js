@@ -12,6 +12,9 @@ const {
   updateAdmission,
   getFeesOverview,
   updateFeeStatus,
+  getStudentFeeDirectory,
+  getStudentFeeHistory,
+  recordFeePayment,
 } = require('../controllers/adminController');
 const {
   getAllLeaves,
@@ -54,7 +57,11 @@ router.get('/live-monitor', getLiveMonitor);
 
 // Fees
 router.get('/fees', getFeesOverview);
+router.get('/student-fees', getStudentFeeDirectory);
+router.get('/fees/history/:studentId', getStudentFeeHistory);
 router.put('/fees/:id', updateFeeStatus);
+router.post('/fees/record-payment', recordFeePayment);
+
 // Create fee record
 router.post('/fees', async (req, res) => {
   try {

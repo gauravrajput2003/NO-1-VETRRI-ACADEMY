@@ -60,10 +60,10 @@ const getAllTeachers = async (req, res) => {
 // @access  Admin
 const updateStudent = async (req, res) => {
   try {
-    const { course, assignedTeacher, grade, board, isActive } = req.body;
+    const { course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes } = req.body;
     const student = await User.findByIdAndUpdate(
       req.params.id,
-      { course, assignedTeacher, grade, board, isActive },
+      { course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes },
       { new: true, runValidators: true }
     )
       .select('-password -refreshToken')
@@ -229,6 +229,91 @@ const updateFeeStatus = async (req, res) => {
   }
 };
 
+// @desc    Get student fee directory
+// @route   GET /api/admin/student-fees
+// @access  Admin
+const getStudentFeeDirectory = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const query = { role: 'student', isActive: true };
+    if (req.query.search) {
+      query.$or = [
+        { name: { $regex: req.query.search, $options: 'i' } },
+        { mobile: { $regex: req.query.search, $options: 'i' } },
+      ];
+    }
+
+    const students = await User.find(query)
+      .select('name grade board mobile profilePic feeAmount feeFrequency feeDueDate')
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalStudents = await User.countDocuments(query);
+
+    // Fetch latest fee record for each student
+    const studentIds = students.map(s => s._id);
+    const latestFees = await FeesRecord.aggregate([
+      { $match: { student: { $in: studentIds } } },
+      { $sort: { createdAt: -1 } },
+      { $group: { _id: "$student", latestFee: { $first: "$$ROOT" } } }
+    ]);
+
+    const feesMap = {};
+    latestFees.forEach(f => { feesMap[f._id.toString()] = f.latestFee; });
+
+    const directory = students.map(s => ({
+      ...s,
+      latestFee: feesMap[s._id.toString()] || null
+    }));
+
+    res.status(200).json({ success: true, students: directory, total: totalStudents, page, pages: Math.ceil(totalStudents / limit) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get student fee history
+// @route   GET /api/admin/fees/history/:studentId
+// @access  Admin
+const getStudentFeeHistory = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const fees = await FeesRecord.find({ student: studentId })
+      .sort({ createdAt: -1 })
+      .populate('updatedBy', 'name');
+    res.status(200).json({ success: true, history: fees });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Record fee payment
+// @route   POST /api/admin/fees/record-payment
+// @access  Admin
+const recordFeePayment = async (req, res) => {
+  try {
+    const { studentId, amount, paymentMethod, status, month, year, remarks } = req.body;
+    const fee = await FeesRecord.create({
+      student: studentId,
+      amount,
+      paymentMethod,
+      status: status || 'paid',
+      month,
+      year,
+      remarks,
+      paidAt: new Date(),
+      updatedBy: req.user._id,
+    });
+    res.status(201).json({ success: true, fee });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -239,4 +324,7 @@ module.exports = {
   updateAdmission,
   getFeesOverview,
   updateFeeStatus,
+  getStudentFeeDirectory,
+  getStudentFeeHistory,
+  recordFeePayment,
 };

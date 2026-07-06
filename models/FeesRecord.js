@@ -10,13 +10,13 @@ const feesRecordSchema = new mongoose.Schema(
     amount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['paid', 'pending', 'overdue'],
+      enum: ['paid', 'pending', 'overdue', 'partial'],
       default: 'pending',
     },
     paidAt: { type: Date },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'online', 'upi', 'bank_transfer', ''],
+      enum: ['cash', 'online', 'upi', 'bank_transfer', 'cheque', 'card', 'other', ''],
       default: '',
     },
     transactionId: { type: String },
@@ -25,6 +25,7 @@ const feesRecordSchema = new mongoose.Schema(
     remarks: { type: String },
     reminderSent: { type: Boolean, default: false },
     reminderSentAt: { type: Date },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );

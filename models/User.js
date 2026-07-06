@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema(
     assignedTeacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     admissionFormFilled: { type: Boolean, default: false },
     firstLogin: { type: Boolean, default: true },
+    feeAmount: { type: Number, default: 0 },
+    feeFrequency: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'one-time'], default: 'monthly' },
+    feeDueDate: { type: Number, default: 1 }, // e.g., 1st of every month
+    feeNotes: { type: String, default: '' },
 
     // Teacher-specific
     qualification: { type: String },
