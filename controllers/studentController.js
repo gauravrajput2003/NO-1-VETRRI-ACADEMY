@@ -173,6 +173,12 @@ const getStudentMaterials = async (req, res) => {
         grade: m.grade,
         mimeType: m.mimeType,
         fileSize: m.fileSize,
+        fileUrl: m.fileUrl,
+        publicId: m.publicId,
+        resourceType: m.resourceType,
+        storageType: m.storageType,
+        originalFilename: m.originalFilename,
+        extension: m.extension,
         isLocked,
         createdAt: m.createdAt,
       };
@@ -259,18 +265,24 @@ const getMaterialDownloadUrl = async (req, res) => {
       });
     }
 
-    logDev('[Download] Generating material download URL');
+    logDev('[Download] Generating direct material file URL');
 
-    // Return the direct-download endpoint URL (no leading /api)
-    // Frontend already prefixes API_BASE_URL which includes /api
-    const directDownloadUrl = `/student/materials/${material._id}/direct-download`;
+    const downloadUrl = await resolveMaterialAccessUrl(material, true);
 
-    logDev('[Download] Returning direct-download endpoint');
+    if (!downloadUrl) {
+      return res.status(404).json({
+        success: false,
+        message: 'Material file is missing or inaccessible.',
+      });
+    }
+
+    logDev('[Download] Returning direct file URL');
 
     res.status(200).json({
       success: true,
-      url: directDownloadUrl,
+      url: downloadUrl,
       type: material.type,
+      resourceType: material.resourceType || 'raw',
       metadata: {
         filename: material.originalFilename,
         extension: material.extension,

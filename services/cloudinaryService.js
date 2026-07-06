@@ -70,7 +70,7 @@ class CloudinaryService {
       const resourceType = this.getResourceType(mimetype);
       const filename = this.extractOriginalFilename(originalname);
       const extension = this.getFileExtension(filename);
-
+ 
       // Cloudinary upload options
       const uploadOptions = {
         folder,
