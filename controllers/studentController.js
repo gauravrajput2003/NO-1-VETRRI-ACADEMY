@@ -324,18 +324,41 @@ const downloadMaterialDirect = async (req, res) => {
 
     logDev('[Download] Direct download requested');
 
-    if (!material.fileUrl) {
-      return res.status(404).json({ success: false, message: 'File URL not found.' });
+    const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
+    const mimeType = material.mimeType || 'application/octet-stream';
+    const resourceType = material.resourceType || 'raw';
+
+    let downloadUrl;
+
+    if (material.publicId) {
+      const cloudinary = require('../config/cloudinary');
+      // Use Admin API to generate a signed download URL. 
+      // CRITICAL: We must specify `type: 'upload'` because private_download_url 
+      // defaults to 'authenticated', which causes a 404 since our files are 'upload'.
+      downloadUrl = cloudinary.utils.private_download_url(
+        material.publicId,
+        material.extension || 'pdf',
+        {
+          resource_type: resourceType,
+          type: 'upload', 
+          expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour valid
+          attachment: true
+        }
+      );
+      logDev(`[Download] Generated Admin API URL for: ${filename}`);
+    } else {
+      if (!material.fileUrl) {
+        return res.status(404).json({ success: false, message: 'File URL not found.' });
+      }
+      downloadUrl = material.fileUrl.startsWith('https://')
+        ? material.fileUrl
+        : material.fileUrl.replace('http://', 'https://');
+      logDev(`[Download] Using plain URL for: ${filename}`);
     }
 
-    const fileUrl = material.fileUrl.startsWith('https://')
-      ? material.fileUrl
-      : material.fileUrl.replace('http://', 'https://');
-
-    logDev(`[Download] Redirecting to: ${fileUrl.substring(0, 80)}`);
-
-    // Files are stored with access_mode: public — redirect directly to Cloudinary CDN
-    return res.redirect(302, fileUrl);
+    // Proxy the download through our backend so the student gets the file
+    // without hitting the Cloudinary CDN restrictions.
+    await proxyDownload(downloadUrl, filename, mimeType, res);
   } catch (error) {
     errorCrit('[Download] Direct download error:', error.message);
     if (!res.headersSent) {
