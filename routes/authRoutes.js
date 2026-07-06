@@ -20,6 +20,9 @@ const registerGuard = (req, res, next) => {
 // POST /api/auth/register
 router.post('/register', authLimiter, registerGuard, register);
 
+// POST /api/auth/login  (unified login, role resolved from identifier)
+router.post('/login', authLimiter, login);
+
 // POST /api/auth/login/:role  (role = student | teacher | admin)
 router.post('/login/:role', authLimiter, login);
 

@@ -129,13 +129,13 @@ const register = async (req, res) => {
 // ─── Login ────────────────────────────────────────────────────────────────────
 const login = async (req, res) => {
   try {
-    const { role } = req.params;
+    const role = req.params.role || req.body.role;
     const { identifier, password } = req.body;
 
-    const user = await User.findOne({
-      $or: [{ mobile: identifier }, { email: identifier }],
-      role,
-    });
+    const baseQuery = { $or: [{ mobile: identifier }, { email: identifier }] };
+    const user = role
+      ? await User.findOne({ ...baseQuery, role })
+      : await User.findOne(baseQuery);
 
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });

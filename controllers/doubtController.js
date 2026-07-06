@@ -89,13 +89,6 @@ const buildDoubtQuery = (user, query) => {
 		mongoQuery.status = query.status;
 	}
 
-	if (query.priority) {
-		mongoQuery.priority = query.priority;
-	}
-
-	if (query.subject) {
-		mongoQuery.subject = { $regex: trimSafe(query.subject), $options: 'i' };
-	}
 
 	if (query.studentId && user.role === 'admin') {
 		const sid = toObjectId(query.studentId);
@@ -124,8 +117,6 @@ const buildDoubtQuery = (user, query) => {
 		mongoQuery.$or = [
 			{ title: { $regex: kw, $options: 'i' } },
 			{ description: { $regex: kw, $options: 'i' } },
-			{ chapter: { $regex: kw, $options: 'i' } },
-			{ tags: { $regex: kw, $options: 'i' } },
 		];
 	}
 
@@ -249,19 +240,12 @@ const createDoubt = async (req, res) => {
 
 		const title = trimSafe(req.body.title);
 		const description = trimSafe(req.body.description);
-		const subject = trimSafe(req.body.subject);
-		const chapter = trimSafe(req.body.chapter);
-		const priority = trimSafe(req.body.priority || 'medium').toLowerCase();
-		const tags = parseTags(req.body.tags);
+
 		const assignedTeachers = parseTeacherIds(req.body.assignedTeachers);
 		const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
 
-		if (!title || !description || !subject) {
-			return res.status(400).json({ success: false, message: 'Title, description, and subject are required.' });
-		}
-
-		if (!PRIORITIES.includes(priority)) {
-			return res.status(400).json({ success: false, message: 'Priority must be low, medium, or high.' });
+		if (!title || !description) {
+			return res.status(400).json({ success: false, message: 'Title and description are required.' });
 		}
 
 		const validTeachers = assignedTeachers.length
@@ -272,10 +256,7 @@ const createDoubt = async (req, res) => {
 		const doubt = await Doubt.create({
 			title,
 			description,
-			subject,
-			chapter,
-			priority,
-			tags,
+
 			studentId: req.user._id,
 			assignedTeachers: teacherIds,
 			attachments,
@@ -728,12 +709,10 @@ const exportDoubts = async (req, res) => {
 
 		const format = trimSafe(req.query.format || 'json').toLowerCase();
 		if (format === 'csv') {
-			const header = ['id', 'title', 'subject', 'priority', 'status', 'student', 'teachers', 'createdAt', 'updatedAt'];
+			const header = ['id', 'title', 'status', 'student', 'teachers', 'createdAt', 'updatedAt'];
 			const rows = doubts.map((d) => [
 				d._id,
 				JSON.stringify(d.title || ''),
-				JSON.stringify(d.subject || ''),
-				d.priority,
 				d.status,
 				JSON.stringify(d.studentId?.displayName || d.studentId?.name || ''),
 				JSON.stringify((d.assignedTeachers || []).map((t) => t.displayName || t.name).join('; ')),

@@ -18,9 +18,6 @@ const doubtSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 150 },
     description: { type: String, required: true, trim: true, maxlength: 5000 },
-    subject: { type: String, required: true, trim: true, index: true },
-    chapter: { type: String, trim: true, default: '' },
-    tags: [{ type: String, trim: true }],
 
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }],
@@ -31,7 +28,6 @@ const doubtSchema = new mongoose.Schema(
       default: 'open',
       index: true,
     },
-    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium', index: true },
 
     attachments: [attachmentSchema],
 
@@ -50,6 +46,5 @@ const doubtSchema = new mongoose.Schema(
 );
 
 doubtSchema.index({ createdAt: -1, isDeleted: 1 });
-doubtSchema.index({ status: 1, priority: 1, subject: 1 });
 
 module.exports = mongoose.model('Doubt', doubtSchema);
