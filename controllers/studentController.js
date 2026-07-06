@@ -324,22 +324,18 @@ const downloadMaterialDirect = async (req, res) => {
 
     logDev('[Download] Direct download requested');
 
-    // Build a proper public download URL via storageService (adds fl_attachment for raw files)
-    const downloadUrl = await storageService.getDownloadUrl(
-      material.fileUrl,
-      material.storageType || 'cloudinary',
-      {
-        publicId: material.publicId,
-        originalFilename: material.originalFilename,
-        extension: material.extension,
-      },
-      true
-    );
+    // Use the plain file URL (no fl_attachment - that only works for image/video, not raw)
+    const fileUrl = material.fileUrl.startsWith('https://')
+      ? material.fileUrl
+      : material.fileUrl.replace('http://', 'https://');
 
-    logDev('[Download] Redirecting to:', downloadUrl);
+    const filename = material.originalFilename || `file.${material.extension || 'pdf'}`;
+    const mimeType = material.mimeType || 'application/octet-stream';
 
-    // Redirect to the Cloudinary URL (public raw files work with fl_attachment)
-    res.redirect(downloadUrl);
+    logDev(`[Download] Proxying: ${filename}`);
+
+    // Proxy the file through our server — most reliable approach for raw Cloudinary files
+    await proxyDownload(fileUrl, filename, mimeType, res);
   } catch (error) {
     errorCrit('[Download] Direct download error:', error.message);
     if (!res.headersSent) {
