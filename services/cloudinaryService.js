@@ -313,13 +313,13 @@ class CloudinaryService {
       return cloudinary.url(publicId, {
         resource_type: resourceType,
         sign_url: true,
-        type: 'authenticated',
+        type: 'upload',
         expires_at: expiresAt,
       });
     } catch (error) {
       errorCrit('[Cloudinary] Signed URL generation failed:', error.message);
       // Fallback: return regular URL (still protected by JWT middleware)
-      return cloudinary.url(publicId, { resource_type: resourceType });
+      return cloudinary.url(publicId, { resource_type: resourceType, type: 'upload' });
     }
   }
 }

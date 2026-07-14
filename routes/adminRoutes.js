@@ -7,6 +7,8 @@ const {
   getAllTeachers,
   updateStudent,
   approveTeacher,
+  deleteTeacher,
+  deleteStudent,
   getAdminStats,
   getAdmissions,
   updateAdmission,
@@ -47,10 +49,12 @@ router.get('/stats', getAdminStats);
 // Students
 router.get('/students', getAllStudents);
 router.put('/students/:id', updateStudent);
+router.delete('/students/:id', deleteStudent);
 
 // Teachers
 router.get('/teachers', getAllTeachers);
 router.put('/teachers/:id/approve', approveTeacher);
+router.delete('/teachers/:id', deleteTeacher);
 
 // Live monitor
 router.get('/live-monitor', getLiveMonitor);

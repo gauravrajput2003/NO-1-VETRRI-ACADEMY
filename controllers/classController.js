@@ -12,7 +12,7 @@ const createSchedule = async (req, res) => {
     const {
       title, course, board, subject, grade,
       scheduledDate, scheduledTime, durationMinutes, repeatType,
-      dayOfWeek, academicYear, batch, notes,
+      dayOfWeek, academicYear, batch, googleMeetLink, zoomMeetingLink,
     } = req.body;
 
     const teacherId = req.user.role === 'teacher'
@@ -34,6 +34,18 @@ const createSchedule = async (req, res) => {
     if (Number.isNaN(parsedScheduledDate.getTime())) {
       return res.status(400).json({ success: false, message: 'scheduledDate is invalid' });
     }
+    const validateOptionalUrl = (value, label) => {
+      if (!value) return null;
+      try {
+        const url = new URL(String(value).trim());
+        if (url.protocol === 'http:' || url.protocol === 'https:') return null;
+      } catch {}
+      return `${label} must be a valid URL`;
+    };
+    const urlError = validateOptionalUrl(googleMeetLink, 'Google Meet link') || validateOptionalUrl(zoomMeetingLink, 'Zoom meeting link');
+    if (urlError) {
+      return res.status(400).json({ success: false, message: urlError });
+    }
 
     const schedule = await ClassSchedule.create({
       title, course, board, subject, grade,
@@ -41,7 +53,9 @@ const createSchedule = async (req, res) => {
       scheduledDate: parsedScheduledDate,
       scheduledTime, durationMinutes: durationMinutes || 60,
       repeatType: repeatType || 'once',
-      dayOfWeek, academicYear, batch, notes,
+      dayOfWeek, academicYear, batch,
+      googleMeetLink: String(googleMeetLink || '').trim(),
+      zoomMeetingLink: String(zoomMeetingLink || '').trim(),
     });
 
     res.status(201).json({ success: true, schedule });

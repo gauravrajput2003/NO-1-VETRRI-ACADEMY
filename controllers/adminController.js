@@ -2,6 +2,32 @@ const User = require('../models/User');
 const AdmissionForm = require('../models/AdmissionForm');
 const FeesRecord = require('../models/FeesRecord');
 const Course = require('../models/Course');
+const AnnouncementRead = require('../models/AnnouncementRead');
+const Attendance = require('../models/Attendance');
+const ChatMessage = require('../models/ChatMessage');
+const ClassAttendance = require('../models/ClassAttendance');
+const ClassSchedule = require('../models/ClassSchedule');
+const Conversation = require('../models/Conversation');
+const DemoBooking = require('../models/DemoBooking');
+const Doubt = require('../models/Doubt');
+const DoubtAuditLog = require('../models/DoubtAuditLog');
+const DoubtReply = require('../models/DoubtReply');
+const ExamScore = require('../models/ExamScore');
+const LeaveApplication = require('../models/LeaveApplication');
+const LiveClass = require('../models/LiveClass');
+const LiveSession = require('../models/LiveSession');
+const LoginLog = require('../models/LoginLog');
+const Notification = require('../models/Notification');
+const PdfAnalytics = require('../models/PdfAnalytics');
+const PdfBookmark = require('../models/PdfBookmark');
+const PdfNote = require('../models/PdfNote');
+const PdfProgress = require('../models/PdfProgress');
+const SalaryTransaction = require('../models/SalaryTransaction');
+const StudyMaterial = require('../models/StudyMaterial');
+const TeacherGrading = require('../models/TeacherGrading');
+const TeacherPermissions = require('../models/TeacherPermissions');
+const TrainingVideoProgress = require('../models/TrainingVideoProgress');
+const WeeklyTopPerformer = require('../models/WeeklyTopPerformer');
 
 // @desc    Get all students (admin)
 // @route   GET /api/admin/students
@@ -93,6 +119,88 @@ const approveTeacher = async (req, res) => {
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found.' });
 
     res.status(200).json({ success: true, teacher });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deleteTeacher = async (req, res) => {
+  try {
+    const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' });
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found.' });
+
+    const classIds = await ClassSchedule.find({ teacherId: teacher._id }).distinct('_id');
+    const liveClassIds = await LiveClass.find({ teacher: teacher._id }).distinct('_id');
+
+    await Promise.all([
+      User.updateMany({ assignedTeacher: teacher._id }, { $unset: { assignedTeacher: '' } }),
+      AdmissionForm.updateMany({ assignedTeacher: teacher._id }, { $unset: { assignedTeacher: '' } }),
+      DemoBooking.updateMany({ assignedTeacher: teacher._id }, { $unset: { assignedTeacher: '' } }),
+      Doubt.updateMany({ assignedTeachers: teacher._id }, { $pull: { assignedTeachers: teacher._id, participants: teacher._id } }),
+      StudyMaterial.deleteMany({ teacher: teacher._id }),
+      TeacherPermissions.deleteMany({ teacherId: teacher._id }),
+      TeacherGrading.deleteMany({ teacher: teacher._id }),
+      TrainingVideoProgress.deleteMany({ teacherId: teacher._id }),
+      SalaryTransaction.deleteMany({ teacherId: teacher._id }),
+      ClassSchedule.deleteMany({ teacherId: teacher._id }),
+      ClassAttendance.deleteMany({ $or: [{ classId: { $in: classIds } }, { markedBy: teacher._id }] }),
+      LiveSession.deleteMany({ $or: [{ teacherId: teacher._id }, { classId: { $in: classIds } }] }),
+      LiveClass.deleteMany({ teacher: teacher._id }),
+      Attendance.deleteMany({ $or: [{ teacher: teacher._id }, { liveClass: { $in: liveClassIds } }] }),
+      ExamScore.deleteMany({ teacher: teacher._id }),
+      LeaveApplication.deleteMany({ applicant: teacher._id }),
+      Notification.deleteMany({ $or: [{ recipient: teacher._id }, { sender: teacher._id }] }),
+      ChatMessage.deleteMany({ $or: [{ senderId: teacher._id }, { receiverId: teacher._id }, { sender: teacher._id }, { receiver: teacher._id }] }),
+      Conversation.deleteMany({ participants: teacher._id }),
+      DoubtReply.deleteMany({ senderId: teacher._id }),
+      DoubtAuditLog.deleteMany({ actorId: teacher._id }),
+      AnnouncementRead.deleteMany({ userId: teacher._id }),
+      LoginLog.deleteMany({ userId: teacher._id }),
+      User.deleteOne({ _id: teacher._id }),
+    ]);
+
+    res.status(200).json({ success: true, message: 'Teacher and related data deleted.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deleteStudent = async (req, res) => {
+  try {
+    const student = await User.findOne({ _id: req.params.id, role: 'student' });
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found.' });
+
+    const doubtIds = await Doubt.find({ studentId: student._id }).distinct('_id');
+
+    await Promise.all([
+      ClassSchedule.updateMany({ studentIds: student._id }, { $pull: { studentIds: student._id } }),
+      LiveClass.updateMany(
+        { $or: [{ enrolledStudents: student._id }, { 'attendance.student': student._id }] },
+        { $pull: { enrolledStudents: student._id, attendance: { student: student._id } } }
+      ),
+      Doubt.deleteMany({ studentId: student._id }),
+      DoubtReply.deleteMany({ $or: [{ doubtId: { $in: doubtIds } }, { senderId: student._id }] }),
+      DoubtAuditLog.deleteMany({ $or: [{ doubtId: { $in: doubtIds } }, { actorId: student._id }] }),
+      ClassAttendance.deleteMany({ studentId: student._id }),
+      Attendance.deleteMany({ student: student._id }),
+      ExamScore.deleteMany({ student: student._id }),
+      FeesRecord.deleteMany({ student: student._id }),
+      AdmissionForm.deleteMany({ student: student._id }),
+      LeaveApplication.deleteMany({ applicant: student._id }),
+      Notification.deleteMany({ $or: [{ recipient: student._id }, { sender: student._id }] }),
+      ChatMessage.deleteMany({ $or: [{ senderId: student._id }, { receiverId: student._id }, { sender: student._id }, { receiver: student._id }] }),
+      Conversation.deleteMany({ participants: student._id }),
+      PdfAnalytics.deleteMany({ studentId: student._id }),
+      PdfBookmark.deleteMany({ userId: student._id }),
+      PdfNote.deleteMany({ userId: student._id }),
+      PdfProgress.deleteMany({ userId: student._id }),
+      AnnouncementRead.deleteMany({ userId: student._id }),
+      LoginLog.deleteMany({ userId: student._id }),
+      WeeklyTopPerformer.updateMany({}, { $pull: { performers: { studentId: student._id } } }),
+      User.deleteOne({ _id: student._id }),
+    ]);
+
+    res.status(200).json({ success: true, message: 'Student and related data deleted.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -319,6 +427,8 @@ module.exports = {
   getAllTeachers,
   updateStudent,
   approveTeacher,
+  deleteTeacher,
+  deleteStudent,
   getAdminStats,
   getAdmissions,
   updateAdmission,

@@ -38,6 +38,8 @@ const classScheduleSchema = new mongoose.Schema(
     recordingDuration: { type: Number }, // seconds
     recordingUploadedAt: { type: Date },
     cancelReason: { type: String },
+    googleMeetLink: { type: String, trim: true, default: '' },
+    zoomMeetingLink: { type: String, trim: true, default: '' },
     // Metadata
     academicYear: { type: String },
     batch: { type: String },
