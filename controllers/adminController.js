@@ -71,7 +71,7 @@ const getAllStudents = async (req, res) => {
 // @access  Admin
 const getAllTeachers = async (req, res) => {
   try {
-    const teachers = await User.find({ role: 'teacher' })
+    const teachers = await User.find({ role: 'teacher', isApproved: true })
       .select('-password -refreshToken') // Admin CAN see mobile/email
       .sort({ createdAt: -1 });
 
