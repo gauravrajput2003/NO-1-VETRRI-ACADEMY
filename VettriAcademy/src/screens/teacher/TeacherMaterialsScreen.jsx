@@ -333,82 +333,89 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#FFF8FB', '#F8F7FC', '#F5FCFF', '#F2FFFC']} style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#F8FAFC' }]} />
       
-      {/* Background Decor */}
-      <View style={styles.bgBlobPink} />
-      <View style={styles.bgBlobTeal} />
-      <View style={styles.bgBubble1} />
-      <View style={styles.bgBubble2} />
-      <Sparkle size={12} color="#EC4899" opacity={0.06} style={{ position: 'absolute', top: 250, left: 60 }} />
-      <Sparkle size={18} color="#14B8A6" opacity={0.05} style={{ position: 'absolute', top: 450, right: 40 }} />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-
-      {/* COMPACT PREMIUM HEADER */}
-      <View style={[styles.headerWrap, { height: Math.max(90, insets.top + 50), paddingTop: insets.top }]}>
-        <ScaleBtn style={styles.glassCircleBtn} onPress={() => navigation?.goBack()}><Ionicons name="arrow-back" size={24} color="#1F2937" /></ScaleBtn>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>Manage Materials</Text>
-          <Text style={styles.headerSubtitle}>Upload and manage study materials</Text>
-        </View>
-        <View style={{ width: 46 }} />
-      </View>
-
       <View style={styles.contentContainer}>
-        {/* Upload Button */}
-        <ParticleWrapper>
-          <ScaleBtn activeScale={0.96} onPress={() => setUploadModalVisible(true)} style={styles.uploadBtnWrap}>
-            <LinearGradient colors={['#FF4D8D', '#FF6EA8']} style={styles.uploadBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <View style={styles.uploadIconCircle}>
-                <Ionicons name="cloud-upload" size={20} color="#FF4D8D" />
-              </View>
-              <Text style={styles.uploadBtnText}>UPLOAD MATERIAL</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ position: 'absolute', right: 20 }} />
-            </LinearGradient>
-          </ScaleBtn>
-        </ParticleWrapper>
-
-        {/* Search & Filter */}
-        <View style={styles.filterSection}>
-          <View style={styles.searchBox}>
-            <View style={styles.searchIconWrap}>
-              <Ionicons name="search" size={18} color="#EC4899" />
-            </View>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search by title, subject or class"
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={{ paddingRight: 18 }}>
-            {filterTabs.map((sub) => {
-              const isActive = filterSubject === sub;
-              const icon = FILTER_ICONS[sub];
-              return (
-                <TouchableOpacity key={sub} style={[styles.chip, isActive && styles.chipActive]} onPress={() => setFilterSubject(sub)}>
-                  {isActive && <LinearGradient colors={['#FF4D8D', '#FF6EA8']} style={StyleSheet.absoluteFillObject} borderRadius={20} />}
-                  <Text style={[styles.chipText, isActive ? { color: '#FFF' } : { color: '#4B5563' }]}>
-                    {icon ? `${icon} ${sub}` : sub}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* List */}
         {loading && !uploading ? (
-          <ActivityIndicator size="large" color="#FF4D8D" style={{ marginTop: 40 }} />
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
+            <ActivityIndicator size="large" color="#FF4D8D" />
+          </View>
         ) : (
           <FlatList
             data={filteredMaterials}
             keyExtractor={(item) => item._id}
             renderItem={renderMaterial}
             contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={{ paddingBottom: 10 }}>
+                {/* PREMIUM MODERN HEADER */}
+                <LinearGradient 
+                  colors={['#EC4899', '#F472B6']} 
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={[styles.premiumHeader, { height: insets.top + 160, paddingTop: insets.top + 20 }]}
+                >
+                  <View style={styles.headerTopRow}>
+                    <ScaleBtn style={styles.headerBackBtn} onPress={() => navigation?.goBack()}>
+                      <Ionicons name="arrow-back" size={24} color="#1F2937" />
+                    </ScaleBtn>
+                  </View>
+                  
+                  <View style={styles.headerTitlesModern}>
+                    <Text style={styles.headerTitleModern}>Manage Materials</Text>
+                   
+                  </View>
+                </LinearGradient>
+
+                {/* Upload Button */}
+                <ScaleBtn activeScale={0.96} onPress={() => setUploadModalVisible(true)} style={styles.uploadBtnWrapModern}>
+                  <LinearGradient colors={['#EC4899', '#F472B6']} style={styles.uploadBtnModern} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <View style={styles.uploadIconCircleModern}>
+                      <Ionicons name="cloud-upload" size={24} color="#FFF" />
+                    </View>
+                    <Text style={styles.uploadBtnTextModern}>Upload Material</Text>
+                    <View style={styles.uploadArrowCircle}>
+                      <Ionicons name="arrow-forward" size={20} color="#EC4899" />
+                    </View>
+                  </LinearGradient>
+                </ScaleBtn>
+
+                {/* Search & Filter */}
+                <View style={styles.filterSectionModern}>
+                  <View style={styles.searchBoxModern}>
+                    <View style={styles.searchIconWrapModern}>
+                      <Ionicons name="search" size={20} color="#EC4899" />
+                    </View>
+                    <TextInput
+                      style={styles.searchInputModern}
+                      placeholder="Search by title, subject..."
+                      placeholderTextColor="#9CA3AF"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                  </View>
+                  
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollModern} contentContainerStyle={{ paddingHorizontal: 24 }}>
+                    {filterTabs.map((sub) => {
+                      const isActive = filterSubject === sub;
+                      const icon = FILTER_ICONS[sub];
+                      return (
+                        <ScaleBtn key={sub} activeScale={0.92} onPress={() => setFilterSubject(sub)}>
+                          <View style={[styles.chipModernHeader, isActive ? styles.chipModernHeaderActive : styles.chipModernHeaderInactive]}>
+                            {isActive && <LinearGradient colors={['#EC4899', '#F472B6']} style={StyleSheet.absoluteFillObject} start={{x:0, y:0}} end={{x:1, y:1}} />}
+                            <Text style={[styles.chipTextModernHeader, isActive ? { color: '#FFF' } : { color: '#1E293B' }]}>
+                              {icon ? `${icon} ${sub}` : sub}
+                            </Text>
+                          </View>
+                        </ScaleBtn>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </View>
+            }
             ListEmptyComponent={
               <View style={styles.empty}>
                 <View style={styles.emptyIllustrationBox}>
@@ -428,133 +435,130 @@ export default function TeacherMaterialsScreen({ navigation }) {
         )}
       </View>
 
-      {/* Upload Modal */}
-      <Modal visible={isUploadModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeUploadModal}>
-        <KeyboardAvoidingView style={[styles.modalContainer, { backgroundColor: bgColor }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderCol }]}>
-            <TouchableOpacity onPress={closeUploadModal}>
-              <Ionicons name="close" size={28} color={textColor} />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: textColor }]}>{editingMaterial ? 'Edit Material' : 'Upload Material'}</Text>
-            <View style={{ width: 28 }} />
-          </View>
+      {/* FULL SCREEN UPLOAD MODAL */}
+      <Modal visible={isUploadModalVisible} animationType="slide" transparent={false} onRequestClose={closeUploadModal}>
+        <View style={styles.fullScreenModal}>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
           
-          <ScrollView contentContainerStyle={styles.modalScroll}>
-            {/* File Picker */}
-            {!editingMaterial && (
-              <TouchableOpacity style={[styles.filePicker, { backgroundColor: cardBg, borderColor: borderCol }]} onPress={handlePickFile}>
-                {file ? (
-                  <View style={styles.fileSelected}>
-                    <Ionicons name="document" size={40} color={Colors.primary} />
-                    <Text style={[styles.fileName, { color: textColor }]} numberOfLines={1}>{file.name}</Text>
-                    <Text style={[styles.fileSize, { color: textSec }]}>{formatFileSize(file.size)}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.filePlaceholder}>
-                    <Ionicons name="folder-open" size={48} color={Colors.primary} />
-                    <Text style={[styles.filePickerText, { color: textColor }]}>Select File</Text>
-                    <Text style={[styles.fileLimits, { color: textSec }]}>PDF, PPT, Video, Image</Text>
-                    <Text style={[styles.fileLimitsSmall, { color: textSec }]}>Max: 500MB Video / 50MB Doc</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-
-            <Text style={[styles.label, { color: textColor }]}>Title *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: cardBg, color: textColor, borderColor: borderCol }]}
-              placeholder="e.g. Chapter 5 - Quadratic Eq..."
-              placeholderTextColor={textSec}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
-
-            <Text style={[styles.label, { color: textColor }]}>Subject *</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollForm}>
-              {availableSubjects.length > 0 ? availableSubjects.map((sub) => (
-                <TouchableOpacity 
-                  key={sub} 
-                  style={[styles.chip, subject === sub ? { backgroundColor: Colors.primary } : { backgroundColor: cardBg, borderColor: borderCol, borderWidth: 1 }]}
-                  onPress={() => setSubject(sub)}
-                >
-                  <Text style={[styles.chipText, subject === sub ? { color: '#fff' } : { color: textColor }]}>{sub}</Text>
-                </TouchableOpacity>
-              )) : (
-                <View style={[styles.emptyMetaWrap, { borderColor: borderCol }]}> 
-                  <Text style={[styles.emptyMetaText, { color: textSec }]}>No subjects loaded from courses. Enter manually below.</Text>
-                </View>
-              )}
-            </ScrollView>
-            <TextInput
-              style={[styles.input, { backgroundColor: cardBg, color: textColor, borderColor: borderCol }]}
-              placeholder="Enter subject"
-              placeholderTextColor={textSec}
-              value={subject}
-              onChangeText={setSubject}
-              maxLength={60}
-            />
-
-            <Text style={[styles.label, { color: textColor }]}>Grade *</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollForm}>
-              {availableGrades.length > 0 ? availableGrades.map((g) => (
-                <TouchableOpacity 
-                  key={g} 
-                  style={[styles.chip, grade === g ? { backgroundColor: Colors.primary } : { backgroundColor: cardBg, borderColor: borderCol, borderWidth: 1 }]}
-                  onPress={() => setGrade(g)}
-                >
-                  <Text style={[styles.chipText, grade === g ? { color: '#fff' } : { color: textColor }]}>{g}</Text>
-                </TouchableOpacity>
-              )) : (
-                <View style={[styles.emptyMetaWrap, { borderColor: borderCol }]}> 
-                  <Text style={[styles.emptyMetaText, { color: textSec }]}>No grades loaded from courses. Enter manually below.</Text>
-                </View>
-              )}
-            </ScrollView>
-            <TextInput
-              style={[styles.input, { backgroundColor: cardBg, color: textColor, borderColor: borderCol }]}
-              placeholder="Enter grade"
-              placeholderTextColor={textSec}
-              value={grade}
-              onChangeText={setGrade}
-              maxLength={30}
-            />
-
-            <Text style={[styles.label, { color: textColor }]}>Description (Optional)</Text>
-            <TextInput
-              style={[styles.inputArea, { backgroundColor: cardBg, color: textColor, borderColor: borderCol }]}
-              placeholder="Add some notes..."
-              placeholderTextColor={textSec}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-            />
-
-            <View style={[styles.lockRow, { backgroundColor: cardBg, borderColor: borderCol }]}>
-              <View>
-                <Text style={[styles.lockTitle, { color: textColor }]}>Lock by default</Text>
-                <Text style={[styles.lockDesc, { color: textSec }]}>Students can't see it until you unlock</Text>
-              </View>
-              <TouchableOpacity onPress={() => setIsLocked(!isLocked)}>
-                <Ionicons name={isLocked ? 'toggle' : 'toggle-outline'} size={40} color={isLocked ? Colors.primary : textSec} />
-              </TouchableOpacity>
+          <LinearGradient 
+            colors={['#EC4899', '#F472B6']} 
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={[styles.fullScreenHeader, { paddingTop: insets.top + 20 }]}
+          >
+            <View style={styles.fsHeaderTop}>
+              <ScaleBtn style={styles.fsBackBtn} onPress={closeUploadModal}>
+                <Ionicons name="arrow-back" size={24} color="#1E293B" />
+              </ScaleBtn>
             </View>
+            <Text style={styles.fsHeaderTitle}>Upload Material</Text>
+            <Text style={styles.fsHeaderSubtitle}>Upload PDFs, videos, images and study materials.</Text>
+          </LinearGradient>
 
-            <TouchableOpacity style={styles.submitBtn} onPress={handleUpload} disabled={uploading}>
-              {uploading ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <ActivityIndicator color="#fff" size="small" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitBtnText}>{editingMaterial ? 'UPDATING...' : 'UPLOADING...'}</Text>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView contentContainerStyle={styles.fsScrollContent} showsVerticalScrollIndicator={false}>
+              
+              {/* UPLOAD CARD */}
+              <ScaleBtn activeScale={0.98} onPress={handlePickFile} disabled={!!editingMaterial}>
+                <View style={styles.uploadCard}>
+                  {file ? (
+                    <View style={styles.fileSelectedState}>
+                      <View style={styles.fileIconWrap}>
+                        <Ionicons name="document-text" size={40} color="#14B8A6" />
+                      </View>
+                      <Text style={styles.fileSelectedName} numberOfLines={1}>{file.name}</Text>
+                      <Text style={styles.fileSelectedSize}>{formatFileSize(file.size)}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.uploadCardPlaceholder}>
+                      <View style={styles.uploadIconBigWrap}>
+                        <Ionicons name="cloud-upload" size={40} color="#14B8A6" />
+                      </View>
+                      <Text style={styles.uploadCardTitle}>Select File</Text>
+                      <Text style={styles.uploadCardSupported}>Supported: PDF • PPT • Video • Image</Text>
+                      <Text style={styles.uploadCardLimits}>Max: 500MB Video / 50MB Document</Text>
+                      
+                      {!editingMaterial && (
+                        <View style={styles.chooseFileBtnBig}>
+                          <Text style={styles.chooseFileBtnText}>Choose File</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
-              ) : (
-                <Text style={styles.submitBtnText}>{editingMaterial ? 'UPDATE MATERIAL' : 'UPLOAD MATERIAL'}</Text>
-              )}
-            </TouchableOpacity>
+              </ScaleBtn>
 
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
+              {/* FORM FIELDS */}
+              <View style={styles.formSection}>
+                <Text style={styles.fsLabel}>Title *</Text>
+                <View style={styles.fsInputWrap}>
+                  <Ionicons name="document-text-outline" size={22} color="#94A3B8" style={styles.fsInputIcon} />
+                  <TextInput
+                    style={styles.fsInput}
+                    placeholder="e.g. Chapter 5 - Quadratic Equations"
+                    placeholderTextColor="#94A3B8"
+                    value={title}
+                    onChangeText={setTitle}
+                    maxLength={100}
+                  />
+                </View>
+
+                <Text style={styles.fsLabel}>Subject *</Text>
+                <View style={styles.fsInputWrap}>
+                  <Ionicons name="book-outline" size={22} color="#94A3B8" style={styles.fsInputIcon} />
+                  <TextInput
+                    style={styles.fsInput}
+                    placeholder="Enter subject"
+                    placeholderTextColor="#94A3B8"
+                    value={subject}
+                    onChangeText={setSubject}
+                    maxLength={60}
+                  />
+                </View>
+
+                <Text style={styles.fsLabel}>Grade / Class *</Text>
+                <View style={styles.fsInputWrap}>
+                  <Ionicons name="school-outline" size={22} color="#94A3B8" style={styles.fsInputIcon} />
+                  <TextInput
+                    style={styles.fsInput}
+                    placeholder="Enter grade or class"
+                    placeholderTextColor="#94A3B8"
+                    value={grade}
+                    onChangeText={setGrade}
+                    maxLength={30}
+                  />
+                </View>
+
+                <Text style={styles.fsLabel}>Visibility</Text>
+                <View style={styles.segmentedControl}>
+                  <ScaleBtn activeScale={0.96} style={{ flex: 1 }} onPress={() => setIsLocked(false)}>
+                    <View style={[styles.segmentBtn, !isLocked && styles.segmentBtnActive]}>
+                      <Ionicons name="lock-open" size={18} color={!isLocked ? '#14B8A6' : '#64748B'} style={{ marginRight: 6 }} />
+                      <Text style={[styles.segmentText, !isLocked && styles.segmentTextActive]}>Unlocked</Text>
+                    </View>
+                  </ScaleBtn>
+                  <ScaleBtn activeScale={0.96} style={{ flex: 1 }} onPress={() => setIsLocked(true)}>
+                    <View style={[styles.segmentBtn, isLocked && styles.segmentBtnActive]}>
+                      <Ionicons name="lock-closed" size={18} color={isLocked ? '#14B8A6' : '#64748B'} style={{ marginRight: 6 }} />
+                      <Text style={[styles.segmentText, isLocked && styles.segmentTextActive]}>Locked</Text>
+                    </View>
+                  </ScaleBtn>
+                </View>
+              </View>
+
+              {/* ACTION BUTTON */}
+              <ScaleBtn activeScale={0.96} onPress={handleUpload} disabled={uploading}>
+                <LinearGradient colors={['#14B8A6', '#0D9488']} style={styles.fsSubmitBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  {uploading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.fsSubmitBtnText}>{editingMaterial ? 'Update Material' : 'Upload Material'}</Text>
+                  )}
+                </LinearGradient>
+              </ScaleBtn>
+              
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -562,37 +566,35 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  bgBlobPink: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: '#EC4899', opacity: 0.05, top: 150, left: -100, filter: 'blur(60px)' },
-  bgBlobTeal: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: '#14B8A6', opacity: 0.04, top: 500, right: -80, filter: 'blur(70px)' },
-  bgBubble1: { position: 'absolute', width: 60, height: 60, borderRadius: 30, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', backgroundColor: 'rgba(255,255,255,0.2)', top: 280, right: 50, opacity: 0.08 },
-  bgBubble2: { position: 'absolute', width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', backgroundColor: 'rgba(255,255,255,0.2)', top: 550, left: 40, opacity: 0.08 },
-
-  headerWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, zIndex: 10 },
-  glassCircleBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center' },
-  headerTitles: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937' },
-  headerSubtitle: { fontSize: 13, fontWeight: '500', color: '#EC4899', marginTop: 2 },
+  premiumHeader: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingHorizontal: 24, zIndex: 10 },
+  headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  headerBackBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
+  headerTitlesModern: { alignItems: 'flex-start' },
+  headerTitleModern: { fontSize: 30, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
+  headerSubtitleModern: { fontSize: 14, fontWeight: '500', color: 'rgba(255,255,255,0.9)' },
 
   contentContainer: { flex: 1 },
   
-  uploadBtnWrap: { marginHorizontal: 18, marginTop: 18, marginBottom: 12, zIndex: 10 },
-  uploadBtn: { height: 56, borderRadius: 18, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, shadowColor: '#FF4D8D', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
-  uploadIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  uploadBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  uploadBtnWrapModern: { marginHorizontal: 24, marginTop: 24, marginBottom: 24, zIndex: 10 },
+  uploadBtnModern: { height: 60, borderRadius: 18, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, shadowColor: '#EC4899', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 8 },
+  uploadIconCircleModern: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  uploadBtnTextModern: { flex: 1, color: '#FFF', fontSize: 17, fontWeight: '700' },
+  uploadArrowCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
 
-  filterSection: { paddingHorizontal: 18, paddingTop: 4 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginBottom: 16, paddingHorizontal: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  searchIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(236, 72, 153, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 15, color: '#1F2937', fontWeight: '500' },
+  filterSectionModern: { paddingTop: 4 },
+  searchBoxModern: { flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', marginHorizontal: 24, marginBottom: 24, paddingHorizontal: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  searchIconWrapModern: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF2F8', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  searchInputModern: { flex: 1, fontSize: 16, color: '#1E293B', fontWeight: '500' },
   
-  chipScroll: { paddingBottom: 8 },
-  chip: { height: 40, paddingHorizontal: 16, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginRight: 10, justifyContent: 'center' },
-  chipActive: { borderWidth: 0, shadowColor: '#FF4D8D', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-  chipText: { fontSize: 14, fontWeight: '700' },
+  chipScrollModern: { paddingBottom: 16 },
+  chipModernHeader: { height: 46, paddingHorizontal: 20, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
+  chipModernHeaderActive: { backgroundColor: '#EC4899', shadowColor: '#EC4899', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  chipModernHeaderInactive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
+  chipTextModernHeader: { fontSize: 15, fontWeight: '600' },
 
-  listContent: { padding: 18, paddingBottom: 140 },
+  listContent: { paddingBottom: 140 },
   
-  card: { borderRadius: 24, marginBottom: 18, shadowColor: '#1E293B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 8, overflow: 'hidden' },
+  card: { marginHorizontal: 24, borderRadius: 24, marginBottom: 18, shadowColor: '#1E293B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 8, overflow: 'hidden' },
   cardInner: { flexDirection: 'row', alignItems: 'center', padding: 20 },
   cardGlass: { position: 'absolute', top: 0, left: 0, right: 0, height: 40, backgroundColor: 'rgba(255,255,255,0.4)' },
   cardDecoCircle1: { position: 'absolute', width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(255,255,255,0.4)', top: -20, right: -20 },
@@ -617,28 +619,41 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 18, fontWeight: '800', color: '#1F2937' },
   emptyHint: { fontSize: 14, fontWeight: '500', color: '#9CA3AF', marginTop: 8 },
 
-  // Modal
-  modalContainer: { flex: 1 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalScroll: { padding: 20 },
-  filePicker: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 20 },
-  filePlaceholder: { alignItems: 'center' },
-  filePickerText: { fontSize: 16, fontWeight: '600', marginTop: 12 },
-  fileLimits: { fontSize: 13, marginTop: 4 },
-  fileLimitsSmall: { fontSize: 11, marginTop: 4, opacity: 0.7 },
-  fileSelected: { alignItems: 'center' },
-  fileName: { fontSize: 15, fontWeight: '600', marginTop: 8, textAlign: 'center' },
-  fileSize: { fontSize: 13, marginTop: 4 },
+  // Full Screen Upload Page
+  fullScreenModal: { flex: 1, backgroundColor: '#F8FAFC' },
+  fullScreenHeader: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingHorizontal: 24, paddingBottom: 24, shadowColor: '#EC4899', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  fsHeaderTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  fsBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
+  fsHeaderTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
+  fsHeaderSubtitle: { fontSize: 14, fontWeight: '500', color: 'rgba(255,255,255,0.9)', lineHeight: 20 },
   
-  label: { fontSize: 15, fontWeight: '600', marginBottom: 8, marginTop: 8 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 48, fontSize: 15, marginBottom: 16 },
-  inputArea: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingTop: 12, fontSize: 15, height: 100, textAlignVertical: 'top', marginBottom: 20 },
+  fsScrollContent: { padding: 24, paddingBottom: 80 },
   
-  lockRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 24 },
-  lockTitle: { fontSize: 15, fontWeight: '600' },
-  lockDesc: { fontSize: 13, marginTop: 4 },
+  uploadCard: { backgroundColor: '#F0FDF4', borderRadius: 18, borderWidth: 2, borderColor: '#5EEAD4', borderStyle: 'dashed', padding: 24, alignItems: 'center', marginBottom: 30 },
+  uploadIconBigWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#CCFBF1', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  uploadCardTitle: { fontSize: 20, fontWeight: '700', color: '#0F766E', marginBottom: 8 },
+  uploadCardSupported: { fontSize: 14, color: '#0F766E', fontWeight: '500', marginBottom: 4 },
+  uploadCardLimits: { fontSize: 12, color: '#14B8A6', opacity: 0.8, marginBottom: 24 },
+  chooseFileBtnBig: { paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#FFFFFF', borderRadius: 14, shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  chooseFileBtnText: { fontSize: 16, fontWeight: '700', color: '#14B8A6' },
   
-  submitBtn: { backgroundColor: Colors.pink, height: 54, borderRadius: 14, justifyContent: 'center', alignItems: 'center', ...Shadows.medium },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  fileSelectedState: { alignItems: 'center', paddingVertical: 10 },
+  fileIconWrap: { width: 72, height: 72, borderRadius: 20, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
+  fileSelectedName: { fontSize: 16, fontWeight: '700', color: '#0F766E', textAlign: 'center', marginBottom: 6 },
+  fileSelectedSize: { fontSize: 14, color: '#14B8A6', fontWeight: '500' },
+
+  formSection: { marginBottom: 30 },
+  fsLabel: { fontSize: 15, fontWeight: '600', color: '#334155', marginBottom: 8, marginLeft: 2 },
+  fsInputWrap: { flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EAEAEA', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 },
+  fsInputIcon: { paddingHorizontal: 16 },
+  fsInput: { flex: 1, fontSize: 16, color: '#1E293B', fontWeight: '500', height: '100%' },
+
+  segmentedControl: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 16, padding: 4, height: 52 },
+  segmentBtn: { flex: 1, flexDirection: 'row', height: '100%', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  segmentBtnActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  segmentText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  segmentTextActive: { color: '#14B8A6' },
+
+  fsSubmitBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
+  fsSubmitBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 });

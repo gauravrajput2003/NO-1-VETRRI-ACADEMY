@@ -206,9 +206,9 @@ export default function TeacherDashboard({ navigation }) {
   const { width } = useWindowDimensions();
 
   // Dynamic responsive values
-  const heroHeight = width < 380 ? 250 : width < 420 ? 240 : 230;
+  const heroHeight = (width < 380 ? 250 : width < 420 ? 240 : 230) + 30 + insets.top;
   const tNameSize = width < 380 ? 32 : width < 420 ? 36 : 40;
-  const avatarSize = width < 380 ? 96 : width < 420 ? 106 : 116;
+  const avatarSize = (width < 380 ? 96 : width < 420 ? 106 : 116) + 12;
 
   const loadData = useCallback(async () => {
     dispatch(fetchTeacherDashboard());
@@ -291,7 +291,7 @@ export default function TeacherDashboard({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[T.pink]} />}
         showsVerticalScrollIndicator={false}
       >
-        <StatusBar barStyle="light-content" backgroundColor={T.sky} />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
 
         {/* ── BACKGROUND DECORATIONS ── */}
         <Ionicons name="star" size={240} color="#14C8C4" style={[st.bgGeom, { top: 80, left: -90, transform: [{ rotate: '15deg' }] }]} />
@@ -305,7 +305,7 @@ export default function TeacherDashboard({ navigation }) {
         {/* ── HERO HEADER ── */}
       <View style={[st.heroWrap, { height: heroHeight }]}>
         <LinearGradient
-          colors={['#C2185B', '#D81B60', '#FF5D9E']}
+          colors={['#C2185B', '#D81B60', '#E83E8C']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[st.heroGradient, { height: heroHeight }]}
@@ -317,20 +317,20 @@ export default function TeacherDashboard({ navigation }) {
           <View style={st.heroStreak1} />
           <View style={st.heroStreak2} />
 
-          <Sparkle size={14} color="#FFF" opacity={0.2} style={{ position: 'absolute', top: 50, left: 30 }} />
-          <Sparkle size={10} color="#FFF" opacity={0.3} style={{ position: 'absolute', top: 100, right: 80 }} />
+          <Sparkle size={14} color="#FFF" opacity={0.2} style={{ position: 'absolute', top: insets.top + 50, left: 30 }} />
+          <Sparkle size={10} color="#FFF" opacity={0.3} style={{ position: 'absolute', top: insets.top + 100, right: 80 }} />
           <Sparkle size={18} color="#FFF" opacity={0.15} style={{ position: 'absolute', bottom: 40, left: '50%' }} />
         </LinearGradient>
 
-        <View style={[st.heroTopBar, { top: Math.max(insets.top, 16) }]}>
+        <View style={[st.heroTopBar, { top: Math.max(insets.top, 24) }]}>
           <ParticleWrapper>
             <TouchableOpacity style={st.glassBtn} onPress={openMenu} activeOpacity={0.8}>
-              <Ionicons name="grid" size={28} color={T.white} />
+              <Ionicons name="grid" size={24} color={T.white} />
             </TouchableOpacity>
           </ParticleWrapper>
           <ParticleWrapper>
-            <TouchableOpacity style={st.glassBtnRight} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.8}>
-              <Ionicons name="notifications" size={28} color={T.white} />
+            <TouchableOpacity style={st.whiteIconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.8}>
+              <Ionicons name="notifications" size={24} color="#E83E8C" />
               {unreadCount > 0 && (
                 <View style={st.notifBadge}>
                   <Text style={st.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -340,10 +340,10 @@ export default function TeacherDashboard({ navigation }) {
           </ParticleWrapper>
         </View>
 
-        <View style={[st.heroContent, { bottom: 20 }]}>
+        <View style={[st.heroContent, { bottom: 28 }]}>
           <View style={st.heroLeft}>
             <FadeInView delay={100}>
-              <Text style={st.greeting}>{dynamicGreeting.toUpperCase()}</Text>
+              <Text style={st.greeting}>{dynamicGreeting}</Text>
             </FadeInView>
             <FadeInView delay={200}>
               <Text style={[st.teacherName, { fontSize: tNameSize }]} numberOfLines={2}>{teacherName}</Text>
@@ -457,7 +457,7 @@ export default function TeacherDashboard({ navigation }) {
       </View>
 
       {/* ── TODAY'S SCHEDULE ── */}
-      <ParticleWrapper style={{ marginHorizontal: 16, marginTop: 12 }}>
+      <ParticleWrapper style={{ marginHorizontal: 16, marginTop: 24 }}>
         <LinearGradient
           colors={scheduleList.length === 0 ? ['#FFE7F0', '#E0F2FE'] : ['#FFFFFF', '#F8FBFF']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -623,12 +623,12 @@ const st = StyleSheet.create({
 
   bgGeom: { position: 'absolute', opacity: 0.04 },
 
-  heroWrap: { position: 'relative', marginBottom: 28 },
+  heroWrap: { position: 'relative', marginBottom: 0 },
   heroGradient: {
     position: 'absolute',
     top: 0, left: 0, right: 0,
-    borderBottomLeftRadius: 42,
-    borderBottomRightRadius: 42,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     overflow: 'hidden',
   },
   heroPremiumCircle1: {
@@ -657,21 +657,21 @@ const st = StyleSheet.create({
     paddingHorizontal: 20, zIndex: 3,
   },
   glassBtn: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: 'rgba(255,255,255,0.20)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4,
   },
-  glassBtnRight: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: 'rgba(255,255,255,0.20)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+  whiteIconBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: T.white, marginTop: 6,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 6,
   },
   notifBadge: {
-    position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9,
+    position: 'absolute', top: -2, right: -2, minWidth: 20, height: 20, borderRadius: 10,
     backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 4, borderWidth: 1.5, borderColor: '#D81B60',
+    paddingHorizontal: 4, borderWidth: 2, borderColor: T.white,
   },
   notifBadgeText: { fontSize: 8, fontWeight: '900', color: T.white },
   heroContent: {
@@ -680,35 +680,35 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
     zIndex: 2,
   },
-  heroLeft: { flex: 0.6, paddingRight: 12 },
-  greeting: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6 },
-  teacherName: { fontWeight: '900', color: '#FFFFFF', letterSpacing: 0, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
-  subtitleText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  heroLeft: { flex: 0.65, paddingRight: 16 },
+  greeting: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.95)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 },
+  teacherName: { fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+  subtitleText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)', marginBottom: 6 },
   datePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14,
     alignSelf: 'flex-start',
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.30)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
-  datePillText: { fontSize: 11, fontWeight: '800', color: T.white },
-  heroRight: { flex: 0.4, alignItems: 'flex-end', justifyContent: 'center' },
+  datePillText: { fontSize: 12, fontWeight: '800', color: T.white },
+  heroRight: { flex: 0.35, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 8 },
   avatarFrame: { position: 'relative' },
   avatarOuterGlow: {
     padding: 6,
     borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    shadowColor: '#FFB6C1', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9, shadowRadius: 28, elevation: 14,
+    backgroundColor: 'transparent',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2, shadowRadius: 15, elevation: 14,
     position: 'relative',
   },
   avatarRing: {
     justifyContent: 'center', alignItems: 'center',
     backgroundColor: T.white,
-    borderWidth: 2, borderColor: '#FFFFFF',
+    borderWidth: 4, borderColor: '#FFFFFF',
     overflow: 'hidden',
   },
   avatarGlassHighlight: {

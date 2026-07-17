@@ -532,20 +532,20 @@ const st = StyleSheet.create({
     backgroundColor: '#22C55E', borderWidth: 2, borderColor: T.white,
   },
   name: {
-    fontSize: 32, fontWeight: '900', color: T.white,
+    fontSize: 32, fontWeight: '900', color: T.title,
     textAlign: 'center', letterSpacing: -0.5,
     textTransform: 'lowercase', paddingHorizontal: 20,
-    textShadowColor: 'rgba(0,0,0,0.12)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
+    textShadowColor: 'rgba(0,0,0,0.05)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginTop: 12, paddingHorizontal: 16, paddingVertical: 7,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(31,41,55,0.08)',
+    borderWidth: 1, borderColor: 'rgba(31,41,55,0.15)',
   },
-  rolePillText: { fontSize: 11, fontWeight: '800', color: T.white, letterSpacing: 1.2 },
-  gradeText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.90)', marginTop: 8 },
+  rolePillText: { fontSize: 11, fontWeight: '800', color: T.title, letterSpacing: 1.2 },
+  gradeText: { fontSize: 14, fontWeight: '600', color: T.subtitle, marginTop: 8 },
 
   body: { paddingHorizontal: 16, gap: 16 },
 

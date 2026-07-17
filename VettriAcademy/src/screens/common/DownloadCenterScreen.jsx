@@ -334,16 +334,8 @@ export default function DownloadCenterScreen({ navigation }) {
     );
   }
 
-  return (
-    <LinearGradient colors={[P.bgTop, P.bgBottom]} style={styles.container}>
-      {/* Top bar — back / title, on the same gradient (no white strip) */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.topIconBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color={P.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.topTitle}>Downloads</Text>
-      </View>
-
+  const renderHeader = () => (
+    <>
       {/* Header — pink → gold gradient */}
       <LinearGradient colors={[P.pink, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.hRow}>
@@ -407,7 +399,7 @@ export default function DownloadCenterScreen({ navigation }) {
 
       {/* Grade Filter */}
       <FlatList data={GRADES} horizontal showsHorizontalScrollIndicator={false} keyExtractor={(i) => i}
-        style={{ maxHeight: 50, minHeight: 45, flexGrow: 0 }}
+        style={{ maxHeight: 50, minHeight: 45, flexGrow: 0, marginBottom: 8 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
         renderItem={({ item: g }) => (
           grade === g ? (
@@ -422,18 +414,32 @@ export default function DownloadCenterScreen({ navigation }) {
             </RNTouchableOpacity>
           )
         )} />
+    </>
+  );
+
+  return (
+    <LinearGradient colors={[P.bgTop, P.bgBottom]} style={styles.container}>
+      {/* Top bar — back / title, on the same gradient (no white strip) */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={styles.topIconBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={20} color={P.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>Downloads</Text>
+      </View>
 
       {/* Content */}
       {tab === 'ncert' ? (
         <FlatList data={filteredNcert} keyExtractor={(i, idx) => `${i.title}-${idx}`} renderItem={renderNcertBook}
           onScroll={onTabBarScroll} scrollEventThrottle={16}
-          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: bottomPadding }}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={{ paddingBottom: bottomPadding }}
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="book-outline" size={56} color={P.textMuted} /><Text style={styles.emptyTitle}>No Books Found</Text><Text style={styles.emptySub}>Try a different class or search</Text></View>}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[P.gold]} tintColor={P.gold} />} />
       ) : (
         <FlatList data={filteredMats} keyExtractor={(i) => i._id} renderItem={renderMaterial}
           onScroll={onTabBarScroll} scrollEventThrottle={16}
-          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: bottomPadding }}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={{ paddingBottom: bottomPadding }}
           ListEmptyComponent={<View style={styles.empty}><Ionicons name="folder-open-outline" size={56} color={P.textMuted} /><Text style={styles.emptyTitle}>No Materials</Text><Text style={styles.emptySub}>No downloadable materials available</Text></View>}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[P.gold]} tintColor={P.gold} />} />
       )}
@@ -478,6 +484,7 @@ const styles = StyleSheet.create({
 
   // NCERT book card
   bookCard: {
+    marginHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 16, paddingRight: 14, marginBottom: 14,
     backgroundColor: P.surface, borderWidth: 1, borderColor: P.border, overflow: 'visible',
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,
@@ -512,6 +519,7 @@ const styles = StyleSheet.create({
 
   // Material card
   matCard: {
+    marginHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 16, marginBottom: 14,
     backgroundColor: P.surface, borderWidth: 1, borderColor: P.border,
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,

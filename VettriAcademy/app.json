@@ -4,7 +4,7 @@
     "slug": "no-1-vettri-academy",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Picsart_ client.png",
+    "icon": "./assets/logo_playstore.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -18,11 +18,12 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logo_playstore.png",
         "backgroundColor": "#0A1628"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.vettriacademy.app"
+      "package": "com.vettriacademy.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -122,13 +122,16 @@ const buildQueryParams = ({ filter, keyword, role }) => {
 function DoubtCard({ item, onPress }) {
   const priorityColor = PRIORITY_COLOR[item.priority] || D.pink;
   const statusColors = {
-    open: '#3B82F6',
-    teacher_responded: '#8B5CF6',
+    open: '#F59E0B',
+    teacher_responded: '#3B82F6',
     waiting_for_student: '#EF4444',
     resolved: '#10B981',
-    closed: '#6B7280',
+    closed: '#10B981',
   };
   const statusColor = statusColors[item.status] || '#6B7280';
+  
+  const teachersCount = (item.assignedTeachers || []).length;
+  const teacherText = teachersCount === 1 ? '1 Teacher' : `${teachersCount} Teachers`;
 
   return (
     <ParticleWrapper particleCount={12} size="small">
@@ -147,11 +150,18 @@ function DoubtCard({ item, onPress }) {
 
         <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={2}>{item.description}</Text>
 
-        <View style={styles.metaRow}>
-          <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.95)' }]}>
+        <View style={[styles.metaRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.95)', height: 30, borderRadius: 999, paddingVertical: 0 }]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <Text style={[styles.statusText, { color: statusColor }]}>
               {STATUS_LABEL[item.status] || item.status}
+            </Text>
+          </View>
+          
+          <View style={{ backgroundColor: '#E8F4FD', height: 30, paddingHorizontal: 14, borderRadius: 999, flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="person" size={13} color="#0284C7" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#0284C7', fontWeight: '600', fontSize: 13 }} numberOfLines={1} ellipsizeMode="tail">
+              {teacherText}
             </Text>
           </View>
         </View>
@@ -159,27 +169,9 @@ function DoubtCard({ item, onPress }) {
         <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
 
         <View style={styles.cardFooter}>
-          <View style={styles.authorRow}>
-            <View style={[styles.avatarMini, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Text style={[styles.avatarMiniText, { color: D.white }]}>
-                {(item.studentId?.displayName || item.studentId?.name || 'S')?.[0]?.toUpperCase()}
-              </Text>
-            </View>
-            <View>
-              <Text style={[styles.footerAuthorName, { color: D.white }]}>
-                {item.studentId?.displayName || item.studentId?.name || 'Student'}
-              </Text>
-              <Text style={[styles.createdAtText, { color: 'rgba(255,255,255,0.7)' }]}>
-                Posted: {formatDateTime(item.createdAt || item.updatedAt || item.date)}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.teachersBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-            <Ionicons name="people" size={14} color={D.white} style={{ marginRight: 4 }} />
-            <Text style={[styles.teachersBadgeText, { color: D.white }]}>
-              {(item.assignedTeachers || []).length} {(item.assignedTeachers || []).length === 1 ? 'Teacher' : 'Teachers'}
-            </Text>
-          </View>
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
+            📅 Posted: {formatDateTime(item.createdAt || item.updatedAt || item.date)}
+          </Text>
         </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -486,10 +478,12 @@ export default function DiscussScenarioScreen({ navigation }) {
       <View style={styles.metricRow}>
         {rows.map((m) => (
           <LinearGradient key={m.label} colors={m.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.metricCard, { shadowColor: m.colors[1] }]}>
-            <View style={styles.metricIconWrap}>
-              <Ionicons name={m.icon} size={18} color={D.white} />
+            <View style={styles.metricTop}>
+              <View style={styles.metricIconWrap}>
+                <Ionicons name={m.icon} size={14} color={D.white} />
+              </View>
+              <Text style={styles.metricValue}>{m.value}</Text>
             </View>
-            <Text style={styles.metricValue}>{m.value}</Text>
             <Text style={styles.metricLabel}>{m.label}</Text>
           </LinearGradient>
         ))}
@@ -787,12 +781,13 @@ const styles = StyleSheet.create({
 
   metricRow: { marginTop: 16, marginBottom: 14, flexDirection: 'row', gap: 10 },
   metricCard: {
-    flex: 1, borderRadius: 18, padding: 14, alignItems: 'flex-start',
-    shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5,
+    flex: 1, borderRadius: 16, padding: 12,
+    shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  metricIconWrap: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.28)' },
-  metricValue: { fontSize: 24, fontWeight: '900', color: D.white },
-  metricLabel: { marginTop: 3, fontSize: 12.5, color: 'rgba(255,255,255,0.9)', fontWeight: '700' },
+  metricTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  metricIconWrap: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.25)' },
+  metricValue: { fontSize: 20, fontWeight: '900', color: D.white },
+  metricLabel: { fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: '700' },
 
   searchBox: { marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 14, backgroundColor: D.white, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
   searchInput: { flex: 1, fontSize: 15, color: D.ink, paddingVertical: 13 },
