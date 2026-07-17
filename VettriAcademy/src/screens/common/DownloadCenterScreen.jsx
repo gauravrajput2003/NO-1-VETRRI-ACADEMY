@@ -8,15 +8,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
+import Toast from 'react-native-toast-message';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { getDownloadResourcesAPI, getNcertResourcesAPI } from '../../services/api';
-import { checkBlockedSite, downloadFileToCache, getMimeType, normalizeMaterialFileUrl } from '../../utils/fileUtils';
+import { checkBlockedSite, silentDownloadFile, getMimeType, normalizeMaterialFileUrl } from '../../utils/fileUtils';
 import { API_BASE_URL } from '../../utils/constants';
 import { getToken } from '../../services/storage';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { scheduleDownloadCompleteNotification } from '../../services/pushNotifications';
 
 const TouchableOpacity = (props) => {
   const { particleCount = 20, size = "small", colors, children, ...rest } = props;
@@ -71,7 +73,9 @@ export default function DownloadCenterScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [grade, setGrade] = useState('All');
-  const [downloading, setDownloading] = useState(null);
+  const [downloading, setDownloading] = useState(null); // item._id being downloaded
+  const [dlProgress, setDlProgress] = useState({});      // { [itemId]: 0..1 }
+
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
   const insets = useSafeAreaInsets();
@@ -116,9 +120,9 @@ export default function DownloadCenterScreen({ navigation }) {
   };
 
   /**
-   * Download a study material file.
-   * Uses expo-file-system for streaming download to cache (avoids RAM issues),
-   * then opens share sheet via expo-sharing for saving/opening.
+   * Silent download — saves to app-private documentDirectory with no share dialog.
+   * Shows a progress bar on the card button, fires a local OS notification on
+   * completion, and shows an in-app Toast with an "Open" action.
    */
   const downloadFile = async (item) => {
     let directUrl = normalizeMaterialFileUrl(item.fileUrl, {
@@ -128,49 +132,57 @@ export default function DownloadCenterScreen({ navigation }) {
     if (!directUrl) { Alert.alert('Error', 'No download URL available'); return; }
     try {
       setDownloading(item._id);
+      setDlProgress((prev) => ({ ...prev, [item._id]: 0 }));
 
-      // Open Cloudinary directly on web; native downloads to cache and shares.
+      // Web: open in browser (no file-system access on web)
       if (Platform.OS === 'web') {
         await Linking.openURL(directUrl);
-      } else {
-        const filename = item.originalFilename || `${item.title}.${item.extension || 'pdf'}`;
-        let file;
-        try {
-          file = await downloadFileToCache(directUrl, filename);
-        } catch (downloadErr) {
-          const statusText = String(downloadErr?.message || '');
-          const shouldRetryViaBackend =
-            statusText.includes('401') || statusText.includes('403') || statusText.includes('404');
-
-          if (!shouldRetryViaBackend || !item?._id) {
-            throw downloadErr;
-          }
-
-          const token = await getToken();
-          if (!token) {
-            throw downloadErr;
-          }
-
-          const proxyUrl = `${API_BASE_URL}/student/materials/${item._id}/direct-download`;
-          file = await downloadFileToCache(proxyUrl, filename, undefined, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(file.uri, {
-            mimeType: getMimeType(filename),
-            dialogTitle: `Save ${filename}`,
-          });
-        } else {
-          Alert.alert('Downloaded', `File saved: ${filename}`);
-        }
+        return;
       }
+
+      const filename = item.originalFilename || `${item.title}.${item.extension || 'pdf'}`;
+      let file;
+
+      try {
+        file = await silentDownloadFile(directUrl, filename, (pct) => {
+          setDlProgress((prev) => ({ ...prev, [item._id]: pct }));
+        });
+      } catch (downloadErr) {
+        // Retry via authenticated backend proxy if Cloudinary returns 401/403/404
+        const statusText = String(downloadErr?.message || '');
+        const shouldRetryViaBackend =
+          statusText.includes('401') || statusText.includes('403') || statusText.includes('404');
+        if (!shouldRetryViaBackend || !item?._id) throw downloadErr;
+        const token = await getToken();
+        if (!token) throw downloadErr;
+        const proxyUrl = `${API_BASE_URL}/student/materials/${item._id}/direct-download`;
+        file = await silentDownloadFile(proxyUrl, filename, (pct) => {
+          setDlProgress((prev) => ({ ...prev, [item._id]: pct }));
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+
+      // 1. Fire local OS notification (heads-up banner in status bar)
+      await scheduleDownloadCompleteNotification(filename, file.uri);
+
+      // 2. In-app Toast — tapping it opens the file with the native viewer
+      Toast.show({
+        type: 'success',
+        text1: '✅ Download Complete',
+        text2: `${filename} — tap to open`,
+        visibilityTime: 5000,
+        onPress: async () => {
+          try {
+            const canShare = await Sharing.isAvailableAsync();
+            if (canShare) await Sharing.shareAsync(file.uri, { mimeType: getMimeType(filename) });
+          } catch (e) { console.warn('Could not open file:', e); }
+        },
+      });
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to download file');
     } finally {
       setDownloading(null);
+      setDlProgress((prev) => { const n = { ...prev }; delete n[item._id]; return n; });
     }
   };
 
@@ -298,7 +310,16 @@ export default function DownloadCenterScreen({ navigation }) {
         </View>
         <TouchableOpacity style={styles.dlBtnWrap} onPress={() => downloadFile(item)} disabled={isDownloading}>
           <LinearGradient colors={[P.teal, P.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dlBtn}>
-            {isDownloading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="download-outline" size={18} color="#fff" />}
+            {isDownloading ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', width: 40, height: 40 }}>
+                <ActivityIndicator size="small" color="#fff" />
+                {dlProgress[item._id] > 0 && (
+                  <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', position: 'absolute' }}>
+                    {Math.round((dlProgress[item._id] || 0) * 100)}%
+                  </Text>
+                )}
+              </View>
+            ) : <Ionicons name="download-outline" size={18} color="#fff" />}
           </LinearGradient>
         </TouchableOpacity>
       </TouchableOpacity>

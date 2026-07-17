@@ -245,6 +245,89 @@ const webDownloadFile = (url) => {
 };
 
 /**
+ * NATIVE ONLY: Download a file silently to app-private persistent storage
+ * (documentDirectory) with no OS share/save dialog.
+ *
+ * - Uses createDownloadResumable for progress callbacks
+ * - Saves to documentDirectory (survives app restarts, no user dialog)
+ * - Returns { uri, filename, size, cached }
+ * - Web: falls back to browser download (no-op for web builds)
+ *
+ * After calling this, the caller should:
+ *   1. Show an in-app Toast with an "Open" button (Sharing.shareAsync)
+ *   2. Fire a local OS notification via scheduleDownloadCompleteNotification()
+ *
+ * @param {string}   url         Full URL to download
+ * @param {string}   filename    Desired filename (sanitised internally)
+ * @param {function} onProgress  (0..1) progress callback, called during download
+ * @param {object}   options     Optional: { headers: {} }
+ */
+export const silentDownloadFile = async (url, filename, onProgress, options = {}) => {
+  if (!url) throw new Error('No download URL provided');
+  const headers = options?.headers || {};
+
+  // WEB: Trigger browser download — expo-file-system not available on web
+  if (isWeb) {
+    webDownloadFile(url, filename);
+    return { uri: url, filename: filename || 'download', size: 0, cached: false, web: true };
+  }
+
+  const FileSystem = require('expo-file-system');
+  const LegacyFS = require('expo-file-system/legacy');
+  const safeFilename = (filename || 'download').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  // documentDirectory: app-private, persistent across restarts, no dialog
+  const docDirectory = LegacyFS.documentDirectory || FileSystem.documentDirectory;
+  const localUri = docDirectory + safeFilename;
+
+  // Return cached copy if already downloaded
+  try {
+    const getInfoAsync = LegacyFS.getInfoAsync || FileSystem.getInfoAsync;
+    const fileInfo = await getInfoAsync(localUri);
+    if (fileInfo.exists && fileInfo.size > 0) {
+      if (onProgress) onProgress(1);
+      return { uri: localUri, filename: safeFilename, size: fileInfo.size, cached: true };
+    }
+  } catch (e) { /* not cached — proceed to download */ }
+
+  let result;
+  const createDownloadResumable =
+    LegacyFS.createDownloadResumable || FileSystem.createDownloadResumable;
+
+  if (typeof createDownloadResumable === 'function') {
+    const downloadResumable = createDownloadResumable(
+      url,
+      localUri,
+      { headers },
+      (progress) => {
+        if (onProgress && progress.totalBytesExpectedToWrite > 0) {
+          const pct = progress.totalBytesWritten / progress.totalBytesExpectedToWrite;
+          onProgress(pct);
+        }
+      }
+    );
+    result = await downloadResumable.downloadAsync();
+  } else {
+    // Fallback for Expo environments where createDownloadResumable is unavailable
+    result = await (LegacyFS.downloadAsync || FileSystem.downloadAsync)(url, localUri, { headers });
+    if (onProgress) onProgress(1);
+  }
+
+  if (!result || (result.status && result.status !== 200 && result.status !== 201)) {
+    throw new Error(`Download failed with status: ${result?.status || 'unknown'}`);
+  }
+
+  let size = 0;
+  try {
+    const getInfoAsync = LegacyFS.getInfoAsync || FileSystem.getInfoAsync;
+    const dlInfo = await getInfoAsync(result.uri);
+    size = dlInfo.size || 0;
+  } catch (e) { /* ignore size check failure */ }
+
+  return { uri: result.uri, filename: safeFilename, size, cached: false };
+};
+
+/**
  * Download a file. Platform-aware:
  * - Web: triggers browser download via anchor tag
  * - Native: downloads to cache using expo-file-system, returns { uri, filename, size }

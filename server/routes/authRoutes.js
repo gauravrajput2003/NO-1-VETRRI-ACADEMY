@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, logout, getMe, refreshAccessToken, getCoursesMeta } = require('../controllers/authController');
+const { register, login, logout, getMe, refreshAccessToken, getCoursesMeta, savePushToken } = require('../controllers/authController');
+
 const { authLimiter } = require('../middleware/rateLimiter');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
@@ -37,5 +38,8 @@ router.post('/refresh', refreshAccessToken);
 
 // GET /api/auth/courses/meta
 router.get('/courses/meta', getCoursesMeta);
+
+// PUT /api/auth/push-token  (saves/refreshes Expo push token after login)
+router.put('/push-token', verifyToken, savePushToken);
 
 module.exports = router;

@@ -31,10 +31,13 @@ import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate, formatFileSize } from '../../utils/formatters';
 import { fetchPreviewUrl, fetchDownloadUrl } from '../../redux/slices/materialsSlice';
-import {
-  detectFileType, getPreviewStrategy, downloadAndOpenFile,
+import { 
+  detectFileType, getPreviewStrategy, downloadAndOpenFile, silentDownloadFile,
   FILE_TYPE_ICONS, normalizeMaterialFileUrl,
 } from '../../utils/fileUtils';
+import { scheduleDownloadCompleteNotification } from '../../services/pushNotifications';
+import * as Sharing from 'expo-sharing';
+
 import { getSignedPdfUrlAPI } from '../../services/api';
 import { getToken } from '../../services/storage';
 import { API_BASE_URL } from '../../utils/constants';
@@ -185,16 +188,26 @@ export default function MaterialDetailScreen({ route, navigation }) {
         });
         break;
 
-      case 'download-open':
-        // Download and open with native app
+      case 'download-open': {
+        // Download silently then notify — same pattern as the download button
+        const dlFilename = material?.originalFilename || `${material.title}.${material?.extension || 'bin'}`;
         try {
           setDownloading(true);
           setDlProgress(0);
-          await downloadAndOpenFile(
-            url,
-            material?.originalFilename || `${material.title}.${material?.extension || 'bin'}`,
-            (p) => setDlProgress(p),
-          );
+          const file = await silentDownloadFile(url, dlFilename, (p) => setDlProgress(p));
+          await scheduleDownloadCompleteNotification(dlFilename, file.uri);
+          Toast.show({
+            type: 'success',
+            text1: '✅ Download Complete',
+            text2: `${dlFilename} — tap to open`,
+            visibilityTime: 5000,
+            onPress: async () => {
+              try {
+                const canShare = await Sharing.isAvailableAsync();
+                if (canShare) await Sharing.shareAsync(file.uri, { mimeType: getMimeType ? getMimeType(dlFilename) : 'application/octet-stream' });
+              } catch (e) { console.warn('Could not open file:', e); }
+            },
+          });
         } catch (e) {
           Toast.show({ type: 'error', text1: 'Download Failed', text2: e.message });
         } finally {
@@ -202,6 +215,7 @@ export default function MaterialDetailScreen({ route, navigation }) {
           setDlProgress(0);
         }
         break;
+      }
 
       case 'external':
         // Open in external browser (blocked sites)
@@ -219,7 +233,7 @@ export default function MaterialDetailScreen({ route, navigation }) {
     }
   };
 
-  // ─── Download Handler ───────────────────────────────────────────────────────
+  // ─── Download Handler (silent — no share sheet) ────────────────────────────
   const handleDownload = async () => {
     if (material.isLocked) {
       Toast.show({ type: 'error', text1: 'Material Locked 🔒', text2: 'This material has not been unlocked yet.' });
@@ -254,7 +268,6 @@ export default function MaterialDetailScreen({ route, navigation }) {
           });
           return;
         }
-
         directUrl = normalizeMaterialFileUrl(result.payload?.url, {
           resourceType: result.payload?.resourceType || material?.resourceType,
           publicId: material?.publicId,
@@ -265,44 +278,56 @@ export default function MaterialDetailScreen({ route, navigation }) {
         Toast.show({ type: 'error', text1: 'Download Failed', text2: 'No file URL available for this material' });
         return;
       }
+
       const filename = material?.originalFilename || `${material.title}.${material?.extension || 'bin'}`;
+
+      let file;
       try {
-        await downloadAndOpenFile(directUrl, filename, (p) => setDlProgress(p));
+        file = await silentDownloadFile(directUrl, filename, (p) => setDlProgress(p));
       } catch (downloadErr) {
         const statusText = String(downloadErr?.message || '');
-        const shouldRetryWithPreview =
+        const shouldRetry =
           statusText.includes('401') || statusText.includes('403') || statusText.includes('404');
 
-        if (!shouldRetryWithPreview) {
-          throw downloadErr;
-        }
+        if (!shouldRetry) throw downloadErr;
 
         const previewResult = await dispatch(fetchPreviewUrl(material._id));
-        if (!fetchPreviewUrl.fulfilled.match(previewResult)) {
-          throw downloadErr;
+        if (fetchPreviewUrl.fulfilled.match(previewResult)) {
+          const previewUrl = normalizeMaterialFileUrl(previewResult.payload?.url, {
+            resourceType: material?.resourceType,
+            publicId: material?.publicId,
+          });
+          if (previewUrl && previewUrl !== directUrl) {
+            file = await silentDownloadFile(previewUrl, filename, (p) => setDlProgress(p));
+          }
         }
 
-        const previewUrl = normalizeMaterialFileUrl(previewResult.payload?.url, {
-          resourceType: material?.resourceType,
-          publicId: material?.publicId,
-        });
-
-        if (!previewUrl || previewUrl === directUrl) {
+        if (!file) {
           const token = await getToken();
           if (!token) throw downloadErr;
-
           const proxyUrl = `${API_BASE_URL}/student/materials/${material._id}/direct-download`;
-          await downloadAndOpenFile(
-            proxyUrl,
-            filename,
-            (p) => setDlProgress(p),
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          return;
+          file = await silentDownloadFile(proxyUrl, filename, (p) => setDlProgress(p), {
+            headers: { Authorization: `Bearer ${token}` },
+          });
         }
-
-        await downloadAndOpenFile(previewUrl, filename, (p) => setDlProgress(p));
       }
+
+      // 1. Local OS notification (status bar heads-up banner)
+      await scheduleDownloadCompleteNotification(filename, file.uri);
+
+      // 2. In-app Toast — tapping opens the file
+      Toast.show({
+        type: 'success',
+        text1: '✅ Download Complete',
+        text2: `${filename} — tap to open`,
+        visibilityTime: 5000,
+        onPress: async () => {
+          try {
+            const canShare = await Sharing.isAvailableAsync();
+            if (canShare) await Sharing.shareAsync(file.uri, { mimeType: getMimeType(filename) });
+          } catch (e) { console.warn('Could not open file:', e); }
+        },
+      });
     } catch (e) {
       Toast.show({ type: 'error', text1: 'Download Failed', text2: e.message || 'An error occurred' });
     } finally {

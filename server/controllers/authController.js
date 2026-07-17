@@ -272,6 +272,34 @@ const getCoursesMeta = async (req, res) => {
   }
 };
 
+// ─── Save / Refresh Expo Push Token ──────────────────────────────────────────
+/**
+ * PUT /api/auth/push-token
+ * Saves or refreshes the Expo push token for the authenticated user.
+ * Called by the app on login and whenever the token refreshes.
+ * Validates that the token looks like a valid Expo push token before saving.
+ */
+const savePushToken = async (req, res) => {
+  try {
+    const { expoPushToken } = req.body;
+
+    if (!expoPushToken || typeof expoPushToken !== 'string') {
+      return res.status(400).json({ success: false, message: 'expoPushToken is required' });
+    }
+
+    // Basic validation — Expo tokens always start with "ExponentPushToken["
+    if (!expoPushToken.startsWith('ExponentPushToken[')) {
+      return res.status(400).json({ success: false, message: 'Invalid Expo push token format' });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, { expoPushToken });
+
+    res.json({ success: true, message: 'Push token saved' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -279,4 +307,5 @@ module.exports = {
   getMe,
   refreshAccessToken,
   getCoursesMeta,
+  savePushToken,
 };

@@ -708,4 +708,14 @@ export const uploadDoubtAttachmentAPI = async ({ uri, name, type }) => {
   return { data };
 };
 
+// ─── Push Notifications ────────────────────────────────────────────────────────
+/**
+ * Save or refresh the Expo push token for the current authenticated user.
+ * Called once after login and whenever expo-notifications refreshes the token.
+ *
+ * @param {string} expoPushToken  e.g. "ExponentPushToken[xxx]"
+ */
+export const savePushTokenAPI = (expoPushToken) =>
+  api.put('/auth/push-token', { expoPushToken });
+
 export default api;

@@ -1,5 +1,7 @@
 const Announcement = require('../models/Announcement');
 const AnnouncementRead = require('../models/AnnouncementRead');
+const User = require('../models/User');
+const { sendPushNotifications } = require('../services/pushService');
 
 const DEFAULT_MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS = 30;
 const parsedMaxAgeDays = Number.parseInt(process.env.MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS, 10);
@@ -22,6 +24,37 @@ const createAnnouncement = async (req, res) => {
     } else if (targetRole === 'teacher') {
       io.emit('announcement:new', { announcement: { ...announcement.toObject() } });
     }
+
+    // ─── Push Notification (fire-and-forget, never blocks response) ───────────
+    // Runs asynchronously so the HTTP response is never delayed.
+    (async () => {
+      try {
+        // Build role filter: 'all' targets both students and teachers
+        const roleFilter = targetRole === 'all'
+          ? { role: { $in: ['student', 'teacher'] } }
+          : { role: targetRole };
+
+        const users = await User.find({
+          ...roleFilter,
+          expoPushToken: { $ne: null, $exists: true },
+          isActive: true,
+        }).select('expoPushToken').lean();
+
+        const tokens = users.map((u) => u.expoPushToken).filter(Boolean);
+
+        if (tokens.length > 0) {
+          const result = await sendPushNotifications(tokens, {
+            title: `📢 ${title}`,
+            body: content.substring(0, 150),
+            data: { type: 'announcement', announcementId: String(announcement._id) },
+          });
+          console.log(`[Push] Announcement sent: ${result.sent} ok, ${result.failed} failed`);
+        }
+      } catch (pushErr) {
+        // Never let push errors affect the announcement creation flow
+        console.error('[Push] Announcement push failed:', pushErr.message);
+      }
+    })();
 
     res.status(201).json({ success: true, announcement });
   } catch (error) {

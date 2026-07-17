@@ -80,7 +80,7 @@ const uploadTrainingVideoByUrl = async (req, res) => {
 
     if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
     if (!videoUrl) return res.status(400).json({ success: false, message: 'videoUrl is required.' });
-
+  
     let nextOrder = parseInt(order) || 0;
     if (!order) {
       const last = await TrainingVideo.findOne().sort({ order: -1 }).select('order');

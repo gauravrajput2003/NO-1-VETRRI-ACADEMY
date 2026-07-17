@@ -31,8 +31,14 @@
       "expo-font",
       "@react-native-community/datetimepicker",
       "expo-audio",
-      "expo-video",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "color": "#0A1628",
+          "defaultChannel": "vettri-default"
+        }
+      ]
     ],
     "extra": {
       "eas": {

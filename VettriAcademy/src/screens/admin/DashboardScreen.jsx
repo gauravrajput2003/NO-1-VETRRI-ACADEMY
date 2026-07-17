@@ -22,7 +22,6 @@ Image.prefetch(Object.values(ASSETS));
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Shadow } from 'react-native-shadow-2';
 import { Colors } from '../../utils/colors';
 import { fetchAdminStats } from '../../redux/slices/adminSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
@@ -73,18 +72,26 @@ function ActionButton({ icon, badge, onPress, isGold = false, delay = 0 }) {
 
   return (
     <FadeInDown delay={delay}>
-      <Shadow distance={10} startColor={'#00000010'} offset={[0, 4]} style={{ borderRadius: 26 }}>
-        <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={1}>
-          <Animated.View style={[styles.actionBtn, { transform: [{ scale }] }]}>
-            <Ionicons name={icon} size={24} color={isGold ? "#F8C24E" : "#FFF"} />
-            {badge > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{badge}</Text>
-              </View>
-            )}
-          </Animated.View>
-        </TouchableOpacity>
-      </Shadow>
+      <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={1}>
+        <Animated.View style={[
+          styles.actionBtn,
+          { transform: [{ scale }] },
+          {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
+            elevation: 4
+          }
+        ]}>
+          <Ionicons name={icon} size={24} color={isGold ? "#F8C24E" : "#FFF"} />
+          {badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </TouchableOpacity>
     </FadeInDown>
   );
 }
@@ -113,30 +120,39 @@ function PremiumCard({ title, subtitle, value, icon, gradient, onPress, width, h
 
   return (
     <FadeInUp delay={delay}>
-      <Shadow distance={10} startColor={'#0000000A'} offset={[0, 6]} style={{ borderRadius: 24, width: width || '100%' }}>
-        <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={1}>
-          <Animated.View style={[{ transform: [{ scale }] }, styles.cardBase, { width: width || '100%', height }]}>
-            <LinearGradient colors={gradient} style={styles.cardGradient}>
-              <View style={styles.cardTop}>
-                {title && <Text style={styles.cardTitle}>{title}</Text>}
-                {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
-                {value !== undefined && <Text style={styles.cardValue}>{value}</Text>}
+      <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={1}>
+        <Animated.View style={[
+          { transform: [{ scale }] },
+          styles.cardBase,
+          { width: width || '100%', height },
+          {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            elevation: 4
+          }
+        ]}>
+          <LinearGradient colors={gradient} style={styles.cardGradient}>
+            <View style={styles.cardTop}>
+              {title && <Text style={styles.cardTitle}>{title}</Text>}
+              {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
+              {value !== undefined && <Text style={styles.cardValue}>{value}</Text>}
+            </View>
+            
+            {icon && <Image source={icon} style={[styles.cardImage, (!title && !subtitle && value === undefined) && styles.cardImageFull]} contentFit="contain" transition={200} cachePolicy="memory-disk" />}
+            
+            <View style={styles.cardFooter}>
+              <Text style={styles.cardFooterText}>{footerText}</Text>
+              <View style={styles.glassArrowBtn}>
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                </Animated.View>
               </View>
-              
-              {icon && <Image source={icon} style={[styles.cardImage, (!title && !subtitle && value === undefined) && styles.cardImageFull]} contentFit="contain" transition={200} cachePolicy="memory-disk" />}
-              
-              <View style={styles.cardFooter}>
-                <Text style={styles.cardFooterText}>{footerText}</Text>
-                <View style={styles.glassArrowBtn}>
-                  <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                    <Ionicons name="arrow-forward" size={16} color="#FFF" />
-                  </Animated.View>
-                </View>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-        </TouchableOpacity>
-      </Shadow>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      </TouchableOpacity>
     </FadeInUp>
   );
 }

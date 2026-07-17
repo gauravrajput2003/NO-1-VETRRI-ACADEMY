@@ -106,7 +106,8 @@ const userSchema = new mongoose.Schema(
     lastLoginDate: { type: String }, // YYYY-MM-DD
 
     // Push notifications
-    deviceTokens: [{ type: String }],
+    deviceTokens: [{ type: String }], // legacy — kept for backward compat
+    expoPushToken: { type: String, default: null }, // current Expo push token (refreshed on login)
 
     // Soft delete
     deactivatedAt: { type: Date },
