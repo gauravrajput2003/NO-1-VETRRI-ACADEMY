@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "314308827935",
+    "project_id": "no-1-vettri-academy",
+    "storage_bucket": "no-1-vettri-academy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314308827935:android:a33f1024779bdb7ba76e2a",
+        "android_client_info": {
+          "package_name": "com.vettriacademy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOGW4pcXybe0xagrDBOLAHsMEQErLp8oc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
