@@ -7,6 +7,7 @@ const {
   getAllTeachers,
   updateStudent,
   approveTeacher,
+  updateTeacher,
   deleteTeacher,
   deleteStudent,
   getAdminStats,
@@ -24,6 +25,7 @@ const {
   getBestTeacher,
   gradeTeacher,
   getLiveMonitor,
+  approveCompensationClass,
 } = require('../controllers/leaveController');
 const {
   getAdminSalaryDashboard,
@@ -54,6 +56,7 @@ router.delete('/students/:id', deleteStudent);
 // Teachers
 router.get('/teachers', getAllTeachers);
 router.put('/teachers/:id/approve', approveTeacher);
+router.put('/teachers/:id', updateTeacher);
 router.delete('/teachers/:id', deleteTeacher);
 
 // Live monitor
@@ -87,6 +90,7 @@ router.put('/enquiries/:id', updateEnquiryStatus);
 // Leave approvals
 router.get('/leaves', getAllLeaves);
 router.put('/leaves/:id', updateLeaveStatus);
+router.patch('/leaves/:id/compensation/status', approveCompensationClass);
 
 // Best teacher
 router.get('/best-teacher', getBestTeacher);

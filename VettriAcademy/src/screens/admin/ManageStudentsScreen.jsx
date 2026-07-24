@@ -21,7 +21,7 @@ import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../utils/colors';
 import { getInitials } from '../../utils/formatters';
-import { fetchAdminStudents, editStudent, deleteStudent } from '../../redux/slices/adminSlice';
+import { fetchAdminStudents, fetchAdminTeachers, editStudent, deleteStudent } from '../../redux/slices/adminSlice';
 import { registerAPI } from '../../services/api';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
@@ -83,7 +83,7 @@ export default function ManageStudentsScreen({ navigation }) {
   const dispatch = useDispatch();
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
-  const { students, studentsPagination, loading } = useSelector((s) => s.admin);
+  const { students, teachers, studentsPagination, loading } = useSelector((s) => s.admin);
   const theme = useSelector((s) => s.ui.theme);
   const insets = useSafeAreaInsets();
   const r = useResponsive();
@@ -100,7 +100,7 @@ export default function ManageStudentsScreen({ navigation }) {
   const [editBoardQuery, setEditBoardQuery] = useState('');
   const [showEditBoardSuggestions, setShowEditBoardSuggestions] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', password: '', grade: '', board: '' });
+  const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
   const [createGradeQuery, setCreateGradeQuery] = useState('');
   const [showCreateGradeSuggestions, setShowCreateGradeSuggestions] = useState(false);
   const [createBoardQuery, setCreateBoardQuery] = useState('');
@@ -108,7 +108,10 @@ export default function ManageStudentsScreen({ navigation }) {
 
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
 
-  useEffect(() => { dispatch(fetchAdminStudents({ search })); }, [search]);
+  useEffect(() => {
+    dispatch(fetchAdminStudents({ search }));
+    dispatch(fetchAdminTeachers());
+  }, [search]);
 
   const filterBoards = (query) => {
     const q = (query || '').trim().toLowerCase();
@@ -155,10 +158,11 @@ export default function ManageStudentsScreen({ navigation }) {
         password: createData.password,
         grade: createData.grade.trim() || undefined,
         board: createData.board.trim() || undefined,
+        assignedTeacher: createData.assignedTeacher || undefined,
       });
       Toast.show({ type: 'success', text1: 'Student account created ✅' });
       setShowCreateModal(false);
-      setCreateData({ name: '', mobile: '', email: '', password: '', grade: '', board: '' });
+      setCreateData({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
       setCreateGradeQuery('');
       setShowCreateGradeSuggestions(false);
       setCreateBoardQuery('');
@@ -347,6 +351,10 @@ export default function ManageStudentsScreen({ navigation }) {
                   <Ionicons name="book-outline" size={18} color={B.teal} />
                   <Text style={styles.viewRowText}>{viewModal?.board || 'N/A'}</Text>
                 </View>
+                <View style={styles.viewRow}>
+                  <Ionicons name="person-outline" size={18} color={B.purple} />
+                  <Text style={styles.viewRowText}>Teacher: {viewModal?.assignedTeacher?.name || 'Unassigned'}</Text>
+                </View>
               </View>
 
               <View style={styles.viewSection}>
@@ -386,7 +394,18 @@ export default function ManageStudentsScreen({ navigation }) {
                   const item = viewModal;
                   setViewModal(null);
                   setEditModal(item);
-                  setEditData({ grade: item.grade || '', board: item.board || '', feeAmount: item.feeAmount || '', feeFrequency: item.feeFrequency || 'monthly', feeDueDate: item.feeDueDate || 1, feeNotes: item.feeNotes || '' });
+                  setEditData({
+                    name: item.name || '',
+                    mobile: item.mobile || '',
+                    email: item.email || '',
+                    grade: item.grade || '',
+                    board: item.board || '',
+                    assignedTeacher: item.assignedTeacher?._id || item.assignedTeacher || '',
+                    feeAmount: item.feeAmount || '',
+                    feeFrequency: item.feeFrequency || 'monthly',
+                    feeDueDate: item.feeDueDate || 1,
+                    feeNotes: item.feeNotes || '',
+                  });
                   setEditGradeQuery(item.grade || '');
                   setEditBoardQuery(item.board || '');
                 }}
@@ -409,6 +428,28 @@ export default function ManageStudentsScreen({ navigation }) {
             keyboardShouldPersistTaps="handled"
           >
             <Text style={[styles.modalTitle, { color: textColor }]}>Edit {editModal?.name}</Text>
+
+            <Text style={[styles.label, { color: textColor }]}>Name</Text>
+            <TextInput
+              style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]}
+              value={editData.name}
+              onChangeText={(v) => setEditData({ ...editData, name: v })}
+            />
+
+            <Text style={[styles.label, { color: textColor }]}>Mobile / Reg No.</Text>
+            <TextInput
+              style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]}
+              value={editData.mobile}
+              onChangeText={(v) => setEditData({ ...editData, mobile: v })}
+            />
+
+            <Text style={[styles.label, { color: textColor }]}>Email</Text>
+            <TextInput
+              style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]}
+              value={editData.email}
+              onChangeText={(v) => setEditData({ ...editData, email: v })}
+            />
+
             <Text style={[styles.label, { color: textColor }]}>Grade</Text>
             <View style={styles.boardAutocompleteWrap}>
               <TextInput
@@ -442,6 +483,7 @@ export default function ManageStudentsScreen({ navigation }) {
                 </ScrollView>
               )}
             </View>
+
             <Text style={[styles.label, { color: textColor }]}>Board</Text>
             <View style={styles.boardAutocompleteWrap}>
               <TextInput
@@ -475,6 +517,26 @@ export default function ManageStudentsScreen({ navigation }) {
                 </ScrollView>
               )}
             </View>
+
+            <Text style={[styles.label, { color: textColor }]}>Assigned Teacher</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <TouchableOpacity
+                style={[styles.teacherChip, !editData.assignedTeacher && styles.teacherChipActive]}
+                onPress={() => setEditData({ ...editData, assignedTeacher: '' })}
+              >
+                <Text style={[styles.teacherChipText, !editData.assignedTeacher && styles.teacherChipTextActive]}>Unassigned</Text>
+              </TouchableOpacity>
+              {(teachers || []).map((t) => (
+                <TouchableOpacity
+                  key={t._id}
+                  style={[styles.teacherChip, editData.assignedTeacher === t._id && styles.teacherChipActive]}
+                  onPress={() => setEditData({ ...editData, assignedTeacher: t._id })}
+                >
+                  <Text style={[styles.teacherChipText, editData.assignedTeacher === t._id && styles.teacherChipTextActive]}>{t.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
             <Text style={[styles.label, { color: textColor }]}>Fee Amount</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={String(editData.feeAmount ?? '')} onChangeText={(v) => setEditData({ ...editData, feeAmount: v })} placeholder="e.g. 5000" placeholderTextColor={Colors.mediumGray} keyboardType="numeric" />
             <Text style={[styles.label, { color: textColor }]}>Fee Frequency</Text>
@@ -483,6 +545,7 @@ export default function ManageStudentsScreen({ navigation }) {
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={String(editData.feeDueDate ?? 1)} onChangeText={(v) => setEditData({ ...editData, feeDueDate: v })} placeholder="1-31" placeholderTextColor={Colors.mediumGray} keyboardType="numeric" />
             <Text style={[styles.label, { color: textColor }]}>Fee Notes</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={editData.feeNotes} onChangeText={(v) => setEditData({ ...editData, feeNotes: v })} placeholder="Optional note" placeholderTextColor={Colors.mediumGray} />
+
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditModal(null)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={styles.confirmBtn} onPress={handleEdit}><Text style={styles.confirmText}>Save</Text></TouchableOpacity>
@@ -576,6 +639,24 @@ export default function ManageStudentsScreen({ navigation }) {
                 </ScrollView>
               )}
             </View>
+            <Text style={[styles.label, { color: textColor }]}>Assigned Teacher</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <TouchableOpacity
+                style={[styles.teacherChip, !createData.assignedTeacher && styles.teacherChipActive]}
+                onPress={() => setCreateData({ ...createData, assignedTeacher: '' })}
+              >
+                <Text style={[styles.teacherChipText, !createData.assignedTeacher && styles.teacherChipTextActive]}>Unassigned</Text>
+              </TouchableOpacity>
+              {(teachers || []).map((t) => (
+                <TouchableOpacity
+                  key={`create-t-${t._id}`}
+                  style={[styles.teacherChip, createData.assignedTeacher === t._id && styles.teacherChipActive]}
+                  onPress={() => setCreateData({ ...createData, assignedTeacher: t._id })}
+                >
+                  <Text style={[styles.teacherChipText, createData.assignedTeacher === t._id && styles.teacherChipTextActive]}>{t.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCreateModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={styles.confirmBtn} onPress={handleCreate}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>
@@ -771,5 +852,9 @@ function createStyles(r) {
     confirmText: { fontSize: 15, fontWeight: '700', color: B.white },
     deleteModalBtn: { flex: 1.2, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
     deleteModalBtnText: { fontSize: 15, fontWeight: '700', color: '#DC2626' },
+    teacherChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+    teacherChipActive: { backgroundColor: B.pink, borderColor: B.pink },
+    teacherChipText: { fontSize: 13, fontWeight: '600', color: B.sec },
+    teacherChipTextActive: { color: B.white },
   });
 }

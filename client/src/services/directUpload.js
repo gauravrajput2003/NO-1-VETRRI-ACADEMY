@@ -12,6 +12,7 @@ import {
 export const getResourceType = (mimeType = '') => {
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('audio/')) return 'video'; // Cloudinary stores audio under "video"
   return 'raw'; // PDF, docs, zip, etc.
 };
 

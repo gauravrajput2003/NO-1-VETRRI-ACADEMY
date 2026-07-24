@@ -2,11 +2,22 @@ const Notification = require('../models/Notification');
 
 const getNotifications = async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
     const notifications = await Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })
-      .limit(20)
+      .skip(skip)
+      .limit(limit)
       .populate('sender', 'name displayName profilePic');
-    res.json({ success: true, notifications });
+
+    res.json({
+      success: true,
+      notifications,
+      page,
+      hasMore: notifications.length === limit,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -39,4 +50,19 @@ const markAllRead = async (req, res) => {
   }
 };
 
-module.exports = { getNotifications, getUnreadCount, markRead, markAllRead };
+const deleteNotification = async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      recipient: req.user._id,
+    });
+    if (!notification) {
+      return res.status(404).json({ success: false, message: 'Notification not found.' });
+    }
+    res.json({ success: true, notification });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getNotifications, getUnreadCount, markRead, markAllRead, deleteNotification };

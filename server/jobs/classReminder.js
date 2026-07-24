@@ -16,6 +16,8 @@ function runWithTimeout(fn, timeoutMs) {
 async function runClassReminderCycle(io) {
   const ClassSchedule = require('../models/ClassSchedule');
   const Notification = require('../models/Notification');
+  const User = require('../models/User');
+  const { sendPushNotifications } = require('../services/pushService');
 
   const now = new Date();
   const today = now.toISOString().split('T')[0];
@@ -64,12 +66,35 @@ async function runClassReminderCycle(io) {
       }));
 
       if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
-        const room = `course_${cls.course}_${cls.grade}`;
-        io.to(room).emit('notification:new', {
-          type: 'class_starting',
-          title: `Class starting in 15 min: ${cls.subject}`,
-          classId: cls._id,
+        const studentsWithTokens = await User.find({
+          _id: { $in: cls.studentIds },
+          expoPushToken: { $exists: true, $ne: null },
+        })
+          .select('_id expoPushToken')
+          .lean();
+
+        const createdNotifs = await Notification.insertMany(notifications);
+
+        if (studentsWithTokens.length > 0) {
+          try {
+            await sendPushNotifications(
+              studentsWithTokens.map((student) => student.expoPushToken),
+              {
+                title: `Class starting in 15 min: ${cls.subject}`,
+                body: `Your ${cls.subject} class starts at ${cls.scheduledTime}. Get ready!`,
+                data: {
+                  type: 'class_starting',
+                  classId: cls._id.toString(),
+                },
+              }
+            );
+          } catch (pushError) {
+            console.error(`[CRON][classReminder] Expo push failed for class ${cls._id}: ${pushError.message}`);
+          }
+        }
+
+        createdNotifs.forEach((notif) => {
+          io.to(`user:${notif.recipient}`).emit('notification:new', notif);
         });
       }
     }

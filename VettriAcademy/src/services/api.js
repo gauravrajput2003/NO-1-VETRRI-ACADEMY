@@ -208,8 +208,8 @@ export const getUnreadCountAPI = () =>
   api.get('/chat/unread-count');
 
 // Notifications
-export const getNotificationsAPI = () =>
-  api.get('/notifications');
+export const getNotificationsAPI = (page = 1, limit = 20) =>
+  api.get('/notifications', { params: { page, limit } });
 
 export const getUnreadNotificationCountAPI = () =>
   api.get('/notifications/unread-count');
@@ -219,6 +219,9 @@ export const markNotificationReadAPI = (id) =>
 
 export const markAllNotificationsReadAPI = () =>
   api.patch('/notifications/read-all');
+
+export const deleteNotificationAPI = (id) =>
+  api.delete(`/notifications/${id}`);
 
 // Profile
 export const getProfileAPI = () =>
@@ -297,6 +300,9 @@ export const applyTeacherLeaveAPI = (data) =>
 
 export const getTeacherLeavesAPI = () =>
   api.get('/teacher/leave');
+
+export const updateTeacherCompensationAPI = (id, data) =>
+  api.patch(`/teacher/leaves/${id}/compensation/status`, data);
 
 export const getTeacherSalaryCurrentMonthAPI = () =>
   api.get('/teacher/salary/current-month');
@@ -510,6 +516,9 @@ export const getAdminLeavesAPI = (params) =>
 export const updateLeaveStatusAPI = (id, data) =>
   api.put(`/admin/leaves/${id}`, data);
 
+export const approveAdminLeaveCompensationAPI = (id) =>
+  api.patch(`/admin/leaves/${id}/compensation/status`, { status: 'approved_by_admin' });
+
 // Materials (admin)
 export const getAdminMaterialsAPI = () =>
   api.get('/admin/materials');
@@ -558,6 +567,11 @@ export const getActiveAnnouncementsAPI = () =>
 
 export const markAnnouncementReadAPI = (id) =>
   api.post(`/announcements/${id}/read`);
+
+// Storage — Cloudinary signed upload params (shared with materials)
+export const getCloudinaryUploadParamsAPI = (data) =>
+  api.post('/storage/cloudinary/upload-params', data);
+
 
 // Class scheduling (admin)
 export const createScheduleAPI = (data) =>

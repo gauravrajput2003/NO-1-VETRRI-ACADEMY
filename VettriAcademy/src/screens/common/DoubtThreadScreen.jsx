@@ -25,6 +25,7 @@ import {
   postDoubtReply,
   upsertRealtimeReply,
   applyRealtimeStatus,
+  clearUnreadCount,
 } from '../../redux/slices/doubtsSlice';
 import {
   deleteDoubtContentAPI,
@@ -221,6 +222,7 @@ export default function DoubtThreadScreen({ route, navigation }) {
   const loadDetail = useCallback(() => {
     if (!doubtId) return;
     dispatch(fetchDoubtDetail(doubtId));
+    dispatch(clearUnreadCount(doubtId));
   }, [dispatch, doubtId]);
 
   useFocusEffect(

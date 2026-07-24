@@ -16,6 +16,7 @@ import {
   registerForPushNotifications,
 } from '../services/pushNotifications';
 import { savePushTokenAPI } from '../services/api';
+import { resolveNotificationTarget } from '../utils/notificationNavigation';
 
 import AuthNavigator from './AuthNavigator';
 import StudentNavigator from './StudentNavigator';
@@ -80,8 +81,7 @@ export default function RootNavigator() {
   // Handles ALL notification taps in one place to avoid listener conflicts.
   // Distinguishes type via notification data payload:
   //   { type: 'download_complete', fileUri }  → open the downloaded file
-  //   { type: 'announcement', announcementId } → navigate to Notifications screen
-  //   { type: 'fee_reminder' }                 → navigate to FeeStatus screen
+  //   everything else → resolveNotificationTarget + navigate
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
@@ -97,16 +97,10 @@ export default function RootNavigator() {
           } catch (e) {
             console.warn('[Push] Could not open downloaded file:', e.message);
           }
-        } else if (data.type === 'announcement') {
-          // Navigate to the Notifications screen where announcements are listed
-          // Small delay to let the app foreground before navigating
+        } else {
+          const { screen, params } = resolveNotificationTarget({ data });
           setTimeout(() => {
-            navigationRef.current?.navigate('Notifications');
-          }, 500);
-        } else if (data.type === 'fee_reminder') {
-          // Navigate to the Fee Status screen
-          setTimeout(() => {
-            navigationRef.current?.navigate('FeeStatus');
+            navigationRef.current?.navigate(screen, params);
           }, 500);
         }
       }
@@ -126,6 +120,11 @@ export default function RootNavigator() {
         type: 'info',
         text1: notif.title || 'Notification',
         text2: notif.message || '',
+        onPress: () => {
+          Toast.hide();
+          const { screen, params } = resolveNotificationTarget(notif);
+          navigationRef.current?.navigate(screen, params);
+        },
       });
     });
 

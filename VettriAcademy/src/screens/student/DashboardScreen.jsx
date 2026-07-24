@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator,
   Animated, Easing, StatusBar, Dimensions
 } from 'react-native';
+import { Image } from 'expo-image';
+import { WebView } from 'react-native-webview';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -122,6 +125,135 @@ function formatRelativeTime(value) {
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
+}
+
+// ─── Announcement Card with inline media ─────────────────────────────────────
+function formatMediaTime(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+function AnnouncementCard({ ann }) {
+  const images = (ann.media || []).filter((m) => m.type === 'image');
+  const videos = (ann.media || []).filter((m) => m.type === 'video');
+  const audios = (ann.media || []).filter((m) => m.type === 'audio');
+  const [activeVideo, setActiveVideo] = useState(null);
+
+  return (
+    <LinearGradient colors={['#FFFFFF', '#FFFBFC']} style={st.annCard}>
+      {/* Header row */}
+      <View style={st.annCardTop}>
+        <View style={st.annIconWrap}>
+          <Ionicons name="megaphone" size={22} color={D.pink} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={st.annTitle} numberOfLines={1}>{ann.title}</Text>
+          <Text style={st.annBody} numberOfLines={images.length > 0 || videos.length > 0 ? 2 : 4}>{ann.content}</Text>
+        </View>
+      </View>
+
+      {/* Images / Poster */}
+      {images.length > 0 && (
+        <>
+          <Image source={{ uri: images[0].url }} style={st.annMediaImg} contentFit="cover" />
+          {images.length > 1 && (
+            <Text style={st.annMoreImages}>+{images.length - 1} more image{images.length > 2 ? 's' : ''}</Text>
+          )}
+        </>
+      )}
+
+      {/* Video messages — thumbnail + tap to play (lazy WebView) */}
+      {videos.map((v, idx) => {
+        const playing = activeVideo === idx;
+        const thumb = v.thumbnail || v.url;
+        return (
+          <View key={`vid-${idx}`} style={st.annVideoWrap}>
+            {playing ? (
+              <WebView
+                source={{ uri: v.url }}
+                style={{ flex: 1 }}
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled
+                allowsFullscreenVideo
+              />
+            ) : (
+              <TouchableOpacity style={st.annVideoPoster} onPress={() => setActiveVideo(idx)} activeOpacity={0.9}>
+                <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                <View style={st.annVideoPlay}>
+                  <Ionicons name="play" size={28} color="#FFFFFF" />
+                </View>
+                {v.duration > 0 && (
+                  <View style={st.annVideoDur}>
+                    <Text style={st.annVideoDurText}>{formatMediaTime(v.duration)}</Text>
+                  </View>
+                )}
+                <Text style={st.annVideoLabel}>Video Message</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })}
+
+      {/* Voice messages */}
+      {audios.map((a, idx) => (
+        <AudioRow key={`aud-${idx}`} audio={a} />
+      ))}
+    </LinearGradient>
+  );
+}
+
+// ─── Voice Message player (expo-audio) ───────────────────────────────────────
+function AudioRow({ audio }) {
+  const player = useAudioPlayer({ uri: audio.url });
+  const status = useAudioPlayerStatus(player);
+  const playing = Boolean(status?.playing);
+  const current = status?.currentTime || 0;
+  const duration = status?.duration || audio.duration || 0;
+  const progress = duration > 0 ? Math.min(1, current / duration) : 0;
+
+  const togglePlay = () => {
+    try {
+      if (playing) player.pause();
+      else player.play();
+    } catch {}
+  };
+
+  const seekTo = async (ratio) => {
+    try {
+      if (!duration) return;
+      await player.seekTo(ratio * duration);
+    } catch {}
+  };
+
+  return (
+    <View style={st.annAudioRow}>
+      <TouchableOpacity style={st.annAudioBtn} onPress={togglePlay} activeOpacity={0.8}>
+        <Ionicons name={playing ? 'pause' : 'play'} size={18} color="#FFFFFF" />
+      </TouchableOpacity>
+      <View style={{ flex: 1 }}>
+        <Text style={st.annAudioName} numberOfLines={1}>Voice Message</Text>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={(e) => {
+            const x = e.nativeEvent.locationX;
+            // approximate seek from tap on bar (bar ~ full width of parent)
+            seekTo(Math.min(1, Math.max(0, x / 200)));
+          }}
+          style={st.annSeekTrack}
+        >
+          <View style={[st.annSeekFill, { width: `${progress * 100}%` }]} />
+        </TouchableOpacity>
+        <View style={st.annTimeRow}>
+          <Text style={st.annTimeText}>{formatMediaTime(current)}</Text>
+          <Text style={st.annTimeText}>{formatMediaTime(duration)}</Text>
+        </View>
+      </View>
+      <Ionicons name="mic" size={16} color={D.pink} />
+    </View>
+  );
 }
 
 export default function DashboardScreen({ navigation }) {
@@ -508,17 +640,7 @@ export default function DashboardScreen({ navigation }) {
           <Animated.View style={slide(anims[9])}>
             <SectionHeader label="Announcements" />
             {announcements.map((ann, i) => (
-              <ScaleButton key={ann._id}>
-                <LinearGradient colors={['#FFFFFF', '#FFFBFC']} style={st.annCard}>
-                  <View style={st.annIconWrap}>
-                    <Ionicons name="megaphone" size={22} color={D.pink} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.annTitle} numberOfLines={1}>{ann.title}</Text>
-                    <Text style={st.annBody} numberOfLines={2}>{ann.content}</Text>
-                  </View>
-                </LinearGradient>
-              </ScaleButton>
+              <AnnouncementCard key={ann._id} ann={ann} />
             ))}
           </Animated.View>
         )}
@@ -686,8 +808,34 @@ const st = StyleSheet.create({
   scoreBadgeWrap: { alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   scoreBadgeText: { fontSize: 13, fontWeight: '800', color: '#334155' },
 
-  annCard: { marginHorizontal: 16, borderRadius: 24, padding: 18, marginBottom: 12, flexDirection: 'row', gap: 14, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+  annCard: { marginHorizontal: 16, borderRadius: 24, padding: 18, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, overflow: 'hidden' },
+  annCardTop: { flexDirection: 'row', gap: 14 },
   annIconWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: D.pinkLight, justifyContent: 'center', alignItems: 'center' },
   annTitle: { fontSize: 18, fontWeight: '900', color: D.ink, marginBottom: 4 },
   annBody: { fontSize: 15, color: D.muted, fontWeight: '600', lineHeight: 20 },
+  annMediaImg: { width: '100%', height: 180, borderRadius: 16, marginTop: 14 },
+  annVideoWrap: { width: '100%', height: 200, borderRadius: 16, overflow: 'hidden', marginTop: 14, backgroundColor: '#000' },
+  annVideoPoster: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  annVideoPlay: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  annVideoDur: {
+    position: 'absolute', bottom: 10, right: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  annVideoDurText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
+  annVideoLabel: {
+    position: 'absolute', top: 10, left: 10,
+    color: '#FFFFFF', fontSize: 12, fontWeight: '800',
+    backgroundColor: 'rgba(139,92,246,0.85)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10,
+  },
+  annAudioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, backgroundColor: '#FFF0F6', borderRadius: 14, padding: 12 },
+  annAudioName: { fontSize: 13, color: D.ink, fontWeight: '700', marginBottom: 6 },
+  annAudioBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: D.pink, justifyContent: 'center', alignItems: 'center' },
+  annSeekTrack: { height: 4, backgroundColor: 'rgba(255,79,139,0.2)', borderRadius: 2, overflow: 'hidden' },
+  annSeekFill: { height: 4, backgroundColor: D.pink, borderRadius: 2 },
+  annTimeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  annTimeText: { fontSize: 10, fontWeight: '600', color: D.muted },
+  annMoreImages: { fontSize: 12, color: D.muted, marginTop: 6, fontWeight: '600' },
 });

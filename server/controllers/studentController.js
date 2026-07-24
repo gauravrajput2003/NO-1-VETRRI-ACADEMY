@@ -13,6 +13,7 @@ const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const s3Client = require('../config/s3');
 const storageService = require('../services/storageService');
+const notificationService = require('../services/notificationService');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
 const { proxyDownload } = require('../middleware/fileDownloadHandler');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
@@ -462,6 +463,41 @@ const applyStudentLeave = async (req, res) => {
       toDate: new Date(toDate),
       reason,
     });
+
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const applicantName = req.user.name || req.user.displayName || 'A user';
+      const leaveMessage = `${applicantName} applied for leave from ${new Date(fromDate).toDateString()} to ${new Date(toDate).toDateString()}`;
+
+      if (admins.length > 1) {
+        await notificationService.sendBulkNotifications({
+          recipientIds: admins.map((admin) => admin._id),
+          senderId: req.user._id,
+          type: 'leave_applied',
+          title: 'New Leave Application',
+          message: leaveMessage,
+          referenceId: leave._id,
+          referenceType: 'LeaveApplication',
+          link: '/admin/leaves',
+          io: req.app.get('io'),
+        });
+      } else if (admins.length === 1) {
+        await notificationService.sendNotification({
+          recipientId: admins[0]._id,
+          senderId: req.user._id,
+          type: 'leave_applied',
+          title: 'New Leave Application',
+          message: leaveMessage,
+          referenceId: leave._id,
+          referenceType: 'LeaveApplication',
+          link: '/admin/leaves',
+          io: req.app.get('io'),
+        });
+      }
+    } catch (notificationError) {
+      errorCrit('[Student] Leave notification failed:', notificationError.message);
+    }
+
     res.status(201).json({ success: true, leave });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

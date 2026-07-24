@@ -56,6 +56,7 @@ const runFeeReminderCycle = async (io, options = {}) => {
   const User = require('../models/User');
   const FeesRecord = require('../models/FeesRecord');
   const Notification = require('../models/Notification');
+  const { sendPushNotifications } = require('../services/pushService');
 
   const context = getMonthContext(today);
   const records = await FeesRecord.find({ monthYear: context.monthYear }).lean();
@@ -69,7 +70,7 @@ const runFeeReminderCycle = async (io, options = {}) => {
 
   while (hasMore) {
     const students = await User.find({ role: 'student', isActive: true })
-      .select('name email mobile course grade feeAmount feeFrequency feeDueDate')
+      .select('name email mobile course grade feeAmount feeFrequency feeDueDate expoPushToken')
       .sort({ _id: 1 })
       .skip(skip)
       .limit(BATCH_SIZE)
@@ -134,6 +135,22 @@ const runFeeReminderCycle = async (io, options = {}) => {
           status,
         },
       });
+
+      if (student.expoPushToken) {
+        try {
+          await sendPushNotifications([student.expoPushToken], {
+            title,
+            body: message,
+            data: {
+              type,
+              ...(notification.data || {}),
+              notificationId: notification._id.toString(),
+            },
+          });
+        } catch (pushError) {
+          console.error(`[CRON][feeReminder] Expo push failed for student ${student._id}: ${pushError.message}`);
+        }
+      }
 
       result.notificationsSent += 1;
 

@@ -313,9 +313,30 @@ const listDoubts = async (req, res) => {
 			Doubt.countDocuments(query),
 		]);
 
+		const doubtIds = items.map(d => d._id);
+		const unreadCounts = await DoubtReply.aggregate([
+			{ $match: { 
+				doubtId: { $in: doubtIds }, 
+				isDeleted: false,
+				senderId: { $ne: req.user._id },
+				'readBy.userId': { $ne: req.user._id }
+			} },
+			{ $group: { _id: '$doubtId', count: { $sum: 1 } } }
+		]);
+
+		const unreadMap = unreadCounts.reduce((acc, curr) => {
+			acc[curr._id.toString()] = curr.count;
+			return acc;
+		}, {});
+
+		const doubtsWithUnread = items.map(d => ({
+			...d,
+			unreadRepliesCount: unreadMap[d._id.toString()] || 0
+		}));
+
 		res.json({
 			success: true,
-			doubts: items,
+			doubts: doubtsWithUnread,
 			pagination: {
 				total,
 				page,

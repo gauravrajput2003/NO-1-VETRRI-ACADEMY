@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,18 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Swipeable } from 'react-native-gesture-handler';
 import { formatRelativeTime } from '../../utils/formatters';
-import { fetchNotifications, markNotificationRead, markAllRead } from '../../redux/slices/notificationsSlice';
+import {
+  fetchNotifications,
+  fetchUnreadNotificationCount,
+  markNotificationRead,
+  markAllRead,
+  deleteNotification,
+} from '../../redux/slices/notificationsSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { resolveNotificationTarget } from '../../utils/notificationNavigation';
 
 // ---------------------------------------------------------------------------
 // Responsive scaling helpers
@@ -60,12 +68,20 @@ const NOTIF_COLORS = {
 };
 
 function getCategoryConfig(type) {
+  if (type === 'general') return NOTIF_COLORS.scores;
+  if (['leave_approved', 'leave_rejected', 'leave_applied', 'compensation_approved', 'fee_reminder', 'fee_paid', 'fee_partial', 'fee_overdue'].includes(type)) {
+    return NOTIF_COLORS.attendance;
+  }
+  if (type === 'study_material') return NOTIF_COLORS.homework;
+  if (['live_class', 'class_starting'].includes(type)) return NOTIF_COLORS.live;
+  if (['doubt_created', 'doubt_assigned', 'doubt_reply', 'doubt_status'].includes(type)) return NOTIF_COLORS.doubt;
+  if (['announcement', 'new_enquiry'].includes(type)) return NOTIF_COLORS.announcement;
+  // Legacy / still-used backend types
   if (type === 'new_score') return NOTIF_COLORS.scores;
-  if (type === 'class_reminder' || type === 'recording_available') return NOTIF_COLORS.live;
-  if (type === 'new_material' || type === 'material_unlocked') return NOTIF_COLORS.homework;
-  if (type === 'leave_update' || type === 'fee_reminder') return NOTIF_COLORS.attendance;
-  if (type === 'announcement' || type === 'new_enquiry') return NOTIF_COLORS.announcement;
-  if (['doubt_created', 'doubt_assigned', 'doubt_reply', 'doubt_status', 'chat'].includes(type)) return NOTIF_COLORS.doubt;
+  if (['class_reminder', 'recording_available'].includes(type)) return NOTIF_COLORS.live;
+  if (['new_material', 'material_unlocked'].includes(type)) return NOTIF_COLORS.homework;
+  if (['leave_update', 'compensation_completed', 'salary_paid'].includes(type)) return NOTIF_COLORS.attendance;
+  if (type === 'chat') return NOTIF_COLORS.doubt;
   return NOTIF_COLORS.default;
 }
 
@@ -88,11 +104,11 @@ export default function NotificationsScreen({ navigation }) {
   const r = useResponsive();
   const styles = React.useMemo(() => createStyles(r), [r.width, r.height]);
 
-  const { list = [], loading = false } = useSelector((s) => s.notifications);
-  const { user } = useSelector((s) => s.auth);
+  const { list = [], loading = false, page = 1, hasMore = false } = useSelector((s) => s.notifications);
 
   useEffect(() => {
-    dispatch(fetchNotifications());
+    dispatch(fetchNotifications(1));
+    dispatch(fetchUnreadNotificationCount());
   }, [dispatch]);
 
   // IMPORTANT: this screen renders its own header below. Make sure the
@@ -107,62 +123,72 @@ export default function NotificationsScreen({ navigation }) {
 
   const unreadCount = list.filter((n) => !n.isRead).length;
 
-  const openDoubtFromNotification = (item) => {
-    const payload = item?.data || item?.metadata || {};
-    const doubtId = payload?.doubtId || payload?.doubt || payload?.doubt_id || payload?.threadId || payload?.postId;
-    if (doubtId) navigation.navigate('DoubtDetail', { doubtId: String(doubtId) });
-    else navigation.navigate('DoubtCenter');
-  };
-
   const handlePress = (item) => {
     if (!item.isRead) dispatch(markNotificationRead(item._id));
-    if (item.type === 'chat') navigation.navigate('Chat');
-    else if (item.type === 'new_score') navigation.navigate('ExamScores');
-    else if (item.type === 'class_reminder') navigation.navigate('Classes');
-    else if (item.type === 'new_enquiry' && user?.role === 'admin') navigation.navigate('Enquiries');
-    else if (['doubt_created', 'doubt_assigned', 'doubt_reply', 'doubt_status'].includes(item.type)) {
-      openDoubtFromNotification(item);
-    }
+    const { screen, params } = resolveNotificationTarget(item);
+    navigation.navigate(screen, params);
   };
+
+  const handleEndReached = useCallback(() => {
+    if (hasMore && !loading) {
+      dispatch(fetchNotifications(page + 1));
+    }
+  }, [dispatch, hasMore, loading, page]);
+
+  const renderRightActions = (item) => (
+    <TouchableOpacity
+      style={styles.deleteAction}
+      onPress={() => dispatch(deleteNotification(item._id))}
+      activeOpacity={0.85}
+    >
+      <Ionicons name="trash-outline" size={r.scaleFont(22)} color="#FFFFFF" />
+      <Text style={styles.deleteActionText}>Delete</Text>
+    </TouchableOpacity>
+  );
 
   const renderItem = ({ item, index }) => {
     const config = getCategoryConfig(item.type);
 
     return (
       <Animated.View style={{ animationDuration: '0.4s', animationDelay: `${index * 0.05}s` }}>
-        <ScaleButton style={styles.cardWrap} onPress={() => handlePress(item)}>
-          <LinearGradient
-            colors={!item.isRead ? ['#F0FDFA', '#CCFBF1'] : ['#F0FDFA', '#E6FFFA']}
-            style={styles.card}
-          >
-            <View style={[styles.accentStrip, { backgroundColor: config.strip }]} />
+        <Swipeable
+          overshootRight={false}
+          renderRightActions={() => renderRightActions(item)}
+        >
+          <ScaleButton style={styles.cardWrap} onPress={() => handlePress(item)}>
+            <LinearGradient
+              colors={!item.isRead ? ['#F0FDFA', '#CCFBF1'] : ['#F0FDFA', '#E6FFFA']}
+              style={styles.card}
+            >
+              <View style={[styles.accentStrip, { backgroundColor: config.strip }]} />
 
-            <View style={styles.cardHeader}>
-              <LinearGradient colors={config.bg} style={styles.iconCircle}>
-                <Ionicons name={config.icon} size={r.scaleFont(26)} color={config.text} />
-              </LinearGradient>
+              <View style={styles.cardHeader}>
+                <LinearGradient colors={config.bg} style={styles.iconCircle}>
+                  <Ionicons name={config.icon} size={r.scaleFont(26)} color={config.text} />
+                </LinearGradient>
 
-              <View style={styles.timePill}>
-                <Text style={styles.timeText} numberOfLines={1}>
-                  {formatRelativeTime(item.createdAt)}
-                </Text>
+                <View style={styles.timePill}>
+                  <Text style={styles.timeText} numberOfLines={1}>
+                    {formatRelativeTime(item.createdAt)}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-              <Text style={styles.cardDesc} numberOfLines={2}>{item.message}</Text>
-            </View>
-
-            {!item.isRead && (
-              <View style={styles.unreadGlow}>
-                <View style={styles.unreadDot} />
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.cardDesc} numberOfLines={2}>{item.message}</Text>
               </View>
-            )}
 
-            <View style={styles.glassHighlight} />
-          </LinearGradient>
-        </ScaleButton>
+              {!item.isRead && (
+                <View style={styles.unreadGlow}>
+                  <View style={styles.unreadDot} />
+                </View>
+              )}
+
+              <View style={styles.glassHighlight} />
+            </LinearGradient>
+          </ScaleButton>
+        </Swipeable>
       </Animated.View>
     );
   };
@@ -232,6 +258,10 @@ export default function NotificationsScreen({ navigation }) {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshing={loading}
+        onRefresh={() => dispatch(fetchNotifications(1))}
+        onEndReachedThreshold={0.5}
+        onEndReached={handleEndReached}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Image source={require('../../../assets/rocket.png')} style={styles.emptyImage} resizeMode="contain" />
@@ -325,6 +355,21 @@ function createStyles(r) {
       maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%',
     },
     cardWrap: { marginBottom: 16 },
+    deleteAction: {
+      backgroundColor: '#EF4444',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: moderateScale(88),
+      borderRadius: 22,
+      marginBottom: 16,
+      marginLeft: 8,
+    },
+    deleteActionText: {
+      color: '#FFFFFF',
+      fontSize: scaleFont(11),
+      fontWeight: '800',
+      marginTop: 4,
+    },
     card: {
       borderRadius: 22, padding: moderateScale(16),
       shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },

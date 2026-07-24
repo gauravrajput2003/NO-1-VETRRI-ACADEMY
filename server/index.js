@@ -230,15 +230,6 @@ io.on('connection', (socket) => {
     } catch {}
   });
 
-  // ─── Score notification ────────────────────────────────────────────────────
-  socket.on('score:new', ({ studentId, scoreData }) => {
-    io.to(`user:${studentId}`).emit('notification:new', {
-      type: 'new_score',
-      title: 'New Score Posted!',
-      data: scoreData,
-    });
-  });
-
   // ─── Disconnect ────────────────────────────────────────────────────────────
   socket.on('disconnect', async () => {
     if (socket.userId) {

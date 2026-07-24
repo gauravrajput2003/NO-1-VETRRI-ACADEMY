@@ -27,10 +27,12 @@ const getMaterialTypeFromMime = (mimeType = '') => {
   return 'image';
 };
 
-const getTeacherStudentFilter = async () => {
+const getTeacherStudentFilter = async (teacherId) => {
+  if (!teacherId) return [];
   const students = await User.find({
     role: 'student',
     isActive: true,
+    assignedTeacher: teacherId,
   }).select('_id');
 
   return students.map((student) => student._id.toString());
@@ -47,14 +49,15 @@ const getTeacherDashboard = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [todayClasses, teacherStudentIds, pendingLeaves, totalMaterials] = await Promise.all([
+    const [todayClasses, teacherStudentIds, pendingLeaves, totalMaterials, pendingCompensationLeaves] = await Promise.all([
       ClassSchedule.find({
         teacherId,
         scheduledDate: { $gte: today, $lt: tomorrow },
       }).select('-meetLink').populate('studentIds', 'name grade'),
-      getTeacherStudentFilter(),
+      getTeacherStudentFilter(teacherId),
       require('../models/LeaveApplication').countDocuments({ applicant: teacherId, status: 'pending' }),
       StudyMaterial.countDocuments({ teacher: teacherId }),
+      require('../models/LeaveApplication').find({ applicant: teacherId, compensationStatus: { $in: ['pending', 'completed_by_teacher'] } }).sort({ compensationClassDate: 1 }),
     ]);
 
     res.status(200).json({
@@ -64,6 +67,8 @@ const getTeacherDashboard = async (req, res) => {
         totalStudents: teacherStudentIds.length,
         pendingLeaves,
         totalMaterials,
+        pendingCompensationCount: pendingCompensationLeaves.length,
+        pendingCompensationLeaves,
       },
     });
   } catch (error) {
@@ -76,8 +81,7 @@ const getTeacherDashboard = async (req, res) => {
 // @access  Teacher
 const getMyStudents = async (req, res) => {
   try {
-    // Students expose their info to teacher, but NOT phone/email to students
-    const studentIds = await getTeacherStudentFilter();
+    const studentIds = await getTeacherStudentFilter(req.user._id);
 
     const students = await User.find({
       _id: { $in: studentIds },
@@ -85,7 +89,8 @@ const getMyStudents = async (req, res) => {
       isActive: true,
     })
       .select('-password -refreshToken')
-      .populate('course', 'title category');
+      .populate('course', 'title category')
+      .populate('assignedTeacher', 'name displayName');
 
     res.status(200).json({ success: true, students });
   } catch (error) {
@@ -522,15 +527,20 @@ const getMonthlyGrading = async (req, res) => {
 // @access  Teacher
 const applyLeave = async (req, res) => {
   try {
-    const { leaveType, fromDate, toDate, reason } = req.body;
-    const leave = await LeaveApplication.create({
+    const { leaveType, fromDate, toDate, reason, compensationClassDate } = req.body;
+    const leaveData = {
       applicant: req.user._id,
       applicantRole: 'teacher',
       leaveType,
       fromDate: new Date(fromDate),
       toDate: new Date(toDate),
       reason,
-    });
+    };
+    if (compensationClassDate) {
+      leaveData.compensationClassDate = new Date(compensationClassDate);
+      leaveData.compensationStatus = 'pending';
+    }
+    const leave = await LeaveApplication.create(leaveData);
     res.status(201).json({ success: true, leave });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -544,6 +554,49 @@ const getTeacherLeaves = async (req, res) => {
   try {
     const leaves = await LeaveApplication.find({ applicant: req.user._id }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, leaves });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update compensation status (teacher)
+// @route   PATCH /api/teacher/leaves/:id/compensation/status
+// @access  Teacher
+const updateCompensationStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (status !== 'completed_by_teacher') {
+      return res.status(400).json({ success: false, message: 'Invalid status for teacher update.' });
+    }
+
+    const leave = await LeaveApplication.findOneAndUpdate(
+      { _id: req.params.id, applicant: req.user._id },
+      {
+        compensationStatus: status,
+        compensationCompletedAt: new Date(),
+        compensationCompletedBy: req.user._id,
+      },
+      { new: true }
+    ).populate('applicant', 'name');
+
+    if (!leave) {
+      return res.status(404).json({ success: false, message: 'Leave not found or unauthorized.' });
+    }
+
+    // Find admin users and notify them
+    const admins = await User.find({ role: 'admin' });
+    for (const admin of admins) {
+      await Notification.create({
+        recipient: admin._id,
+        sender: req.user._id,
+        type: 'compensation_completed',
+        title: 'Compensation Class Completed',
+        message: `${leave.applicant.name} has marked the compensation class as completed. Please verify.`,
+        link: '/admin/leaves',
+      });
+    }
+
+    res.status(200).json({ success: true, leave });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -565,4 +618,5 @@ module.exports = {
   getMonthlyGrading,
   applyLeave,
   getTeacherLeaves,
+  updateCompensationStatus,
 };

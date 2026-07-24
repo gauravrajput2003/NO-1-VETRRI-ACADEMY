@@ -107,6 +107,7 @@ const userSchema = new mongoose.Schema(
 
     // Push notifications
     deviceTokens: [{ type: String }],
+    expoPushToken: { type: String, default: null },
 
     // Soft delete
     deactivatedAt: { type: Date },

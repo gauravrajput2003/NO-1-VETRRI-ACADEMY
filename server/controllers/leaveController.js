@@ -1,5 +1,6 @@
 const LeaveApplication = require('../models/LeaveApplication');
 const Notification = require('../models/Notification');
+const notificationService = require('../services/notificationService');
 const TeacherGrading = require('../models/TeacherGrading');
 const User = require('../models/User');
 const LiveClass = require('../models/LiveClass');
@@ -41,13 +42,16 @@ const updateLeaveStatus = async (req, res) => {
     if (!leave) return res.status(404).json({ success: false, message: 'Leave not found.' });
 
     // Notify applicant
-    await Notification.create({
-      recipient: leave.applicant._id,
-      sender: req.user._id,
-      type: 'leave_update',
+    await notificationService.sendNotification({
+      recipientId: leave.applicant._id,
+      senderId: req.user._id,
+      type: status === 'approved' ? 'leave_approved' : 'leave_rejected',
       title: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      message: `Your leave application from ${leave.fromDate.toDateString()} has been ${status}.`,
+      message: `Your leave application from ${new Date(leave.fromDate).toDateString()} has been ${status}.`,
       link: leave.applicantRole === 'student' ? '/student/leave' : '/teacher/leave',
+      referenceId: leave._id,
+      referenceType: 'LeaveApplication',
+      io: req.app.get('io')
     });
 
     res.status(200).json({ success: true, leave });

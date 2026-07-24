@@ -21,6 +21,26 @@ const submitEnquiry = async (req, res) => {
     // Send admin notification email
     sendEnquiryEmail(enquiry);
 
+    const notificationService = require('../services/notificationService');
+    const User = require('../models/User');
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      if (admins.length) {
+        await notificationService.sendBulkNotifications({
+          recipientIds: admins.map((a) => a._id),
+          type: 'new_enquiry',
+          title: 'New Enquiry Received',
+          message: `${enquiry.name} enquired about ${enquiry.course || 'a course'}.`,
+          referenceId: enquiry._id,
+          referenceType: 'Enquiry',
+          link: '/admin/enquiries',
+          io: req.app.get('io'),
+        });
+      }
+    } catch (notifErr) {
+      console.error('[Enquiry] Notification failed:', notifErr.message);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Thank you! We will contact you within 24 hours.',

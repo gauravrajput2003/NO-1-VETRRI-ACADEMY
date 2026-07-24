@@ -28,6 +28,7 @@ import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { formatScheduledTime } from '../../utils/formatters';
 import { Sparkle, PaperPlane, DottedPath } from '../student/BadgeIcons';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { useCompensationNotifications } from '../../hooks/useCompensationNotifications';
 
 
 const T = {
@@ -204,6 +205,9 @@ export default function TeacherDashboard({ navigation }) {
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
   const { width } = useWindowDimensions();
+  
+  // Call the compensation notifications hook to sync local scheduled notifications
+  useCompensationNotifications();
 
   // Dynamic responsive values
   const heroHeight = (width < 380 ? 250 : width < 420 ? 240 : 230) + 30 + insets.top;
@@ -553,6 +557,40 @@ export default function TeacherDashboard({ navigation }) {
           )}
         </LinearGradient>
       </ParticleWrapper>
+
+      {/* ── UPCOMING COMPENSATION CLASSES ── */}
+      {overview?.pendingCompensationCount > 0 && overview?.pendingCompensationLeaves?.length > 0 && (
+        <View style={st.sectionCard}>
+          <Text style={st.sectionTitle}>Upcoming Compensation</Text>
+          <Text style={{ color: T.subtitle, fontSize: 13, marginBottom: 12 }}>
+            You have {overview.pendingCompensationCount} pending compensation class{overview.pendingCompensationCount > 1 ? 'es' : ''}.
+          </Text>
+          {overview.pendingCompensationLeaves.map((l, index) => (
+            <View key={`comp-${l._id}`} style={[st.timelineItem, { marginBottom: index === overview.pendingCompensationLeaves.length - 1 ? 0 : 12 }]}>
+              <View style={st.timelineLeft}>
+                <Text style={st.timelineTime}>{new Date(l.compensationClassDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+              </View>
+              <View style={st.timelineDivider}>
+                <View style={[st.timelineDot, { backgroundColor: T.orange }]} />
+                {index < overview.pendingCompensationLeaves.length - 1 && <View style={st.timelineConnector} />}
+              </View>
+              <View style={st.timelineContent}>
+                <Text style={st.timelineSubject} numberOfLines={1}>Compensation for {l.leaveType} leave</Text>
+                <Text style={{ fontSize: 12, color: l.compensationStatus === 'completed_by_teacher' ? T.orange : T.subtitle, marginTop: 4 }}>
+                  {l.compensationStatus === 'completed_by_teacher' ? 'Awaiting Admin Approval' : 'Pending'}
+                </Text>
+                <View style={st.timelineActions}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Leave')} activeOpacity={0.85}>
+                    <View style={st.viewBtn}>
+                      <Text style={st.viewBtnText}>View</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* ── FEATURED TEACHER BANNER ── */}
       <LinearGradient colors={[T.purple, T.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.banner}>

@@ -372,7 +372,12 @@ const getMonthlyAttendanceSummary = async (req, res) => {
 
     const classIds = classes.map((c) => c._id);
 
-    const students = await User.find({ role: 'student', isActive: true })
+    const studentFilter = { role: 'student', isActive: true };
+    if (req.user.role === 'teacher') {
+      studentFilter.assignedTeacher = req.user._id;
+    }
+
+    const students = await User.find(studentFilter)
       .select('name displayName grade course profilePic');
 
     const allAttendance = await ClassAttendance.find({ classId: { $in: classIds } });

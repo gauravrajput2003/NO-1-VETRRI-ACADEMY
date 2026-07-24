@@ -40,14 +40,57 @@ const updateLeaveStatus = async (req, res) => {
 
     if (!leave) return res.status(404).json({ success: false, message: 'Leave not found.' });
 
+    let msg = `Your leave application from ${new Date(leave.fromDate).toDateString()} has been ${status}.`;
+    if (status === 'approved' && leave.compensationClassDate) {
+      msg += ` Compensation Class is scheduled for ${new Date(leave.compensationClassDate).toDateString()}.`;
+    }
+
     // Notify applicant
     await Notification.create({
       recipient: leave.applicant._id,
       sender: req.user._id,
       type: 'leave_update',
       title: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      message: `Your leave application from ${leave.fromDate.toDateString()} has been ${status}.`,
+      message: msg,
       link: leave.applicantRole === 'student' ? '/student/leave' : '/teacher/leave',
+    });
+
+    res.status(200).json({ success: true, leave });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Approve compensation class completion (admin)
+// @route   PATCH /api/admin/leaves/:id/compensation/status
+// @access  Admin
+const approveCompensationClass = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (status !== 'approved_by_admin') {
+      return res.status(400).json({ success: false, message: 'Invalid status for admin approval.' });
+    }
+
+    const leave = await LeaveApplication.findByIdAndUpdate(
+      req.params.id,
+      {
+        compensationStatus: status,
+        compensationApprovedAt: new Date(),
+        compensationApprovedBy: req.user._id,
+      },
+      { new: true }
+    ).populate('applicant', 'name');
+
+    if (!leave) return res.status(404).json({ success: false, message: 'Leave not found.' });
+
+    // Notify teacher
+    await Notification.create({
+      recipient: leave.applicant._id,
+      sender: req.user._id,
+      type: 'compensation_approved',
+      title: 'Compensation Class Approved',
+      message: 'Your compensation class has been verified and approved.',
+      link: '/teacher/leave',
     });
 
     res.status(200).json({ success: true, leave });
@@ -171,4 +214,5 @@ module.exports = {
   getBestTeacher,
   gradeTeacher,
   getLiveMonitor,
+  approveCompensationClass,
 };

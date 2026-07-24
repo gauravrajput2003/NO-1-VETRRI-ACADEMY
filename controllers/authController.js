@@ -39,7 +39,7 @@ const register = async (req, res) => {
     }
 
     if (role === 'student') {
-      const { name, mobile, email, password, grade, course, board } = req.body;
+      const { name, mobile, email, password, grade, course, board, assignedTeacher } = req.body;
       const normalizedBoard = normalizeBoard(board);
 
       const userExists = await User.findOne({ mobile });
@@ -55,6 +55,8 @@ const register = async (req, res) => {
         role: 'student',
         grade,
         board: normalizedBoard,
+        course: course || undefined,
+        assignedTeacher: assignedTeacher || undefined,
         firstLogin: true,
         admissionFormFilled: false,
       });

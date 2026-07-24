@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdmissionForm = require('../models/AdmissionForm');
 const FeesRecord = require('../models/FeesRecord');
@@ -129,17 +130,93 @@ const approveTeacher = async (req, res) => {
 // @access  Admin
 const updateTeacher = async (req, res) => {
   try {
-    const { qualification, subjects, experience, teacherBio, mobile, email, name } = req.body;
-    const teacher = await User.findByIdAndUpdate(
-      req.params.id,
-      { qualification, subjects, experience, teacherBio, mobile, email, name },
-      { new: true, runValidators: true }
-    ).select('-password -refreshToken');
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid teacher id.' });
+    }
 
-    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    const teacher = await User.findOne({ _id: id, role: 'teacher' });
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    }
 
-    res.status(200).json({ success: true, teacher });
+    const {
+      name,
+      mobile,
+      phone,
+      email,
+      password,
+      qualification,
+      subjects,
+      experience,
+      experienceYears,
+      teacherBio,
+      displayName,
+      isActive,
+      isApproved,
+    } = req.body;
+
+    const nextMobile = mobile !== undefined ? mobile : phone;
+    if (nextMobile !== undefined) {
+      const mobileValue = String(nextMobile).trim();
+      if (!mobileValue) {
+        return res.status(400).json({ success: false, message: 'Mobile number is required.' });
+      }
+      const mobileTaken = await User.findOne({ mobile: mobileValue, _id: { $ne: teacher._id } });
+      if (mobileTaken) {
+        return res.status(409).json({ success: false, message: 'Mobile number already in use.' });
+      }
+      teacher.mobile = mobileValue;
+    }
+
+    if (email !== undefined) {
+      const emailValue = email ? String(email).trim().toLowerCase() : '';
+      if (emailValue) {
+        const emailTaken = await User.findOne({ email: emailValue, _id: { $ne: teacher._id } });
+        if (emailTaken) {
+          return res.status(409).json({ success: false, message: 'Email already in use.' });
+        }
+      }
+      teacher.email = emailValue;
+    }
+
+    if (name !== undefined) teacher.name = String(name).trim();
+    if (displayName !== undefined) teacher.displayName = displayName ? String(displayName).trim() : '';
+    if (qualification !== undefined) teacher.qualification = qualification;
+    if (subjects !== undefined) {
+      teacher.subjects = Array.isArray(subjects)
+        ? subjects
+        : String(subjects).split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (experience !== undefined) teacher.experience = experience;
+    if (experienceYears !== undefined) teacher.experienceYears = experienceYears;
+    if (teacherBio !== undefined) teacher.teacherBio = teacherBio;
+    if (isActive !== undefined) teacher.isActive = isActive;
+    if (isApproved !== undefined) teacher.isApproved = isApproved;
+
+    // Only hash when a new password is provided (User pre-save hook handles hashing)
+    if (password !== undefined && String(password).trim()) {
+      if (String(password).length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+      }
+      teacher.password = String(password);
+    }
+
+    await teacher.save();
+
+    const updated = teacher.toObject();
+    delete updated.password;
+    delete updated.refreshToken;
+
+    res.status(200).json({ success: true, teacher: updated });
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
+      return res.status(409).json({
+        success: false,
+        message: `${field === 'mobile' ? 'Mobile number' : field === 'email' ? 'Email' : 'Value'} already in use.`,
+      });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

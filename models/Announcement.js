@@ -12,6 +12,19 @@ const announcementSchema = new mongoose.Schema(
     expiresAt: { type: Date },
     isActive: { type: Boolean, default: true },
     deletedAt: { type: Date, default: null },
+    // Media attachments — image | video (video message) | audio (voice message)
+    media: [
+      {
+        url: { type: String, required: true },
+        type: { type: String, enum: ['image', 'video', 'audio'], required: true },
+        publicId: { type: String },
+        originalFilename: { type: String },
+        mimeType: { type: String },
+        fileSize: { type: Number },
+        duration: { type: Number },   // seconds (voice / video message)
+        thumbnail: { type: String },  // video poster URL when available
+      },
+    ],
   },
   { timestamps: true }
 );

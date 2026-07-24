@@ -6,11 +6,12 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../../utils/colors';
 import { formatDate } from '../../utils/formatters';
-import { applyLeave, fetchLeaves } from '../../redux/slices/teacherSlice';
+import { applyLeave, fetchLeaves, updateCompensationStatus } from '../../redux/slices/teacherSlice';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { LinearGradient } from 'expo-linear-gradient';
+import { syncCompensationNotifications } from '../../services/NotificationSyncService';
 
 const TouchableOpacity = (props) => {
   const { particleCount = 20, size = "small", colors, children, ...rest } = props;
@@ -37,11 +38,13 @@ export default function LeaveScreen() {
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ leaveType: 'personal', fromDate: '', toDate: '', reason: '' });
+  const [form, setForm] = useState({ leaveType: 'personal', fromDate: '', toDate: '', reason: '', compensationClassDate: '' });
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [showFromPickerWeb, setShowFromPickerWeb] = useState(false);
   const [showToPickerWeb, setShowToPickerWeb] = useState(false);
+  const [showCompPicker, setShowCompPicker] = useState(false);
+  const [showCompPickerWeb, setShowCompPickerWeb] = useState(false);
 
   const bgColor = isDark ? Colors.background.dark : THEME.background;
   const cardBg = isDark ? Colors.card.dark : THEME.white;
@@ -50,8 +53,11 @@ export default function LeaveScreen() {
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
 
-  useEffect(() => { dispatch(fetchLeaves()); }, []);
-
+  useEffect(() => { 
+    dispatch(fetchLeaves()).then(() => {
+      syncCompensationNotifications();
+    }); 
+  }, []);
   const statusColors = { pending: THEME.orange, approved: '#4CAF50', rejected: '#F44336' };
   const statusGradients = {
     pending: ['#FFA726', '#FF9800'],
@@ -91,7 +97,7 @@ export default function LeaveScreen() {
     if (applyLeave.fulfilled.match(result)) {
       Toast.show({ type: 'success', text1: 'Leave Applied ✅' });
       setShowForm(false);
-      setForm({ leaveType: 'personal', fromDate: '', toDate: '', reason: '' });
+      setForm({ leaveType: 'personal', fromDate: '', toDate: '', reason: '', compensationClassDate: '' });
     } else {
       Toast.show({ type: 'error', text1: 'Failed', text2: result.payload });
     }
@@ -107,6 +113,15 @@ export default function LeaveScreen() {
   };
 
   const stats = getStats();
+
+  const handleCompleteCompensation = async (leaveId) => {
+    const res = await dispatch(updateCompensationStatus({ leaveId, status: 'completed_by_teacher' }));
+    if (updateCompensationStatus.fulfilled.match(res)) {
+      Toast.show({ type: 'success', text1: 'Marked Completed ✅' });
+    } else {
+      Toast.show({ type: 'error', text1: 'Failed', text2: res.payload });
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
@@ -228,34 +243,63 @@ export default function LeaveScreen() {
                 </View>
 
                 {/* Bottom Timeline */}
-                <View style={[styles.cardFooter, { borderTopColor: isDark ? '#333' : '#F0F0F0' }]}>
-                  <View style={styles.timelineItem}>
-                    <Text style={[styles.timelineLabel, { color: textSec }]}>Start Date</Text>
-                    <View style={styles.timelineValueRow}>
-                      <Ionicons name="calendar-outline" size={14} color={THEME.primaryTeal} />
-                      <Text style={[styles.timelineValue, { color: textColor }]}>{formatDate(l.fromDate)}</Text>
+                <View style={[styles.cardFooter, { borderTopColor: isDark ? '#333' : '#F0F0F0', flexDirection: 'column', gap: 10 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+                    <View style={styles.timelineItem}>
+                      <Text style={[styles.timelineLabel, { color: textSec }]}>Start Date</Text>
+                      <View style={styles.timelineValueRow}>
+                        <Ionicons name="calendar-outline" size={14} color={THEME.primaryTeal} />
+                        <Text style={[styles.timelineValue, { color: textColor }]}>{formatDate(l.fromDate)}</Text>
+                      </View>
                     </View>
-                  </View>
-                  
-                  <View style={styles.timelineDivider}>
-                    <Ionicons name="arrow-forward" size={16} color={textSec} />
+                    
+                    <View style={styles.timelineDivider}>
+                      <Ionicons name="arrow-forward" size={16} color={textSec} />
+                    </View>
+
+                    <View style={styles.timelineItem}>
+                      <Text style={[styles.timelineLabel, { color: textSec }]}>End Date</Text>
+                      <View style={styles.timelineValueRow}>
+                        <Ionicons name="calendar-outline" size={14} color={THEME.primaryTeal} />
+                        <Text style={[styles.timelineValue, { color: textColor }]}>{formatDate(l.toDate)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={[styles.timelineItem, { alignItems: 'flex-end' }]}>
+                      <Text style={[styles.timelineLabel, { color: textSec }]}>Duration</Text>
+                      <View style={styles.timelineValueRow}>
+                        <Ionicons name="time-outline" size={14} color={THEME.primaryPink} />
+                        <Text style={[styles.timelineValue, { color: THEME.primaryPink, fontWeight: '700' }]}>{l.totalDays || 1} Days</Text>
+                      </View>
+                    </View>
                   </View>
 
-                  <View style={styles.timelineItem}>
-                    <Text style={[styles.timelineLabel, { color: textSec }]}>End Date</Text>
-                    <View style={styles.timelineValueRow}>
-                      <Ionicons name="calendar-outline" size={14} color={THEME.primaryTeal} />
-                      <Text style={[styles.timelineValue, { color: textColor }]}>{formatDate(l.toDate)}</Text>
+                  {(l.compensationClassDate || l.compensationStatus) && (
+                    <View style={{ width: '100%', paddingTop: 10, borderTopWidth: 1, borderTopColor: isDark ? '#444' : '#E8E8E8', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View>
+                        <Text style={[styles.timelineLabel, { color: textSec }]}>Compensation Date</Text>
+                        <Text style={[styles.timelineValue, { color: textColor }]}>{l.compensationClassDate ? formatDate(l.compensationClassDate) : 'Not Specified'}</Text>
+                      </View>
+                      <View>
+                        {l.compensationStatus === 'pending' && (
+                          <RNTouchableOpacity style={{ backgroundColor: THEME.primaryTeal, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }} onPress={() => handleCompleteCompensation(l._id)}>
+                            <Text style={{ color: THEME.white, fontSize: 12, fontWeight: 'bold' }}>Mark Completed</Text>
+                          </RNTouchableOpacity>
+                        )}
+                        {l.compensationStatus === 'completed_by_teacher' && (
+                          <View style={{ backgroundColor: '#E0E0E0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
+                            <Text style={{ color: '#757575', fontSize: 12, fontWeight: 'bold' }}>Awaiting Admin Approval</Text>
+                          </View>
+                        )}
+                        {l.compensationStatus === 'approved_by_admin' && (
+                          <Text style={{ color: '#4CAF50', fontSize: 12, fontWeight: 'bold' }}>Approved</Text>
+                        )}
+                        {l.compensationStatus === 'expired' && (
+                          <Text style={{ color: '#F44336', fontSize: 12, fontWeight: 'bold' }}>Expired</Text>
+                        )}
+                      </View>
                     </View>
-                  </View>
-
-                  <View style={[styles.timelineItem, { alignItems: 'flex-end' }]}>
-                    <Text style={[styles.timelineLabel, { color: textSec }]}>Duration</Text>
-                    <View style={styles.timelineValueRow}>
-                      <Ionicons name="time-outline" size={14} color={THEME.primaryPink} />
-                      <Text style={[styles.timelineValue, { color: THEME.primaryPink, fontWeight: '700' }]}>{l.totalDays || 1} Days</Text>
-                    </View>
-                  </View>
+                  )}
                 </View>
 
                 {l.adminRemarks && (
@@ -304,6 +348,15 @@ export default function LeaveScreen() {
                 <Ionicons name="calendar-outline" size={18} color="#999" />
               </TouchableOpacity>
 
+              <Text style={[styles.label, { color: textColor }]}>Compensation Date (Optional)</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.dateInput, { borderColor: isDark ? Colors.navyLight : '#E0E0E0' }]}
+                onPress={() => (Platform.OS === 'web' ? setShowCompPickerWeb(true) : setShowCompPicker(true))}
+              >
+                <Text style={{ color: form.compensationClassDate ? textColor : '#999' }}>{form.compensationClassDate || 'Select compensation date'}</Text>
+                <Ionicons name="calendar-outline" size={18} color="#999" />
+              </TouchableOpacity>
+
               {showFromPicker && (
                 <DateTimePicker
                   value={form.fromDate ? new Date(form.fromDate) : new Date()}
@@ -329,6 +382,21 @@ export default function LeaveScreen() {
                     setShowToPicker(false);
                     if (selectedDate) {
                       setForm((prev) => ({ ...prev, toDate: toYMD(selectedDate) }));
+                    }
+                  }}
+                />
+              )}
+
+              {showCompPicker && (
+                <DateTimePicker
+                  value={form.compensationClassDate ? new Date(form.compensationClassDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  minimumDate={new Date()}
+                  onChange={(event, selectedDate) => {
+                    setShowCompPicker(false);
+                    if (selectedDate) {
+                      setForm((prev) => ({ ...prev, compensationClassDate: toYMD(selectedDate) }));
                     }
                   }}
                 />
@@ -373,6 +441,30 @@ export default function LeaveScreen() {
                               onPress={() => {
                                 setForm((prev) => ({ ...prev, toDate: item.value }));
                                 setShowToPickerWeb(false);
+                              }}
+                            >
+                              <Text style={[styles.dateOptionLabel, { color: textColor }]}>{item.label}</Text>
+                              <Text style={[styles.dateOptionValue, { color: textSec }]}>{item.value}</Text>
+                            </TouchableOpacity>
+                          )}
+                        />
+                      </View>
+                    </View>
+                  </Modal>
+
+                  <Modal visible={showCompPickerWeb} transparent animationType="slide">
+                    <View style={styles.modalOverlay}>
+                      <View style={[styles.pickerModalContent, { backgroundColor: isDark ? Colors.card.dark : THEME.white }]}> 
+                        <Text style={[styles.modalTitle, { color: textColor }]}>Select Compensation Date</Text>
+                        <FlatList
+                          data={dateOptions}
+                          keyExtractor={(i) => i.value}
+                          renderItem={({ item }) => (
+                            <TouchableOpacity
+                              style={styles.dateOption}
+                              onPress={() => {
+                                setForm((prev) => ({ ...prev, compensationClassDate: item.value }));
+                                setShowCompPickerWeb(false);
                               }}
                             >
                               <Text style={[styles.dateOptionLabel, { color: textColor }]}>{item.label}</Text>

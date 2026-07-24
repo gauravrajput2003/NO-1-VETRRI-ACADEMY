@@ -1,7 +1,7 @@
 const Announcement = require('../models/Announcement');
 const AnnouncementRead = require('../models/AnnouncementRead');
 const User = require('../models/User');
-const { sendPushNotifications } = require('../services/pushService');
+const notificationService = require('../services/notificationService');
 
 const DEFAULT_MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS = 30;
 const parsedMaxAgeDays = Number.parseInt(process.env.MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS, 10);
@@ -9,14 +9,45 @@ const MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS = Number.isFinite(parsedMaxAgeDays) && pa
   ? parsedMaxAgeDays
   : DEFAULT_MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS;
 
+function buildAnnouncementNotifyCopy({ title, content, media = [], posterName }) {
+  const hasVoice = media.some((m) => m.type === 'audio');
+  const hasVideo = media.some((m) => m.type === 'video');
+  const name = posterName || 'Admin';
+
+  if (hasVoice && !hasVideo) {
+    return {
+      pushTitle: 'New Voice Announcement',
+      pushBody: `${name}\nTap to listen.`,
+      notifTitle: 'New Voice Announcement',
+      notifMessage: `${name} shared a voice message. Tap to listen.`,
+    };
+  }
+  if (hasVideo) {
+    return {
+      pushTitle: 'New Video Announcement',
+      pushBody: `${name}\nTap to watch.`,
+      notifTitle: 'New Video Announcement',
+      notifMessage: `${name} shared a video message. Tap to watch.`,
+    };
+  }
+  return {
+    pushTitle: title,
+    pushBody: String(content || '').substring(0, 150),
+    notifTitle: title,
+    notifMessage: String(content || '').substring(0, 200),
+  };
+}
+
 const createAnnouncement = async (req, res) => {
   try {
-    const { title, content, targetRole, targetCourse, targetGrade, isPinned, expiresAt } = req.body;
+    const { title, content, targetRole, targetCourse, targetGrade, isPinned, expiresAt, media } = req.body;
     const io = req.app.get('io');
+    const mediaList = Array.isArray(media) ? media : [];
 
     const announcement = await Announcement.create({
       title, content, targetRole, targetCourse, targetGrade,
       isPinned, expiresAt, postedBy: req.user._id,
+      media: mediaList,
     });
 
     if (targetRole === 'all' || targetRole === 'student') {
@@ -25,34 +56,43 @@ const createAnnouncement = async (req, res) => {
       io.emit('announcement:new', { announcement: { ...announcement.toObject() } });
     }
 
-    // ─── Push Notification (fire-and-forget, never blocks response) ───────────
-    // Runs asynchronously so the HTTP response is never delayed.
+    // In-app + push notifications (fire-and-forget)
     (async () => {
       try {
-        // Build role filter: 'all' targets both students and teachers
         const roleFilter = targetRole === 'all'
           ? { role: { $in: ['student', 'teacher'] } }
           : { role: targetRole };
 
-        const users = await User.find({
+        const recipients = await User.find({
           ...roleFilter,
-          expoPushToken: { $ne: null, $exists: true },
           isActive: true,
-        }).select('expoPushToken').lean();
+        }).select('_id expoPushToken').lean();
 
-        const tokens = users.map((u) => u.expoPushToken).filter(Boolean);
+        const posterName = req.user.displayName || req.user.name || 'Admin';
+        const copy = buildAnnouncementNotifyCopy({
+          title,
+          content,
+          media: mediaList,
+          posterName,
+        });
 
-        if (tokens.length > 0) {
-          const result = await sendPushNotifications(tokens, {
-            title: `📢 ${title}`,
-            body: content.substring(0, 150),
-            data: { type: 'announcement', announcementId: String(announcement._id) },
+        const recipientIds = recipients.map((u) => u._id);
+        if (recipientIds.length) {
+          await notificationService.sendBulkNotifications({
+            recipientIds,
+            senderId: req.user._id,
+            type: 'announcement',
+            title: copy.notifTitle,
+            message: copy.notifMessage,
+            referenceId: announcement._id,
+            referenceType: 'Announcement',
+            link: '/student/dashboard',
+            data: { announcementId: String(announcement._id), type: 'announcement' },
+            io,
           });
-          console.log(`[Push] Announcement sent: ${result.sent} ok, ${result.failed} failed`);
         }
-      } catch (pushErr) {
-        // Never let push errors affect the announcement creation flow
-        console.error('[Push] Announcement push failed:', pushErr.message);
+      } catch (notifErr) {
+        console.error('[Announcement] Notification failed:', notifErr.message);
       }
     })();
 

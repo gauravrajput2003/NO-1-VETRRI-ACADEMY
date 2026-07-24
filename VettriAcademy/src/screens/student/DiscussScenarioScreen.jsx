@@ -145,7 +145,12 @@ function DoubtCard({ item, onPress }) {
           style={styles.card}
         >
         <View style={styles.cardTop}>
-          <Text style={[styles.cardTitle, { color: D.white }]} numberOfLines={2}>{item.title}</Text>
+          <Text style={[styles.cardTitle, { color: D.white, paddingRight: item.unreadRepliesCount > 0 ? 30 : 0 }]} numberOfLines={2}>{item.title}</Text>
+          {item.unreadRepliesCount > 0 && (
+            <View style={{ position: 'absolute', top: -10, right: -10, backgroundColor: '#EF4444', borderRadius: 12, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, elevation: 4, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: {width: 0, height: 2} }}>
+              <Text style={{ color: D.white, fontSize: 12, fontWeight: 'bold' }}>{item.unreadRepliesCount}</Text>
+            </View>
+          )}
         </View>
 
         <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={2}>{item.description}</Text>

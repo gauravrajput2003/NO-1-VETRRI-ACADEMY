@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdmissionForm = require('../models/AdmissionForm');
 const FeesRecord = require('../models/FeesRecord');
@@ -86,15 +87,29 @@ const getAllTeachers = async (req, res) => {
 // @access  Admin
 const updateStudent = async (req, res) => {
   try {
-    const { course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes } = req.body;
+    const { name, mobile, email, course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes } = req.body;
+    const updates = {};
+    if (name) updates.name = name.trim();
+    if (mobile) updates.mobile = mobile.trim();
+    if (email !== undefined) updates.email = email ? email.trim() : '';
+    if (course !== undefined) updates.course = course || null;
+    if (assignedTeacher !== undefined) updates.assignedTeacher = assignedTeacher || null;
+    if (grade !== undefined) updates.grade = grade;
+    if (board !== undefined) updates.board = board;
+    if (isActive !== undefined) updates.isActive = isActive;
+    if (feeAmount !== undefined) updates.feeAmount = feeAmount;
+    if (feeFrequency !== undefined) updates.feeFrequency = feeFrequency;
+    if (feeDueDate !== undefined) updates.feeDueDate = feeDueDate;
+    if (feeNotes !== undefined) updates.feeNotes = feeNotes;
+
     const student = await User.findByIdAndUpdate(
       req.params.id,
-      { course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes },
+      updates,
       { new: true, runValidators: true }
     )
       .select('-password -refreshToken')
       .populate('course', 'title')
-      .populate('assignedTeacher', 'name');
+      .populate('assignedTeacher', 'name displayName');
 
     if (!student) return res.status(404).json({ success: false, message: 'Student not found.' });
 
@@ -120,6 +135,102 @@ const approveTeacher = async (req, res) => {
 
     res.status(200).json({ success: true, teacher });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update teacher (edit profile)
+// @route   PUT /api/admin/teachers/:id
+// @access  Admin
+const updateTeacher = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid teacher id.' });
+    }
+
+    const teacher = await User.findOne({ _id: id, role: 'teacher' });
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    }
+
+    const {
+      name,
+      mobile,
+      phone,
+      email,
+      password,
+      qualification,
+      subjects,
+      experience,
+      experienceYears,
+      teacherBio,
+      displayName,
+      isActive,
+      isApproved,
+    } = req.body;
+
+    const nextMobile = mobile !== undefined ? mobile : phone;
+    if (nextMobile !== undefined) {
+      const mobileValue = String(nextMobile).trim();
+      if (!mobileValue) {
+        return res.status(400).json({ success: false, message: 'Mobile number is required.' });
+      }
+      const mobileTaken = await User.findOne({ mobile: mobileValue, _id: { $ne: teacher._id } });
+      if (mobileTaken) {
+        return res.status(409).json({ success: false, message: 'Mobile number already in use.' });
+      }
+      teacher.mobile = mobileValue;
+    }
+
+    if (email !== undefined) {
+      const emailValue = email ? String(email).trim().toLowerCase() : '';
+      if (emailValue) {
+        const emailTaken = await User.findOne({ email: emailValue, _id: { $ne: teacher._id } });
+        if (emailTaken) {
+          return res.status(409).json({ success: false, message: 'Email already in use.' });
+        }
+      }
+      teacher.email = emailValue;
+    }
+
+    if (name !== undefined) teacher.name = String(name).trim();
+    if (displayName !== undefined) teacher.displayName = displayName ? String(displayName).trim() : '';
+    if (qualification !== undefined) teacher.qualification = qualification;
+    if (subjects !== undefined) {
+      teacher.subjects = Array.isArray(subjects)
+        ? subjects
+        : String(subjects).split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (experience !== undefined) teacher.experience = experience;
+    if (experienceYears !== undefined) teacher.experienceYears = experienceYears;
+    if (teacherBio !== undefined) teacher.teacherBio = teacherBio;
+    if (isActive !== undefined) teacher.isActive = isActive;
+    if (isApproved !== undefined) teacher.isApproved = isApproved;
+
+    // Only hash when a new password is provided (User pre-save hook handles hashing)
+    if (password !== undefined && String(password).trim()) {
+      if (String(password).length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+      }
+      teacher.password = String(password);
+    }
+
+    await teacher.save();
+
+    const updated = teacher.toObject();
+    delete updated.password;
+    delete updated.refreshToken;
+
+    res.status(200).json({ success: true, teacher: updated });
+  } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
+      return res.status(409).json({
+        success: false,
+        message: `${field === 'mobile' ? 'Mobile number' : field === 'email' ? 'Email' : 'Value'} already in use.`,
+      });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -427,6 +538,7 @@ module.exports = {
   getAllTeachers,
   updateStudent,
   approveTeacher,
+  updateTeacher,
   deleteTeacher,
   deleteStudent,
   getAdminStats,

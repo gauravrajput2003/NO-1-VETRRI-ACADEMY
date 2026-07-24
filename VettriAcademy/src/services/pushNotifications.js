@@ -20,8 +20,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// ─── Foreground notification display handler ──────────────────────────────────
-// Makes notifications visible even when the app is open (critical for iOS).
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -32,8 +31,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// ─── Android channel ID (shared by push + local notifications) ───────────────
-export const NOTIFICATION_CHANNEL_ID = 'vettri-default';
+ export const NOTIFICATION_CHANNEL_ID = 'vettri-default';
 
 /**
  * Create/update the Android notification channel.

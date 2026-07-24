@@ -11,6 +11,7 @@ const s3Client = require('../config/s3');
 const LeaveApplication = require('../models/LeaveApplication');
 const TeacherGrading = require('../models/TeacherGrading');
 const storageService = require('../services/storageService');
+const notificationService = require('../services/notificationService');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
 
 const getMaterialTypeFromMime = (mimeType = '') => {
@@ -114,16 +115,17 @@ const postLiveClass = async (req, res) => {
 
     // Notify enrolled students
     if (enrolledStudents && enrolledStudents.length > 0) {
-      const notifications = enrolledStudents.map((studentId) => ({
-        recipient: studentId,
-        sender: req.user._id,
-        type: 'class_reminder',
+      await notificationService.sendBulkNotifications({
+        recipientIds: enrolledStudents,
+        senderId: req.user._id,
+        type: 'live_class',
         title: `Class Scheduled: ${subject}`,
         message: `${req.user.name} has scheduled a class on ${scheduledDate} at ${scheduledTime}`,
         link: '/student/dashboard',
-        data: { liveClassId: liveClass._id },
-      }));
-      await Notification.insertMany(notifications);
+        referenceId: liveClass._id,
+        referenceType: 'LiveClass',
+        io: req.app.get('io'),
+      });
     }
 
     res.status(201).json({ success: true, liveClass });
@@ -369,27 +371,16 @@ const toggleMaterialLock = async (req, res) => {
     await material.save();
 
     if (unlock) {
-      // Notify student in real-time
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${studentId}`).emit('material:unlocked', {
-          materialId: material._id,
-          title: material.title,
-          subject: material.subject,
-          type: material.type,
-          unlockedAt: new Date()
-        });
-      }
-
-      // Create persistent notification in DB
-      await Notification.create({
-        recipient: studentId,
-        sender: req.user._id,
-        type: 'material_unlocked',
+      await notificationService.sendNotification({
+        recipientId: studentId,
+        senderId: req.user._id,
+        type: 'study_material',
         title: 'Study Material Unlocked!',
         message: `"${material.title}" (${material.subject}) is now available for you to study.`,
         link: '/student/materials',
-        data: { materialId: material._id }
+        referenceId: material._id,
+        referenceType: 'StudyMaterial',
+        io: req.app.get('io'),
       });
     }
 
@@ -434,15 +425,16 @@ const enterExamScore = async (req, res) => {
       isPublished: true,
     });
 
-    // Notify student
-    await Notification.create({
-      recipient: student,
-      sender: req.user._id,
-      type: 'new_score',
+    await notificationService.sendNotification({
+      recipientId: student,
+      senderId: req.user._id,
+      type: 'general',
       title: `New Score: ${examTitle}`,
       message: `Your ${subject} score has been entered: ${marksObtained}/${maxMarks}`,
       link: '/student/exam-scores',
-      data: { scoreId: score._id },
+      referenceId: score._id,
+      referenceType: 'ExamScore',
+      io: req.app.get('io'),
     });
 
     res.status(201).json({ success: true, score });
@@ -531,6 +523,41 @@ const applyLeave = async (req, res) => {
       toDate: new Date(toDate),
       reason,
     });
+
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const applicantName = req.user.name || req.user.displayName || 'A user';
+      const leaveMessage = `${applicantName} applied for leave from ${new Date(fromDate).toDateString()} to ${new Date(toDate).toDateString()}`;
+
+      if (admins.length > 1) {
+        await notificationService.sendBulkNotifications({
+          recipientIds: admins.map((admin) => admin._id),
+          senderId: req.user._id,
+          type: 'leave_applied',
+          title: 'New Leave Application',
+          message: leaveMessage,
+          referenceId: leave._id,
+          referenceType: 'LeaveApplication',
+          link: '/admin/leaves',
+          io: req.app.get('io'),
+        });
+      } else if (admins.length === 1) {
+        await notificationService.sendNotification({
+          recipientId: admins[0]._id,
+          senderId: req.user._id,
+          type: 'leave_applied',
+          title: 'New Leave Application',
+          message: leaveMessage,
+          referenceId: leave._id,
+          referenceType: 'LeaveApplication',
+          link: '/admin/leaves',
+          io: req.app.get('io'),
+        });
+      }
+    } catch (notificationError) {
+      errorCrit('[Teacher] Leave notification failed:', notificationError.message);
+    }
+
     res.status(201).json({ success: true, leave });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

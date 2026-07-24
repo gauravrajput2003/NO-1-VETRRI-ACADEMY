@@ -21,6 +21,16 @@ const leaveApplicationSchema = new mongoose.Schema(
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: { type: Date },
     adminRemarks: { type: String },
+    compensationClassDate: { type: Date },
+    compensationStatus: {
+      type: String,
+      enum: [null, 'pending', 'completed_by_teacher', 'approved_by_admin', 'expired'],
+      default: null,
+    },
+    compensationCompletedAt: { type: Date },
+    compensationCompletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    compensationApprovedAt: { type: Date },
+    compensationApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );

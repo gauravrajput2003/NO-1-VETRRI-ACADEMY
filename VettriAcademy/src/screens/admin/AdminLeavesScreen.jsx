@@ -8,7 +8,7 @@ import Toast from 'react-native-toast-message';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate } from '../../utils/formatters';
-import { fetchAdminLeaves, updateLeave } from '../../redux/slices/adminSlice';
+import { fetchAdminLeaves, updateLeave, approveCompensation } from '../../redux/slices/adminSlice';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const TouchableOpacity = (props) => {
@@ -50,6 +50,20 @@ export default function AdminLeavesScreen() {
       text1: 'Action failed',
       text2: r.payload || 'Unable to update leave status',
     });
+  };
+
+  const handleApproveCompensation = async (leaveId) => {
+    const r = await dispatch(approveCompensation(leaveId));
+    if (approveCompensation.fulfilled.match(r)) {
+      Toast.show({ type: 'success', text1: `Compensation Approved ✅` });
+      dispatch(fetchAdminLeaves({}));
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: r.payload || 'Unable to approve compensation',
+      });
+    }
   };
 
   const handleAction = (leave, status) => {
@@ -95,6 +109,23 @@ export default function AdminLeavesScreen() {
                   <Ionicons name="close" size={18} color={Colors.white} />
                   <Text style={styles.actionText}>Reject</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+            {(item.compensationClassDate || item.compensationStatus) && (
+              <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: isDark ? '#444' : '#E8E8E8' }}>
+                <Text style={{ color: textSec, fontSize: 13, marginBottom: 4 }}>
+                  Compensation Date: {item.compensationClassDate ? formatDate(item.compensationClassDate) : 'N/A'}
+                </Text>
+                {item.compensationStatus === 'completed_by_teacher' ? (
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.orange, marginTop: 8 }]} onPress={() => handleApproveCompensation(item._id)}>
+                    <Ionicons name="shield-checkmark" size={18} color={Colors.white} />
+                    <Text style={styles.actionText}>Approve Compensation</Text>
+                  </TouchableOpacity>
+                ) : item.compensationStatus === 'approved_by_admin' ? (
+                  <Text style={{ color: '#4CAF50', fontSize: 13, fontWeight: 'bold' }}>Compensation Approved</Text>
+                ) : (
+                  <Text style={{ color: THEME.primaryTeal, fontSize: 13, fontWeight: 'bold' }}>Status: {item.compensationStatus || 'Pending'}</Text>
+                )}
               </View>
             )}
           </View>

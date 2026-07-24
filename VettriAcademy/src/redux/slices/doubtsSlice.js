@@ -113,6 +113,11 @@ const doubtsSlice = createSlice({
         state.currentDoubt = { ...state.currentDoubt, status };
       }
     },
+    clearUnreadCount: (state, action) => {
+      const doubtId = action.payload;
+      if (!doubtId) return;
+      state.list = state.list.map((d) => (d._id === doubtId ? { ...d, unreadRepliesCount: 0 } : d));
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -193,6 +198,6 @@ const doubtsSlice = createSlice({
   },
 });
 
-export const { clearDoubtDetail, upsertRealtimeReply, applyRealtimeStatus } = doubtsSlice.actions;
+export const { clearDoubtDetail, upsertRealtimeReply, applyRealtimeStatus, clearUnreadCount } = doubtsSlice.actions;
 
 export default doubtsSlice.reducer;

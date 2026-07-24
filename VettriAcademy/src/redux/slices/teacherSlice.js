@@ -8,6 +8,7 @@ import {
   uploadTeacherMaterialAPI, deleteTeacherMaterialAPI,
   editTeacherMaterialAPI,
   getTeacherSalaryCurrentMonthAPI, getTeacherSalaryHistoryAPI,
+  updateTeacherCompensationAPI,
 } from '../../services/api';
 
 export const fetchTeacherDashboard = createAsyncThunk('teacher/fetchDashboard', async (_, { rejectWithValue }) => {
@@ -154,6 +155,15 @@ export const fetchLeaves = createAsyncThunk('teacher/fetchLeaves', async (_, { r
   }
 });
 
+export const updateCompensationStatus = createAsyncThunk('teacher/updateCompensationStatus', async ({ leaveId, status }, { rejectWithValue }) => {
+  try {
+    const { data } = await updateTeacherCompensationAPI(leaveId, { status });
+    return data.leave;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to update compensation status');
+  }
+});
+
 export const fetchPermissions = createAsyncThunk('teacher/fetchPermissions', async (teacherId, { rejectWithValue }) => {
   try {
     const { data } = await getTeacherPermissionsAPI(teacherId);
@@ -283,6 +293,20 @@ const teacherSlice = createSlice({
       // Leaves
       .addCase(applyLeave.fulfilled, (state, action) => { state.leaves.unshift(action.payload); })
       .addCase(fetchLeaves.fulfilled, (state, action) => { state.leaves = action.payload; })
+      .addCase(updateCompensationStatus.fulfilled, (state, action) => {
+        const index = state.leaves.findIndex(l => l._id === action.payload._id);
+        if (index !== -1) {
+          state.leaves[index] = action.payload;
+        }
+        if (state.dashboard?.pendingCompensationLeaves) {
+          const dashIndex = state.dashboard.pendingCompensationLeaves.findIndex(l => l._id === action.payload._id);
+          if (dashIndex !== -1) {
+            state.dashboard.pendingCompensationLeaves[dashIndex] = action.payload;
+          }
+          // Do not remove it, as it needs to stay until admin approves
+          // The count remains the same
+        }
+      })
       // Permissions
       .addCase(fetchPermissions.fulfilled, (state, action) => { state.permissions = action.payload; })
       // Salary

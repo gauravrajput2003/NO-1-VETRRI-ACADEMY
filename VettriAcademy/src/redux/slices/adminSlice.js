@@ -12,6 +12,7 @@ import {
   createAnnouncementAPI, deleteAnnouncementAPI,
   getLiveMonitorAPI,
   getAdminMaterialsAPI, deleteAdminMaterialAPI, toggleAdminMaterialLockAPI,
+  approveAdminLeaveCompensationAPI,
 } from '../../services/api';
 
 // ─── Async Thunks ──────────────────────────────────────────────────────────────
@@ -99,6 +100,11 @@ export const fetchAdminLeaves = createAsyncThunk('admin/fetchLeaves', async (par
 export const updateLeave = createAsyncThunk('admin/updateLeave', async ({ id, status, adminRemarks }, { rejectWithValue }) => {
   try { const { data } = await updateLeaveStatusAPI(id, { status, adminRemarks }); return data.leave; }
   catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const approveCompensation = createAsyncThunk('admin/approveCompensation', async (id, { rejectWithValue }) => {
+  try { const { data } = await approveAdminLeaveCompensationAPI(id); return data.leave; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed to approve compensation'); }
 });
 
 export const fetchCourses = createAsyncThunk('admin/fetchCourses', async (_, { rejectWithValue }) => {
@@ -240,6 +246,7 @@ const adminSlice = createSlice({
 
       .addCase(fetchAdminLeaves.fulfilled, (state, a) => { state.leaves = a.payload; })
       .addCase(updateLeave.fulfilled, (state, a) => { state.leaves = state.leaves.map((l) => l._id === a.payload?._id ? a.payload : l); })
+      .addCase(approveCompensation.fulfilled, (state, a) => { state.leaves = state.leaves.map((l) => l._id === a.payload?._id ? a.payload : l); })
 
       .addCase(fetchCourses.fulfilled, (state, a) => { state.courses = a.payload; })
       .addCase(addCourse.fulfilled, (state, a) => { state.courses.push(a.payload); })
