@@ -55,9 +55,13 @@ const getTeacherDashboard = async (req, res) => {
         scheduledDate: { $gte: today, $lt: tomorrow },
       }).select('-meetLink').populate('studentIds', 'name grade'),
       getTeacherStudentFilter(teacherId),
-      require('../models/LeaveApplication').countDocuments({ applicant: teacherId, status: 'pending' }),
+      LeaveApplication.countDocuments({ applicant: teacherId, status: 'pending' }),
       StudyMaterial.countDocuments({ teacher: teacherId }),
-      require('../models/LeaveApplication').find({ applicant: teacherId, compensationStatus: { $in: ['pending', 'completed_by_teacher'] } }).sort({ compensationClassDate: 1 }),
+      LeaveApplication.find({
+        applicant: teacherId,
+        compensationClassDate: { $exists: true, $ne: null },
+        compensationStatus: { $in: ['pending', 'completed_by_teacher'] },
+      }).select('leaveType compensationClassDate compensationStatus'),
     ]);
 
     res.status(200).json({

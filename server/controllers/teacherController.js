@@ -48,14 +48,19 @@ const getTeacherDashboard = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [todayClasses, teacherStudentIds, pendingLeaves, totalMaterials] = await Promise.all([
+    const [todayClasses, teacherStudentIds, pendingLeaves, totalMaterials, pendingCompensationLeaves] = await Promise.all([
       ClassSchedule.find({
         teacherId,
         scheduledDate: { $gte: today, $lt: tomorrow },
       }).select('-meetLink').populate('studentIds', 'name grade'),
       getTeacherStudentFilter(),
-      require('../models/LeaveApplication').countDocuments({ applicant: teacherId, status: 'pending' }),
+      LeaveApplication.countDocuments({ applicant: teacherId, status: 'pending' }),
       StudyMaterial.countDocuments({ teacher: teacherId }),
+      LeaveApplication.find({
+        applicant: teacherId,
+        compensationClassDate: { $exists: true, $ne: null },
+        compensationStatus: { $in: ['pending', 'completed_by_teacher'] },
+      }).select('leaveType compensationClassDate compensationStatus'),
     ]);
 
     res.status(200).json({
@@ -65,6 +70,8 @@ const getTeacherDashboard = async (req, res) => {
         totalStudents: teacherStudentIds.length,
         pendingLeaves,
         totalMaterials,
+        pendingCompensationCount: pendingCompensationLeaves.length,
+        pendingCompensationLeaves,
       },
     });
   } catch (error) {
