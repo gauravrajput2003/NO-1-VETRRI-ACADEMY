@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { TouchableOpacity } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import CustomTabBar from '../components/CustomTabBar';
 import { TabBarVisibilityProvider } from '../context/TabBarVisibilityContext';
 
@@ -30,7 +31,12 @@ import NotesScreen           from '../screens/student/NotesScreen';
 import TopPerformersScreen  from '../screens/student/TopPerformersScreen';
 import DoubtThreadScreen     from '../screens/common/DoubtThreadScreen';
 import HeaderActions         from '../components/HeaderActions';
-
+import {
+  fetchDoubts,
+  incrementUnreadCount,
+  selectTotalUnreadDoubtReplies,
+} from '../redux/slices/doubtsSlice';
+import { onSocketEvent } from '../services/socket';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -149,11 +155,44 @@ const TAB_CFG = {
 
 // ─── Tab Navigator ────────────────────────────────────────────────────────────
 export default function StudentNavigator() {
+  const dispatch = useDispatch();
+  const { user } = useSelector((s) => s.auth);
+  const currentDoubt = useSelector((s) => s.doubts.currentDoubt);
+  const totalUnread = useSelector(selectTotalUnreadDoubtReplies);
+
+  // Prefetch doubts so Discussion tab can show unread reply count
+  useEffect(() => {
+    dispatch(fetchDoubts({ limit: 50 }));
+  }, [dispatch]);
+
+  // Live WhatsApp-style unread counts when teachers reply
+  useEffect(() => {
+    const unsub = onSocketEvent('doubt:reply', (payload) => {
+      if (!payload?.doubtId || !payload?.reply || !user?._id) return;
+      const senderId = payload.reply.senderId?._id || payload.reply.senderId;
+      dispatch(
+        incrementUnreadCount({
+          doubtId: payload.doubtId,
+          replyId: payload.reply._id,
+          senderId,
+          currentUserId: user._id,
+          viewingDoubtId: currentDoubt?._id,
+        })
+      );
+    });
+    return unsub;
+  }, [dispatch, user?._id, currentDoubt?._id]);
+
+  const tabBadges = useMemo(
+    () => ({ Discussion: totalUnread }),
+    [totalUnread]
+  );
+
   return (
     <TabBarVisibilityProvider>
       <Tab.Navigator
         screenOptions={{ headerShown: false }}
-        tabBar={(props) => <CustomTabBar {...props} iconConfig={TAB_CFG} />}
+        tabBar={(props) => <CustomTabBar {...props} iconConfig={TAB_CFG} badges={tabBadges} />}
       >
         <Tab.Screen name="Home"      component={HomeStack}      />
         <Tab.Screen name="Classes"   component={ClassesStack}   />

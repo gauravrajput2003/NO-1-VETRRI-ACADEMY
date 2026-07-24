@@ -80,6 +80,8 @@ const doubtsSlice = createSlice({
     metrics: null,
     currentDoubt: null,
     replies: [],
+    totalUnreadReplies: 0,
+    recentUnreadReplyIds: [],
     loadingList: false,
     loadingDetail: false,
     loadingMetrics: false,
@@ -116,7 +118,38 @@ const doubtsSlice = createSlice({
     clearUnreadCount: (state, action) => {
       const doubtId = action.payload;
       if (!doubtId) return;
-      state.list = state.list.map((d) => (d._id === doubtId ? { ...d, unreadRepliesCount: 0 } : d));
+      const target = state.list.find((d) => String(d._id) === String(doubtId));
+      const cleared = target?.unreadRepliesCount || 0;
+      state.list = state.list.map((d) =>
+        String(d._id) === String(doubtId) ? { ...d, unreadRepliesCount: 0 } : d
+      );
+      state.totalUnreadReplies = Math.max(0, (state.totalUnreadReplies || 0) - cleared);
+    },
+    /**
+     * Bump unread reply count when another user replies and this user
+     * is not currently viewing that doubt thread.
+     */
+    incrementUnreadCount: (state, action) => {
+      const { doubtId, replyId, senderId, currentUserId, viewingDoubtId } = action.payload || {};
+      if (!doubtId || !currentUserId) return;
+      if (senderId && String(senderId) === String(currentUserId)) return;
+      if (viewingDoubtId && String(viewingDoubtId) === String(doubtId)) return;
+
+      if (replyId) {
+        const id = String(replyId);
+        if ((state.recentUnreadReplyIds || []).includes(id)) return;
+        state.recentUnreadReplyIds = [...(state.recentUnreadReplyIds || []), id].slice(-40);
+      }
+
+      state.totalUnreadReplies = (state.totalUnreadReplies || 0) + 1;
+      state.list = state.list.map((d) => {
+        if (String(d._id) !== String(doubtId)) return d;
+        return {
+          ...d,
+          unreadRepliesCount: (d.unreadRepliesCount || 0) + 1,
+          lastActivityAt: new Date().toISOString(),
+        };
+      });
     },
   },
   extraReducers: (builder) => {
@@ -129,6 +162,10 @@ const doubtsSlice = createSlice({
         state.loadingList = false;
         state.list = action.payload.doubts || [];
         state.pagination = action.payload.pagination || state.pagination;
+        state.totalUnreadReplies = (action.payload.doubts || []).reduce(
+          (sum, d) => sum + (d.unreadRepliesCount || 0),
+          0
+        );
       })
       .addCase(fetchDoubts.rejected, (state, action) => {
         state.loadingList = false;
@@ -198,6 +235,8 @@ const doubtsSlice = createSlice({
   },
 });
 
-export const { clearDoubtDetail, upsertRealtimeReply, applyRealtimeStatus, clearUnreadCount } = doubtsSlice.actions;
+export const { clearDoubtDetail, upsertRealtimeReply, applyRealtimeStatus, clearUnreadCount, incrementUnreadCount } = doubtsSlice.actions;
+
+export const selectTotalUnreadDoubtReplies = (state) => state.doubts?.totalUnreadReplies || 0;
 
 export default doubtsSlice.reducer;

@@ -19,7 +19,7 @@ const TAB_COLORS = {
   Profile: ['#9C27B0', '#CE93D8', '#E1BEE7'],
 };
 
-const TabButton = ({ isFocused, onPress, onLongPress, iconName, label, options, colors }) => {
+const TabButton = ({ isFocused, onPress, onLongPress, iconName, label, options, colors, badgeCount }) => {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -70,6 +70,11 @@ const TabButton = ({ isFocused, onPress, onLongPress, iconName, label, options, 
               ) : (
                 <Ionicons name={iconName} size={24} color={INACTIVE_COLOR} />
               )}
+              {badgeCount > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+                </View>
+              )}
             </View>
           </Animated.View>
         </View>
@@ -78,7 +83,7 @@ const TabButton = ({ isFocused, onPress, onLongPress, iconName, label, options, 
   );
 };
 
-export default function CustomTabBar({ state, descriptors, navigation, iconConfig }) {
+export default function CustomTabBar({ state, descriptors, navigation, iconConfig, badges = {} }) {
   const insets = useSafeAreaInsets();
   const { translateY, opacity } = useTabBarAnimation();
 
@@ -149,6 +154,7 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
                 label={label}
                 options={options}
                 colors={TAB_COLORS[route.name] || TAB_COLORS.Home}
+                badgeCount={badges[route.name] || 0}
               />
             );
           })}
@@ -229,6 +235,26 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 5,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
   },
   label: {
     fontSize: 11,

@@ -456,7 +456,12 @@ const addReply = async (req, res) => {
 		const io = req.app.get('io');
 		if (io) {
 			const populatedReply = await DoubtReply.findById(reply._id).populate('senderId', 'name displayName profilePic role');
-			io.to(`doubt:${doubt._id}`).emit('doubt:reply', { doubtId: doubt._id, reply: populatedReply });
+			const payload = { doubtId: doubt._id, reply: populatedReply };
+			io.to(`doubt:${doubt._id}`).emit('doubt:reply', payload);
+			// Also notify recipients' personal rooms so list unread badges update live
+			recipients.forEach((id) => {
+				io.to(`user:${id}`).emit('doubt:reply', payload);
+			});
 		}
 
 		res.status(201).json({ success: true, reply });

@@ -27,6 +27,7 @@ import {
   createDoubt,
   fetchDoubtMetrics,
   fetchDoubts,
+  selectTotalUnreadDoubtReplies,
 } from '../../redux/slices/doubtsSlice';
 import {
   exportDoubtsAPI,
@@ -51,6 +52,8 @@ const D = {
   ink: '#1E2A3A',
   muted: '#64748B',
   bg: '#F7F8FC',
+  violet: '#7C3AED',
+  violetDark: '#5B21B6',
 };
 
 const STATUS_LABEL = {
@@ -129,7 +132,9 @@ function DoubtCard({ item, onPress }) {
     closed: '#10B981',
   };
   const statusColor = statusColors[item.status] || '#6B7280';
-  
+  const unread = item.unreadRepliesCount || 0;
+  const hasUnread = unread > 0;
+
   const teachersCount = (item.assignedTeachers || []).length;
   const teacherText = teachersCount === 1 ? '1 Teacher' : `${teachersCount} Teachers`;
 
@@ -140,18 +145,30 @@ function DoubtCard({ item, onPress }) {
         activeOpacity={0.85}
       >
         <LinearGradient
-          colors={[D.tealDark, '#09706D']}
+          colors={hasUnread ? [D.violetDark, D.violet] : [D.tealDark, '#09706D']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.card}
+          style={[styles.card, hasUnread && styles.cardUnread]}
         >
         <View style={styles.cardTop}>
-          <Text style={[styles.cardTitle, { color: D.white, paddingRight: item.unreadRepliesCount > 0 ? 30 : 0 }]} numberOfLines={2}>{item.title}</Text>
-          {item.unreadRepliesCount > 0 && (
-            <View style={{ position: 'absolute', top: -10, right: -10, backgroundColor: '#EF4444', borderRadius: 12, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, elevation: 4, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: {width: 0, height: 2} }}>
-              <Text style={{ color: D.white, fontSize: 12, fontWeight: 'bold' }}>{item.unreadRepliesCount}</Text>
-            </View>
-          )}
+          <Text style={[styles.cardTitle, { color: D.white, flex: 1, paddingRight: 8 }]} numberOfLines={2}>{item.title}</Text>
+          <View style={styles.messageIconWrap}>
+            <Ionicons name={hasUnread ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={D.white} />
+            {hasUnread && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            )}
+          </View>
         </View>
+
+        {hasUnread && (
+          <View style={styles.newMessagesPill}>
+            <Ionicons name="mail-unread" size={13} color={D.white} />
+            <Text style={styles.newMessagesPillText}>
+              {unread} new message{unread === 1 ? '' : 's'}
+            </Text>
+          </View>
+        )}
 
         <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={2}>{item.description}</Text>
 
@@ -188,6 +205,7 @@ export default function DiscussScenarioScreen({ navigation }) {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
   const { list, metrics, loadingList, loadingMetrics, creating } = useSelector((s) => s.doubts);
+  const totalUnread = useSelector(selectTotalUnreadDoubtReplies);
 
   const role = user?.role || 'student';
   const bottomPadding = useBottomTabBarPadding();
@@ -518,6 +536,14 @@ export default function DiscussScenarioScreen({ navigation }) {
               <Text style={styles.headerTitle}>Doubt Resolution</Text>
               <Text style={styles.headerSub}>Create, track, and resolve academic doubts</Text>
             </View>
+            <View style={styles.headerMsgIcon}>
+              <Ionicons name="chatbubbles" size={22} color="#FFFFFF" />
+              {totalUnread > 0 && (
+                <View style={styles.headerUnreadBadge}>
+                  <Text style={styles.headerUnreadText}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
+                </View>
+              )}
+            </View>
           </View>
         </LinearGradient>
       </View>
@@ -537,6 +563,21 @@ export default function DiscussScenarioScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={loadingList || loadingMetrics} onRefresh={() => { loadList(); loadMetrics(); }} colors={[D.pink]} />}
         ListHeaderComponent={(
           <View>
+            {totalUnread > 0 && (
+              <View style={styles.unreadBanner}>
+                <View style={styles.unreadBannerIcon}>
+                  <Ionicons name="mail-unread" size={18} color={D.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.unreadBannerTitle}>
+                    {totalUnread} new message{totalUnread === 1 ? '' : 's'}
+                  </Text>
+                  <Text style={styles.unreadBannerSub}>
+                    Open a doubt below to read teacher replies
+                  </Text>
+                </View>
+              </View>
+            )}
             {renderMetricCards()}
 
             <View style={styles.searchBox}>
@@ -811,9 +852,48 @@ const styles = StyleSheet.create({
   secondaryActionText: { color: D.ink, fontWeight: '700', fontSize: 12.5 },
 
   card: { backgroundColor: D.white, borderRadius: 18, padding: 16, marginBottom: 14, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+  cardUnread: { borderWidth: 2, borderColor: '#C4B5FD', shadowColor: D.violet, shadowOpacity: 0.35 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   cardTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: D.ink },
   cardDesc: { marginTop: 8, fontSize: 14, color: '#334155', lineHeight: 20, fontWeight: '500' },
+  messageIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  unreadBadge: {
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: '#EF4444', borderRadius: 11, minWidth: 22, height: 22,
+    paddingHorizontal: 5, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: D.white,
+  },
+  unreadBadgeText: { color: D.white, fontSize: 11, fontWeight: '900' },
+  newMessagesPill: {
+    alignSelf: 'flex-start', marginTop: 10, marginBottom: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(239,68,68,0.95)', borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  newMessagesPillText: { color: D.white, fontSize: 12, fontWeight: '800' },
+  headerMsgIcon: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  headerUnreadBadge: {
+    position: 'absolute', top: -2, right: -2,
+    backgroundColor: '#EF4444', borderRadius: 10, minWidth: 20, height: 20,
+    paddingHorizontal: 5, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: D.white,
+  },
+  headerUnreadText: { color: D.white, fontSize: 10, fontWeight: '900' },
+  unreadBanner: {
+    marginTop: 14, marginBottom: 4, borderRadius: 16, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: D.violet,
+  },
+  unreadBannerIcon: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center',
+  },
+  unreadBannerTitle: { color: D.white, fontSize: 15, fontWeight: '900' },
+  unreadBannerSub: { color: 'rgba(255,255,255,0.88)', fontSize: 12, fontWeight: '600', marginTop: 2 },
   priorityPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   priorityText: { fontSize: 11, fontWeight: '900' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' },
