@@ -26,28 +26,56 @@ const updateProfile = async (req, res) => {
     } = req.body;
 
     const allowedFields = {};
-    const resolvedDisplayName = (displayName ?? name);
+    const trimValue = (value) => (typeof value === 'string' ? value.trim() : value);
+    const resolvedName = trimValue(name);
+    const resolvedDisplayName = trimValue(displayName ?? name);
+
+    if (resolvedName !== undefined) allowedFields.name = resolvedName;
     if (resolvedDisplayName !== undefined) allowedFields.displayName = resolvedDisplayName;
-    if (bio !== undefined) allowedFields.bio = bio;
+    if (bio !== undefined) allowedFields.bio = trimValue(bio);
+    if (mobile !== undefined) allowedFields.mobile = trimValue(mobile);
+
+    if (req.file) {
+      const user = await User.findById(req.user._id);
+      if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+      if (user.profilePic && user.profilePic.includes('cloudinary.com')) {
+        const parts = user.profilePic.split('/');
+        const publicId = parts.slice(-2).join('/').replace(/\.[^.]+$/, '');
+        try { await cloudinary.uploader.destroy(publicId); } catch {}
+      }
+
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: 'vettri-academy/avatars',
+        resource_type: 'image',
+        transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
+      });
+
+      allowedFields.profilePic = result.secure_url;
+    }
 
     // Role-specific fields
     if (req.user.role === 'student') {
-      if (mobile !== undefined) allowedFields.mobile = mobile;
-      if (email !== undefined) allowedFields.email = email;
+      if (email !== undefined) allowedFields.email = trimValue(email);
     } else if (req.user.role === 'teacher') {
       if (subjects !== undefined) allowedFields.subjects = subjects;
-      if (qualification !== undefined) allowedFields.qualification = qualification;
+      if (qualification !== undefined) allowedFields.qualification = trimValue(qualification);
       if (experienceYears !== undefined && experienceYears !== '') {
         allowedFields.experienceYears = parseInt(experienceYears, 10);
       }
-      if (teacherBio !== undefined) allowedFields.teacherBio = teacherBio;
+      if (teacherBio !== undefined) allowedFields.teacherBio = trimValue(teacherBio);
     } else if (req.user.role === 'admin') {
-      if (institutionName !== undefined) allowedFields.institutionName = institutionName;
-      if (contactEmail !== undefined) allowedFields.contactEmail = contactEmail;
+      if (institutionName !== undefined) allowedFields.institutionName = trimValue(institutionName);
+      if (contactEmail !== undefined) allowedFields.contactEmail = trimValue(contactEmail);
     }
 
-    const updated = await User.findByIdAndUpdate(req.user._id, allowedFields, { new: true })
+    const updated = await User.findByIdAndUpdate(req.user._id, allowedFields, {
+      new: true,
+      runValidators: true,
+    })
       .select('-password -refreshToken');
+
+    if (!updated) return res.status(404).json({ success: false, message: 'User not found.' });
 
     res.json({ success: true, profile: updated, user: updated });
   } catch (error) {

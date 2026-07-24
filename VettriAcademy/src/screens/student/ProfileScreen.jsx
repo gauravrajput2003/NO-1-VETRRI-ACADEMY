@@ -8,7 +8,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity as RNTouchableOpacity,
   Image, Alert, Platform, RefreshControl,
-  Pressable as RNPressable, StatusBar,
+  Pressable as RNPressable, StatusBar, Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,10 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
-import { getProfileAPI } from '../../services/api';
-import { logoutUser } from '../../redux/slices/authSlice';
+import { getProfileAPI, updateProfileAPI, updateProfileAvatarAPI } from '../../services/api';
+import { logoutUser, updateUser } from '../../redux/slices/authSlice';
 import { getDiceBearUrl, APP_VERSION } from '../../utils/constants';
 import { formatDate } from '../../utils/formatters';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
@@ -236,6 +237,12 @@ export default function ProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editMobile, setEditMobile] = useState('');
+  const [editImageUri, setEditImageUri] = useState(null);
+  const [editImageAsset, setEditImageAsset] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const anim1 = useRef(new Animated.Value(0)).current;
   const anim2 = useRef(new Animated.Value(0)).current;
@@ -279,6 +286,110 @@ export default function ProfileScreen({ navigation }) {
     setRefreshing(true);
     loadProfile();
   }, []);
+
+  const normalizeProfileUser = (nextUser) => ({
+    ...nextUser,
+    profilePicture: nextUser?.profilePicture || nextUser?.profilePic,
+  });
+
+  const openEditProfile = () => {
+    const currentProfile = profile || user || {};
+    setEditName(currentProfile.displayName || currentProfile.name || '');
+    setEditMobile(currentProfile.mobile || '');
+    setEditImageUri(null);
+    setEditImageAsset(null);
+    setEditMode(true);
+  };
+
+  const pickProfileImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Toast.show({ type: 'error', text1: 'Photo permission is required.' });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setEditImageUri(result.assets[0].uri);
+        setEditImageAsset(result.assets[0]);
+      }
+    } catch {
+      Toast.show({ type: 'error', text1: 'Unable to open photo library.' });
+    }
+  };
+
+  const saveProfileChanges = async () => {
+    const trimmedName = editName.trim();
+    const trimmedMobile = editMobile.trim();
+
+    if (!trimmedName || !trimmedMobile) {
+      Toast.show({ type: 'error', text1: 'Name and mobile are required.' });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const profileResponse = await updateProfileAPI({
+        name: trimmedName,
+        displayName: trimmedName,
+        mobile: trimmedMobile,
+      });
+      let updatedUser = normalizeProfileUser(profileResponse.data.user || profileResponse.data.profile || {});
+
+      if ((updatedUser?.mobile || '').trim() !== trimmedMobile) {
+        throw new Error('Mobile number was not updated by the server. Please deploy the latest backend changes.');
+      }
+
+      if (editImageUri) {
+        const extension = editImageUri.split('.').pop()?.toLowerCase();
+        const imageType = extension === 'png' ? 'image/png' : 'image/jpeg';
+        const avatarData = new FormData();
+        const fileName = editImageAsset?.fileName || `profile.${extension === 'png' ? 'png' : 'jpg'}`;
+
+        if (Platform.OS === 'web') {
+          if (editImageAsset?.file) {
+            avatarData.append('avatar', editImageAsset.file, fileName);
+          } else {
+            const imageResponse = await fetch(editImageUri);
+            const imageBlob = await imageResponse.blob();
+            avatarData.append('avatar', imageBlob, fileName);
+          }
+        } else {
+          avatarData.append('avatar', {
+            uri: editImageUri,
+            type: imageType,
+            name: fileName,
+          });
+        }
+
+        const avatarResponse = await updateProfileAvatarAPI(avatarData);
+        updatedUser = normalizeProfileUser(avatarResponse.data.user || updatedUser);
+      }
+
+      setProfile(updatedUser);
+      dispatch(updateUser(updatedUser));
+      setAvatarFailed(false);
+      setEditMode(false);
+      setEditImageUri(null);
+      setEditImageAsset(null);
+      Toast.show({ type: 'success', text1: 'Profile updated successfully' });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Profile update failed',
+        text2: error.response?.data?.message || error.message || 'Please try again.',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const performLogout = async () => {
     try {
@@ -339,6 +450,7 @@ export default function ProfileScreen({ navigation }) {
   const displayName = (p?.displayName || p?.name || 'Student').toLowerCase();
 
   return (
+    <>
     <ScrollView
       onScroll={onTabBarScroll}
       scrollEventThrottle={16}
@@ -381,6 +493,15 @@ export default function ProfileScreen({ navigation }) {
                     <Ionicons name="star" size={12} color={T.white} />
                   </View>
                   <View style={st.avatarOnlineDot} />
+                  <TouchableOpacity
+                    style={st.avatarEditButton}
+                    onPress={openEditProfile}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit profile"
+                  >
+                    <Ionicons name="pencil" size={14} color={T.white} />
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -413,6 +534,15 @@ export default function ProfileScreen({ navigation }) {
               <Ionicons name="person-circle" size={22} color={T.pink} />
             </View>
             <Text style={st.cardTitle}>Contact Info</Text>
+            <TouchableOpacity
+              style={st.cardEditButton}
+              onPress={openEditProfile}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+            >
+              <Ionicons name="create-outline" size={18} color={T.pink} />
+            </TouchableOpacity>
           </View>
           <InfoRow icon="call-outline" label="Mobile" value={p?.mobile || 'Not set'} />
           <View style={st.divider} />
@@ -469,6 +599,83 @@ export default function ProfileScreen({ navigation }) {
         </Animated.View>
       </View>
     </ScrollView>
+    <Modal visible={editMode} animationType="slide" transparent onRequestClose={() => !saving && setEditMode(false)}>
+      <View style={st.modalBackdrop}>
+        <View style={st.editModal}>
+          <View style={st.editHeader}>
+            <Text style={st.editTitle}>Edit Profile</Text>
+            <TouchableOpacity
+              style={st.modalCloseButton}
+              onPress={() => !saving && setEditMode(false)}
+              activeOpacity={0.85}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel="Close edit profile"
+            >
+              <Ionicons name="close" size={22} color={T.title} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={st.editAvatarWrap}
+            onPress={pickProfileImage}
+            activeOpacity={0.9}
+            disabled={saving}
+          >
+            <Image source={{ uri: editImageUri || avatarUrl }} style={st.editAvatar} />
+            <View style={st.changePhotoButton}>
+              <Ionicons name="camera" size={16} color={T.white} />
+              <Text style={st.changePhotoText}>Change Photo</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={st.inputGroup}>
+            <Text style={st.inputLabel}>Name</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              style={st.textInput}
+              placeholder="Enter name"
+              placeholderTextColor={T.subtitle}
+              editable={!saving}
+            />
+          </View>
+
+          <View style={st.inputGroup}>
+            <Text style={st.inputLabel}>Mobile</Text>
+            <TextInput
+              value={editMobile}
+              onChangeText={setEditMobile}
+              style={st.textInput}
+              placeholder="Enter mobile number"
+              placeholderTextColor={T.subtitle}
+              keyboardType="phone-pad"
+              editable={!saving}
+            />
+          </View>
+
+          <View style={st.editActions}>
+            <TouchableOpacity
+              style={[st.editActionButton, st.cancelButton]}
+              onPress={() => !saving && setEditMode(false)}
+              activeOpacity={0.85}
+              disabled={saving}
+            >
+              <Text style={st.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[st.editActionButton, st.saveButton, saving && st.disabledButton]}
+              onPress={saveProfileChanges}
+              activeOpacity={0.85}
+              disabled={saving}
+            >
+              {saving ? <ActivityIndicator color={T.white} /> : <Text style={st.saveButtonText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -531,6 +738,12 @@ const st = StyleSheet.create({
     width: 14, height: 14, borderRadius: 7,
     backgroundColor: '#22C55E', borderWidth: 2, borderColor: T.white,
   },
+  avatarEditButton: {
+    position: 'absolute', right: -4, top: -4,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: T.pink, borderWidth: 2.5, borderColor: T.white,
+    justifyContent: 'center', alignItems: 'center',
+  },
   name: {
     fontSize: 32, fontWeight: '900', color: T.title,
     textAlign: 'center', letterSpacing: -0.5,
@@ -573,7 +786,12 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(255,77,141,0.10)',
     justifyContent: 'center', alignItems: 'center',
   },
-  cardTitle: { fontSize: 17, fontWeight: '900', color: T.title },
+  cardTitle: { flex: 1, fontSize: 17, fontWeight: '900', color: T.title },
+  cardEditButton: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,77,141,0.10)',
+    justifyContent: 'center', alignItems: 'center',
+  },
   infoRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 16, gap: 14,
@@ -676,4 +894,91 @@ const st = StyleSheet.create({
   },
   logoutText: { flex: 1, fontSize: 15, fontWeight: '800', color: T.error },
   version: { textAlign: 'center', fontSize: 12, color: T.subtitle, marginTop: 16, marginBottom: 8 },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(31,41,55,0.42)',
+    justifyContent: 'flex-end',
+  },
+  editModal: {
+    backgroundColor: T.white,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 26,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  editTitle: { fontSize: 20, fontWeight: '900', color: T.title },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editAvatarWrap: { alignItems: 'center', marginBottom: 20 },
+  editAvatar: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 4,
+    borderColor: T.pinkLight,
+    backgroundColor: '#F3F4F6',
+  },
+  changePhotoButton: {
+    marginTop: -18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: T.pink,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: T.white,
+  },
+  changePhotoText: { color: T.white, fontSize: 12, fontWeight: '800' },
+  inputGroup: { marginBottom: 14 },
+  inputLabel: {
+    fontSize: 12,
+    color: T.subtitle,
+    fontWeight: '800',
+    marginBottom: 8,
+    letterSpacing: 0.3,
+  },
+  textInput: {
+    minHeight: 52,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FAFAFA',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: T.title,
+  },
+  editActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  editActionButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  saveButton: { backgroundColor: T.pink },
+  disabledButton: { opacity: 0.7 },
+  cancelButtonText: { fontSize: 15, fontWeight: '900', color: T.title },
+  saveButtonText: { fontSize: 15, fontWeight: '900', color: T.white },
 });

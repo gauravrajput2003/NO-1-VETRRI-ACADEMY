@@ -9,7 +9,8 @@ const {
 } = require('../controllers/profileController');
 
 router.get('/', verifyToken, getProfile);
-router.patch('/', verifyToken, updateProfile);
+router.patch('/', verifyToken, uploadAvatar.single('profilePicture'), updateProfile);
+router.put('/', verifyToken, uploadAvatar.single('profilePicture'), updateProfile);
 router.patch('/avatar', verifyToken, uploadAvatar.single('avatar'), updateAvatar);
 router.patch('/password', verifyToken, changePassword);
 

@@ -230,6 +230,24 @@ export const getProfileAPI = () =>
 export const updateProfileAPI = (data) =>
   api.patch('/profile', data);
 
+export const updateProfileAvatarAPI = async (formData) => {
+  const token = await getToken();
+  const response = await fetch(`${API_BASE_URL}/profile/avatar`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err = new Error(data.message || `Avatar upload failed (${response.status})`);
+    err.response = { data, status: response.status };
+    throw err;
+  }
+  return { data };
+};
+
 export const changePasswordAPI = (currentPassword, newPassword) =>
   api.patch('/profile/password', { currentPassword, newPassword });
 
