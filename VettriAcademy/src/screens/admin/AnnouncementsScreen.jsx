@@ -411,13 +411,23 @@ export default function AnnouncementsScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
         >
-          <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, paddingBottom: Math.max(24, bottomPadding) }]}>
+     <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.card.dark : Colors.white, paddingBottom: 20 }]}>
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.modalScrollContent}
             >
-              <Text style={[styles.modalTitle, { color: textColor }]}>New Announcement</Text>
+              {/* Header: title left, close (X) button top-right */}
+              <View style={styles.modalHeaderRow}>
+                <Text style={[styles.modalTitle, { color: textColor }]}>New Announcement</Text>
+                <RNTouchableOpacity
+                  onPress={handleCancel}
+                  disabled={isUploading}
+                  style={styles.headerCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color={Colors.darkGray} />
+                </RNTouchableOpacity>
+              </View>
 
               <TextInput
                 style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]}
@@ -455,30 +465,42 @@ export default function AnnouncementsScreen() {
                 <Text style={[styles.pinText, { color: textColor }]}>Pin this announcement</Text>
               </TouchableOpacity>
 
-              {/* ── Media Attachments ── */}
+              {/* ── Media Attachments (icon-only circular buttons) ── */}
               <Text style={[styles.label, { color: textColor, marginTop: 16 }]}>Attach Media</Text>
 
               <View style={styles.attachRow}>
-                <RNTouchableOpacity style={styles.attachBtn} onPress={pickImage} disabled={isUploading}>
-                  <Ionicons name="image-outline" size={18} color={Colors.info} />
-                  <Text style={[styles.attachBtnText, { color: Colors.info }]}>Image</Text>
-                </RNTouchableOpacity>
-                <RNTouchableOpacity
-                  style={styles.attachBtn}
-                  onPress={() => setVideoSheetOpen(true)}
-                  disabled={isUploading}
-                >
-                  <Ionicons name="videocam-outline" size={18} color="#8B5CF6" />
-                  <Text style={[styles.attachBtnText, { color: '#8B5CF6' }]}>Video Message</Text>
-                </RNTouchableOpacity>
-                <RNTouchableOpacity
-                  style={styles.attachBtn}
-                  onPress={() => setVoiceSheetOpen(true)}
-                  disabled={isUploading}
-                >
-                  <Ionicons name="mic-outline" size={18} color={Colors.success} />
-                  <Text style={[styles.attachBtnText, { color: Colors.success }]}>Voice Message</Text>
-                </RNTouchableOpacity>
+                <View style={styles.attachItem}>
+                  <RNTouchableOpacity
+                    style={[styles.attachIconBtn, { backgroundColor: Colors.info + '15', borderColor: Colors.info }]}
+                    onPress={pickImage}
+                    disabled={isUploading}
+                  >
+                    <Ionicons name="image" size={22} color={Colors.info} />
+                  </RNTouchableOpacity>
+                  <Text style={[styles.attachLabel, { color: Colors.info }]}>Image</Text>
+                </View>
+
+                <View style={styles.attachItem}>
+                  <RNTouchableOpacity
+                    style={[styles.attachIconBtn, { backgroundColor: '#8B5CF615', borderColor: '#8B5CF6' }]}
+                    onPress={() => setVideoSheetOpen(true)}
+                    disabled={isUploading}
+                  >
+                    <Ionicons name="videocam" size={22} color="#8B5CF6" />
+                  </RNTouchableOpacity>
+                  <Text style={[styles.attachLabel, { color: '#8B5CF6' }]}>Video</Text>
+                </View>
+
+                <View style={styles.attachItem}>
+                  <RNTouchableOpacity
+                    style={[styles.attachIconBtn, { backgroundColor: Colors.success + '15', borderColor: Colors.success }]}
+                    onPress={() => setVoiceSheetOpen(true)}
+                    disabled={isUploading}
+                  >
+                    <Ionicons name="mic" size={22} color={Colors.success} />
+                  </RNTouchableOpacity>
+                  <Text style={[styles.attachLabel, { color: Colors.success }]}>Voice</Text>
+                </View>
               </View>
 
               {/* Selected file chips */}
@@ -492,11 +514,8 @@ export default function AnnouncementsScreen() {
                 />
               ))}
 
-              {/* Action buttons */}
+              {/* Publish action */}
               <View style={styles.modalActions}>
-                <RNTouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUploading}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </RNTouchableOpacity>
                 <RNTouchableOpacity
                   style={[styles.confirmBtn, isUploading && { opacity: 0.7 }]}
                   onPress={handleCreate}
@@ -505,7 +524,10 @@ export default function AnnouncementsScreen() {
                   {isUploading ? (
                     <ActivityIndicator size="small" color={Colors.white} />
                   ) : (
-                    <Text style={styles.confirmBtnText}>Publish</Text>
+                    <>
+                      <Ionicons name="send" size={17} color={Colors.white} style={{ marginRight: 8 }} />
+                      <Text style={styles.confirmBtnText}>Publish</Text>
+                    </>
                   )}
                 </RNTouchableOpacity>
               </View>
@@ -557,29 +579,69 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, maxHeight: '92%' },
   modalScrollContent: { paddingTop: 24, paddingBottom: 8 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  headerCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.gray + '40',
+  },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, marginBottom: 12 },
   textArea: { height: 100, textAlignVertical: 'top' },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
   roleRow: { flexDirection: 'row', gap: 8 },
-  roleChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, backgroundColor: Colors.primary + '10' },
+  roleChip: {
+    flex: 1,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: Colors.primary + '10',
+  },
   roleActive: { backgroundColor: Colors.primary },
   roleText: { fontSize: 13, fontWeight: '500', color: Colors.primary },
   pinToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
   pinText: { fontSize: 14 },
-  // Media attach
-  attachRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  attachBtn: {
-    minWidth: '30%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: 10, paddingHorizontal: 6, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.lightGray,
-    backgroundColor: Colors.lightGray + '30',
+  // Media attach — icon-only circular buttons
+  attachRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 14 },
+  attachItem: { alignItems: 'center', gap: 6 },
+  attachIconBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
   },
-  attachBtnText: { fontSize: 10, fontWeight: '700' },
+  attachLabel: { fontSize: 11, fontWeight: '700' },
   // Action buttons
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: Colors.gray },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: Colors.darkGray },
-  confirmBtn: { flex: 2, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: Colors.pink },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: Colors.white,
+    borderWidth: 1.5,
+    borderColor: Colors.pink,
+  },
+  cancelBtnText: { fontSize: 15, fontWeight: '700', color: Colors.pink },
+  confirmBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: Colors.pink,
+  },
   confirmBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
 });

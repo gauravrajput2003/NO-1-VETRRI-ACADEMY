@@ -8,6 +8,29 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+// Printable component definitions — used for "select which components to include" on slips/reports
+const EARNING_FIELDS = [
+  { key: 'baseSalary', label: 'Base Salary' },
+  { key: 'groupTuitionSalary', label: 'Group Tuition Salary' },
+  { key: 'individualTuitionSalary', label: 'Individual Tuition Salary' },
+  { key: 'hourlyTuitionSalary', label: 'Hourly Tuition Salary' },
+  { key: 'weeklyTuitionSalary', label: 'Weekly Tuition Salary' },
+  { key: 'performanceBonus', label: 'Performance Bonus' },
+  { key: 'specialAllowance', label: 'Special Allowance' },
+];
+
+const DEDUCTION_FIELDS = [
+  { key: 'providentFund', label: 'Provident Fund' },
+  { key: 'taxDeduction', label: 'Tax Deduction' },
+  { key: 'otherDeductions', label: 'Other Deductions' },
+  { key: 'attendanceDeductionAmount', label: 'Attendance Deduction' },
+];
+
+const parseComponents = (raw) => {
+  if (!raw) return null; // null = include everything (backward compatible default)
+  return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
+};
+
 const getMonthContext = (month, year) => {
   const now = new Date();
   const monthNumber = month ? MONTH_NAMES.findIndex((name) => name.toLowerCase() === String(month).toLowerCase()) + 1 : now.getMonth() + 1;
@@ -36,6 +59,11 @@ const buildSalaryBreakdown = (teacher, overrides = {}) => {
   const absenceCount = Math.max(daysInMonth - daysPresent, 0);
   const attendanceDeductionAmount = attendanceDeduction ? absenceCount * deductionPerDay : 0;
 
+  const groupTuitionSalary = toNumber(overrides.groupTuitionSalary ?? config.groupTuitionSalary);
+  const individualTuitionSalary = toNumber(overrides.individualTuitionSalary ?? config.individualTuitionSalary);
+  const hourlyTuitionSalary = toNumber(overrides.hourlyTuitionSalary ?? config.hourlyTuitionSalary);
+  const weeklyTuitionSalary = toNumber(overrides.weeklyTuitionSalary ?? config.weeklyTuitionSalary);
+
   const baseSalary = toNumber(overrides.baseSalary ?? config.baseSalary);
   const performanceBonus = toNumber(overrides.performanceBonus ?? config.performanceBonus);
   const specialAllowance = toNumber(overrides.specialAllowance ?? config.specialAllowance);
@@ -43,11 +71,16 @@ const buildSalaryBreakdown = (teacher, overrides = {}) => {
   const taxDeduction = toNumber(overrides.taxDeduction ?? config.taxDeduction);
   const otherDeductions = toNumber(overrides.otherDeductions ?? config.otherDeductions);
 
-  const grossSalary = baseSalary + performanceBonus + specialAllowance;
+  const grossSalary = baseSalary + performanceBonus + specialAllowance
+    + groupTuitionSalary + individualTuitionSalary + hourlyTuitionSalary + weeklyTuitionSalary;
   const totalDeductions = providentFund + taxDeduction + otherDeductions + attendanceDeductionAmount;
   const netSalary = Math.max(grossSalary - totalDeductions, 0);
 
   return {
+    groupTuitionSalary,
+    individualTuitionSalary,
+    hourlyTuitionSalary,
+    weeklyTuitionSalary,
     baseSalary,
     performanceBonus,
     specialAllowance,
@@ -73,6 +106,10 @@ const upsertTeacherSalaryHistory = async (teacher, record) => {
     month: record.month,
     year: record.year,
     monthYear: record.monthYear,
+    groupTuitionSalary: record.groupTuitionSalary || 0,
+    individualTuitionSalary: record.individualTuitionSalary || 0,
+    hourlyTuitionSalary: record.hourlyTuitionSalary || 0,
+    weeklyTuitionSalary: record.weeklyTuitionSalary || 0,
     baseSalary: record.baseSalary,
     performanceBonus: record.performanceBonus,
     specialAllowance: record.specialAllowance,
@@ -80,6 +117,7 @@ const upsertTeacherSalaryHistory = async (teacher, record) => {
     providentFund: record.providentFund,
     taxDeduction: record.taxDeduction,
     otherDeductions: record.otherDeductions,
+    attendanceDeductionAmount: record.attendanceDeductionAmount || 0,
     totalDeductions: record.totalDeductions,
     netSalary: record.netSalary,
     paymentStatus: record.paymentStatus,
@@ -87,6 +125,8 @@ const upsertTeacherSalaryHistory = async (teacher, record) => {
     paidAmount: record.paidAmount || 0,
     paymentMethod: record.paymentMethod || '',
     transactionId: record.transactionId || '',
+    processingDate: record.processingDate || null,
+    salaryDate: record.salaryDate || null,
     recordedBy: record.processedBy || null,
     recordedAt: record.processedAt || new Date(),
     notes: record.notes || '',
@@ -115,6 +155,10 @@ const setTeacherSalaryConfig = async (req, res) => {
       { _id: req.params.teacherId, role: 'teacher' },
       {
         salary: {
+          groupTuitionSalary: toNumber(req.body.groupTuitionSalary),
+          individualTuitionSalary: toNumber(req.body.individualTuitionSalary),
+          hourlyTuitionSalary: toNumber(req.body.hourlyTuitionSalary),
+          weeklyTuitionSalary: toNumber(req.body.weeklyTuitionSalary),
           baseSalary: toNumber(req.body.baseSalary),
           performanceBonus: toNumber(req.body.performanceBonus),
           specialAllowance: toNumber(req.body.specialAllowance),
@@ -133,6 +177,8 @@ const setTeacherSalaryConfig = async (req, res) => {
           paidLeaveBalance: toNumber(req.body.paidLeaveBalance, 12),
           casualLeaveBalance: toNumber(req.body.casualLeaveBalance, 5),
           medicalLeaveBalance: toNumber(req.body.medicalLeaveBalance, 10),
+          // Salary Configuration effective date — when this config was set / takes effect
+          effectiveDate: req.body.effectiveDate ? new Date(req.body.effectiveDate) : null,
         },
       },
       { new: true, runValidators: true }
@@ -180,6 +226,9 @@ const getAdminSalaryDashboard = async (req, res) => {
         payments: tx?.payments || [],
         processedByName: tx?.processedByName || '',
         processedAt: tx?.processedAt || null,
+        processingDate: tx?.processingDate || null,
+        salaryDate: tx?.salaryDate || null,
+        effectiveDate: teacher.salary?.effectiveDate || null,
         salarySlipGenerated: Boolean(tx?.salarySlipGenerated),
         salarySlipUrl: tx?.salarySlipUrl || createSlipUrl(teacher._id, context.monthYear),
       };
@@ -210,7 +259,10 @@ const getAdminSalaryDashboard = async (req, res) => {
 
 const processSalary = async (req, res) => {
   try {
-    const { teacherId, month, year, paymentDate, transactionId, notes, paymentMethod, processedByName, payingAmount, proofImage, remarks } = req.body;
+    const {
+      teacherId, month, year, paymentDate, transactionId, notes, paymentMethod,
+      processedByName, payingAmount, proofImage, remarks, processingDate, salaryDate,
+    } = req.body;
     const teacher = await User.findOne({ _id: teacherId, role: 'teacher' });
 
     if (!teacher) {
@@ -220,6 +272,8 @@ const processSalary = async (req, res) => {
     const context = getMonthContext(month, year);
     const breakdown = buildSalaryBreakdown(teacher, req.body);
     const paidDate = paymentDate ? new Date(paymentDate) : new Date();
+    const procDate = processingDate ? new Date(processingDate) : new Date();
+    const salDate = salaryDate ? new Date(salaryDate) : paidDate;
     const slipUrl = createSlipUrl(teacher._id, context.monthYear);
 
     let transaction = await SalaryTransaction.findOne({ teacherId: teacher._id, monthYear: context.monthYear });
@@ -229,6 +283,10 @@ const processSalary = async (req, res) => {
 
     transaction.teacherName = teacher.displayName || teacher.name;
     transaction.teacherEmail = teacher.email || '';
+    transaction.groupTuitionSalary = breakdown.groupTuitionSalary;
+    transaction.individualTuitionSalary = breakdown.individualTuitionSalary;
+    transaction.hourlyTuitionSalary = breakdown.hourlyTuitionSalary;
+    transaction.weeklyTuitionSalary = breakdown.weeklyTuitionSalary;
     transaction.baseSalary = breakdown.baseSalary;
     transaction.performanceBonus = breakdown.performanceBonus;
     transaction.specialAllowance = breakdown.specialAllowance;
@@ -236,12 +294,14 @@ const processSalary = async (req, res) => {
     transaction.providentFund = breakdown.providentFund;
     transaction.taxDeduction = breakdown.taxDeduction;
     transaction.otherDeductions = breakdown.otherDeductions;
+    transaction.attendanceDeductionAmount = breakdown.attendanceDeductionAmount;
     transaction.totalDeductions = breakdown.totalDeductions;
     transaction.netSalary = breakdown.netSalary;
+    transaction.processingDate = procDate;
+    transaction.salaryDate = salDate;
 
     const newlyPaying = toNumber(payingAmount, breakdown.netSalary);
 
-    // Append to payments list if newlyPaying > 0
     if (newlyPaying > 0) {
       if (!Array.isArray(transaction.payments)) {
         transaction.payments = [];
@@ -253,6 +313,8 @@ const processSalary = async (req, res) => {
         proofImage: proofImage || '',
         remarks: remarks || '',
         paidAt: paidDate,
+        processingDate: procDate,
+        salaryDate: salDate,
       });
     }
 
@@ -313,11 +375,13 @@ const processSalary = async (req, res) => {
 
 const processAllSalaries = async (req, res) => {
   try {
-    const { month, year } = req.body;
+    const { month, year, salaryDate } = req.body;
     const context = getMonthContext(month, year);
     const teachers = await User.find({ role: 'teacher', isActive: true });
     let processed = 0;
     let failed = 0;
+    const now = new Date();
+    const salDate = salaryDate ? new Date(salaryDate) : now;
 
     for (const teacher of teachers) {
       try {
@@ -330,6 +394,10 @@ const processAllSalaries = async (req, res) => {
 
         transaction.teacherName = teacher.displayName || teacher.name;
         transaction.teacherEmail = teacher.email || '';
+        transaction.groupTuitionSalary = breakdown.groupTuitionSalary;
+        transaction.individualTuitionSalary = breakdown.individualTuitionSalary;
+        transaction.hourlyTuitionSalary = breakdown.hourlyTuitionSalary;
+        transaction.weeklyTuitionSalary = breakdown.weeklyTuitionSalary;
         transaction.baseSalary = breakdown.baseSalary;
         transaction.performanceBonus = breakdown.performanceBonus;
         transaction.specialAllowance = breakdown.specialAllowance;
@@ -337,15 +405,18 @@ const processAllSalaries = async (req, res) => {
         transaction.providentFund = breakdown.providentFund;
         transaction.taxDeduction = breakdown.taxDeduction;
         transaction.otherDeductions = breakdown.otherDeductions;
+        transaction.attendanceDeductionAmount = breakdown.attendanceDeductionAmount;
         transaction.totalDeductions = breakdown.totalDeductions;
         transaction.netSalary = breakdown.netSalary;
         transaction.paymentStatus = 'paid';
-        transaction.paidDate = new Date();
+        transaction.paidDate = now;
         transaction.paidAmount = breakdown.netSalary;
         transaction.paymentMethod = teacher.salary?.paymentMode || 'bank_transfer';
+        transaction.processingDate = now;
+        transaction.salaryDate = salDate;
         transaction.processedBy = req.user?._id || null;
         transaction.processedByName = req.user?.name || req.user?.displayName || '';
-        transaction.processedAt = new Date();
+        transaction.processedAt = now;
         transaction.salarySlipGenerated = true;
         transaction.salarySlipUrl = slipUrl;
         transaction.notes = 'Bulk salary processing';
@@ -458,6 +529,10 @@ const downloadSalarySlip = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Salary record not found.' });
     }
 
+    const selectedKeys = parseComponents(req.query.components);
+    const earningsToShow = selectedKeys ? EARNING_FIELDS.filter((f) => selectedKeys.includes(f.key)) : EARNING_FIELDS;
+    const deductionsToShow = selectedKeys ? DEDUCTION_FIELDS.filter((f) => selectedKeys.includes(f.key)) : DEDUCTION_FIELDS;
+
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="salary-slip-${monthYear.replace(/\s+/g, '-').toLowerCase()}.pdf"`);
@@ -472,21 +547,29 @@ const downloadSalarySlip = async (req, res) => {
     doc.text(`Teacher Name: ${transaction.teacherName}`);
     doc.text(`Teacher Email: ${transaction.teacherEmail || '-'}`);
     doc.text(`Designation: Teacher`);
+    doc.text(`Processing Date: ${transaction.processingDate ? new Date(transaction.processingDate).toLocaleDateString('en-IN') : '-'}`);
+    doc.text(`Salary Date: ${transaction.salaryDate ? new Date(transaction.salaryDate).toLocaleDateString('en-IN') : '-'}`);
     doc.moveDown();
 
-    doc.fontSize(13).text('Earnings', { underline: true });
-    doc.fontSize(11).text(`Base Salary: ₹${transaction.baseSalary || 0}`);
-    doc.text(`Performance Bonus: ₹${transaction.performanceBonus || 0}`);
-    doc.text(`Special Allowance: ₹${transaction.specialAllowance || 0}`);
-    doc.text(`Gross Salary: ₹${transaction.grossSalary || 0}`);
-    doc.moveDown();
+    if (earningsToShow.length) {
+      doc.fontSize(13).text('Earnings', { underline: true });
+      doc.fontSize(11);
+      earningsToShow.forEach((f) => {
+        doc.text(`${f.label}: ₹${transaction[f.key] || 0}`);
+      });
+      doc.text(`Gross Salary: ₹${transaction.grossSalary || 0}`);
+      doc.moveDown();
+    }
 
-    doc.fontSize(13).text('Deductions', { underline: true });
-    doc.fontSize(11).text(`Provident Fund: ₹${transaction.providentFund || 0}`);
-    doc.text(`Tax Deduction: ₹${transaction.taxDeduction || 0}`);
-    doc.text(`Other Deductions: ₹${transaction.otherDeductions || 0}`);
-    doc.text(`Total Deductions: ₹${transaction.totalDeductions || 0}`);
-    doc.moveDown();
+    if (deductionsToShow.length) {
+      doc.fontSize(13).text('Deductions', { underline: true });
+      doc.fontSize(11);
+      deductionsToShow.forEach((f) => {
+        doc.text(`${f.label}: ₹${transaction[f.key] || 0}`);
+      });
+      doc.text(`Total Deductions: ₹${transaction.totalDeductions || 0}`);
+      doc.moveDown();
+    }
 
     doc.fontSize(14).text(`Net Salary: ₹${transaction.netSalary || 0}`, { underline: true });
     doc.moveDown();
@@ -503,6 +586,196 @@ const downloadSalarySlip = async (req, res) => {
   }
 };
 
+const editSalaryPayment = async (req, res) => {
+  try {
+    const { transactionId, paymentId } = req.params;
+    const { amount, method, transactionId: txnId, remarks, paidAt, processingDate, salaryDate } = req.body;
+
+    const transaction = await SalaryTransaction.findById(transactionId);
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Salary transaction not found.' });
+    }
+
+    const payment = transaction.payments.id(paymentId);
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment record not found.' });
+    }
+
+    if (amount !== undefined) payment.amount = toNumber(amount, payment.amount);
+    if (method !== undefined) payment.method = method;
+    if (txnId !== undefined) payment.transactionId = txnId;
+    if (remarks !== undefined) payment.remarks = remarks;
+    if (paidAt) payment.paidAt = new Date(paidAt);
+    if (processingDate) payment.processingDate = new Date(processingDate);
+    if (salaryDate) payment.salaryDate = new Date(salaryDate);
+
+    const totalPaid = transaction.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    transaction.paidAmount = totalPaid;
+
+    if (transaction.payments.length) {
+      const last = transaction.payments[transaction.payments.length - 1];
+      transaction.paidDate = last.paidAt;
+      transaction.paymentMethod = last.method;
+      transaction.transactionId = last.transactionId;
+      transaction.processingDate = last.processingDate;
+      transaction.salaryDate = last.salaryDate;
+    }
+
+    if (totalPaid >= transaction.netSalary && totalPaid > 0) {
+      transaction.paymentStatus = 'paid';
+    } else if (totalPaid > 0) {
+      transaction.paymentStatus = 'partial';
+    } else {
+      transaction.paymentStatus = 'pending';
+    }
+
+    await transaction.save();
+
+    const teacher = await User.findById(transaction.teacherId);
+    if (teacher) {
+      await upsertTeacherSalaryHistory(teacher, { ...transaction.toObject(), salarySlipUrl: transaction.salarySlipUrl });
+    }
+
+    res.status(200).json({ success: true, message: 'Payment record updated', transaction });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deleteSalaryPayment = async (req, res) => {
+  try {
+    const { transactionId, paymentId } = req.params;
+    const transaction = await SalaryTransaction.findById(transactionId);
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Salary transaction not found.' });
+    }
+
+    const payment = transaction.payments.id(paymentId);
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment record not found.' });
+    }
+
+    transaction.payments.pull({ _id: paymentId });
+
+    const totalPaid = transaction.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    transaction.paidAmount = totalPaid;
+
+    if (transaction.payments.length) {
+      const last = transaction.payments[transaction.payments.length - 1];
+      transaction.paidDate = last.paidAt;
+      transaction.paymentMethod = last.method;
+      transaction.transactionId = last.transactionId;
+      transaction.processingDate = last.processingDate;
+      transaction.salaryDate = last.salaryDate;
+    } else {
+      transaction.paidDate = null;
+      transaction.transactionId = '';
+    }
+
+    if (totalPaid >= transaction.netSalary && totalPaid > 0) {
+      transaction.paymentStatus = 'paid';
+    } else if (totalPaid > 0) {
+      transaction.paymentStatus = 'partial';
+    } else {
+      transaction.paymentStatus = 'pending';
+    }
+
+    await transaction.save();
+
+    const teacher = await User.findById(transaction.teacherId);
+    if (teacher) {
+      await upsertTeacherSalaryHistory(teacher, { ...transaction.toObject(), salarySlipUrl: transaction.salarySlipUrl });
+    }
+
+    res.status(200).json({ success: true, message: 'Payment record removed', transaction });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const downloadAllSalariesReport = async (req, res) => {
+  try {
+    const { monthYear } = req.params;
+    const transactions = await SalaryTransaction.find({ monthYear }).sort({ teacherName: 1 });
+
+    if (!transactions.length) {
+      return res.status(404).json({ success: false, message: 'No salary records found for this month.' });
+    }
+
+    const selectedKeys = parseComponents(req.query.components);
+    const earningsToShow = selectedKeys ? EARNING_FIELDS.filter((f) => selectedKeys.includes(f.key)) : EARNING_FIELDS;
+    const deductionsToShow = selectedKeys ? DEDUCTION_FIELDS.filter((f) => selectedKeys.includes(f.key)) : DEDUCTION_FIELDS;
+
+    const summary = transactions.reduce((acc, tx) => {
+      acc.totalPayroll += tx.netSalary || 0;
+      acc.totalPaid += tx.paidAmount || 0;
+      if (tx.paymentStatus === 'paid') acc.paidCount += 1;
+      else acc.pendingCount += 1;
+      return acc;
+    }, { totalPayroll: 0, totalPaid: 0, paidCount: 0, pendingCount: 0 });
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="salary-report-${monthYear.replace(/\s+/g, '-').toLowerCase()}.pdf"`);
+    doc.pipe(res);
+
+    doc.fontSize(18).text('NO.1 VETTRI ACADEMY', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(16).text('SALARY REPORT', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(12).text(`For Month: ${monthYear}`, { align: 'center' });
+    doc.moveDown();
+
+    doc.fontSize(13).text('Summary', { underline: true });
+    doc.fontSize(11).text(`Total Teachers: ${transactions.length}`);
+    doc.text(`Total Payroll: Rs. ${summary.totalPayroll}`);
+    doc.text(`Total Paid: Rs. ${summary.totalPaid}`);
+    doc.text(`Total Pending: Rs. ${Math.max(summary.totalPayroll - summary.totalPaid, 0)}`);
+    doc.text(`Teachers Paid: ${summary.paidCount}`);
+    doc.text(`Teachers Pending: ${summary.pendingCount}`);
+    doc.moveDown();
+
+    doc.fontSize(13).text('Teacher-wise Breakdown', { underline: true });
+    doc.moveDown(0.5);
+
+    transactions.forEach((tx, idx) => {
+      if (doc.y > doc.page.height - doc.page.margins.bottom - 200) {
+        doc.addPage();
+      }
+
+      doc.fontSize(12).text(`${idx + 1}. ${tx.teacherName}`, { underline: true });
+      doc.fontSize(10);
+      doc.text(`Email: ${tx.teacherEmail || '-'}`);
+      doc.text(`Processing Date: ${tx.processingDate ? new Date(tx.processingDate).toLocaleDateString('en-IN') : '-'}   Salary Date: ${tx.salaryDate ? new Date(tx.salaryDate).toLocaleDateString('en-IN') : '-'}`);
+
+      if (earningsToShow.length) {
+        doc.text(earningsToShow.map((f) => `${f.label}: Rs. ${tx[f.key] || 0}`).join('   '));
+        doc.text(`Gross Salary: Rs. ${tx.grossSalary || 0}`);
+      }
+
+      if (deductionsToShow.length) {
+        doc.text(deductionsToShow.map((f) => `${f.label}: Rs. ${tx[f.key] || 0}`).join('   '));
+        doc.text(`Total Deductions: Rs. ${tx.totalDeductions || 0}`);
+      }
+
+      doc.font('Helvetica-Bold').text(`Net Salary: Rs. ${tx.netSalary || 0}`);
+      doc.font('Helvetica');
+      doc.text(`Status: ${tx.paymentStatus?.toUpperCase() || 'PENDING'}   Paid: Rs. ${tx.paidAmount || 0}`);
+      doc.text(`Method: ${tx.paymentMethod || '-'}   Txn ID: ${tx.transactionId || '-'}`);
+      doc.moveDown(0.5);
+      doc.moveTo(doc.page.margins.left, doc.y)
+        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+        .strokeColor('#cccccc').stroke();
+      doc.moveDown(0.5);
+    });
+
+    doc.fontSize(9).fillColor('gray').text(`Generated On: ${new Date().toLocaleDateString('en-IN')}`, { align: 'right' });
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   setTeacherSalaryConfig,
   getAdminSalaryDashboard,
@@ -512,4 +785,7 @@ module.exports = {
   getTeacherCurrentMonthSalary,
   getTeacherSalaryHistory,
   downloadSalarySlip,
+  editSalaryPayment,
+  deleteSalaryPayment,
+  downloadAllSalariesReport,
 };

@@ -328,8 +328,12 @@ export const getTeacherSalaryCurrentMonthAPI = () =>
 export const getTeacherSalaryHistoryAPI = () =>
   api.get('/teacher/salary/history');
 
-export const getTeacherSalarySlipAPI = (teacherId, monthYear) =>
-  api.get(`/teacher/salary/${teacherId}/${encodeURIComponent(monthYear)}/slip`, { responseType: 'arraybuffer' });
+export const getTeacherSalarySlipAPI = (teacherId, monthYear, components) =>
+  api.get(`/teacher/salary/${teacherId}/${encodeURIComponent(monthYear)}/slip`, {
+    responseType: 'arraybuffer',
+    params: components && components.length ? { components: components.join(',') } : undefined,
+  });
+
 
 // Training Videos — Teacher
 export const getTrainingVideosAPI = (params) =>
@@ -619,6 +623,16 @@ export const getDownloadResourcesAPI = (params) =>
 
 export const getNcertResourcesAPI = (params) =>
   api.get('/downloads/ncert', { params });
+export const downloadSalaryReportAPI = (monthYear, components) =>
+  api.get(`/admin/salary/report/${encodeURIComponent(monthYear)}/pdf`, {
+    responseType: 'arraybuffer',
+    params: components && components.length ? { components: components.join(',') } : undefined,
+  });
+export const editSalaryPaymentAPI = (transactionId, paymentId, data) =>
+  api.patch(`/admin/salary/${transactionId}/payment/${paymentId}`, data);
+
+export const deleteSalaryPaymentAPI = (transactionId, paymentId) =>
+  api.delete(`/admin/salary/${transactionId}/payment/${paymentId}`);
 
 // ─── PDF Module ────────────────────────────────────────────────────────────────
 

@@ -36,7 +36,14 @@ const userSchema = new mongoose.Schema(
     teacherBio: { type: String }, // Student-facing bio
 
     // Salary management
+   // Salary management
     salary: {
+      // Tuition-based earning components (all optional)
+      groupTuitionSalary: { type: Number, default: 0 },
+      individualTuitionSalary: { type: Number, default: 0 },
+      hourlyTuitionSalary: { type: Number, default: 0 },
+      weeklyTuitionSalary: { type: Number, default: 0 },
+
       baseSalary: { type: Number, default: 0 },
       performanceBonus: { type: Number, default: 0 },
       specialAllowance: { type: Number, default: 0 },
@@ -55,11 +62,17 @@ const userSchema = new mongoose.Schema(
       paidLeaveBalance: { type: Number, default: 12 },
       casualLeaveBalance: { type: Number, default: 5 },
       medicalLeaveBalance: { type: Number, default: 10 },
+      // When this salary configuration was set / takes effect
+      effectiveDate: { type: Date },
     },
-    salaryHistory: [{
+  salaryHistory: [{
       month: { type: String },
       year: { type: Number },
       monthYear: { type: String },
+      groupTuitionSalary: { type: Number, default: 0 },
+      individualTuitionSalary: { type: Number, default: 0 },
+      hourlyTuitionSalary: { type: Number, default: 0 },
+      weeklyTuitionSalary: { type: Number, default: 0 },
       baseSalary: { type: Number, default: 0 },
       performanceBonus: { type: Number, default: 0 },
       specialAllowance: { type: Number, default: 0 },
@@ -67,6 +80,7 @@ const userSchema = new mongoose.Schema(
       providentFund: { type: Number, default: 0 },
       taxDeduction: { type: Number, default: 0 },
       otherDeductions: { type: Number, default: 0 },
+      attendanceDeductionAmount: { type: Number, default: 0 },
       totalDeductions: { type: Number, default: 0 },
       netSalary: { type: Number, default: 0 },
       paymentStatus: { type: String, enum: ['paid', 'pending', 'partial', 'advance'], default: 'pending' },
@@ -74,13 +88,18 @@ const userSchema = new mongoose.Schema(
       paidAmount: { type: Number, default: 0 },
       paymentMethod: { type: String, default: 'bank_transfer' },
       transactionId: { type: String, default: '' },
+      // Processing vs. actual/effective salary date
+      processingDate: { type: Date },
+      salaryDate: { type: Date },
       payments: [{
         amount: { type: Number },
         method: { type: String },
         transactionId: { type: String },
         proofImage: { type: String },
         remarks: { type: String },
-        paidAt: { type: Date }
+        paidAt: { type: Date },
+        processingDate: { type: Date },
+        salaryDate: { type: Date },
       }],
       recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       recordedAt: { type: Date },

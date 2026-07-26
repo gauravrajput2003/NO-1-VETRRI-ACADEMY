@@ -32,6 +32,9 @@ const {
   processAllSalaries,
   setTeacherSalaryConfig,
   getSalaryReports,
+  editSalaryPayment,
+  deleteSalaryPayment,
+  downloadAllSalariesReport,
 } = require('../controllers/salaryController');
 const {
   getEnquiries,
@@ -209,5 +212,12 @@ router.post('/salary/upload-proof', uploadImage.single('file'), async (req, res)
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
+router.get('/salaries', getAdminSalaryDashboard);
+router.post('/salary/process', processSalary);
+router.post('/salary/process-all', processAllSalaries);
+router.post('/teacher/:teacherId/salary-config', setTeacherSalaryConfig);
+router.get('/salary/reports', getSalaryReports);
+router.patch('/salary/:transactionId/payment/:paymentId', editSalaryPayment);
+router.delete('/salary/:transactionId/payment/:paymentId', deleteSalaryPayment);
+router.get('/salary/report/:monthYear/pdf', downloadAllSalariesReport);
 module.exports = router;

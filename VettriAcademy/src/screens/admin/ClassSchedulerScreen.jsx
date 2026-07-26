@@ -521,7 +521,7 @@ export default function ClassSchedulerScreen({ navigation }) {
   );
 }
 
-// ─── SCHEDULE FORM (Full-Screen Page) ───
+// ─── SCHEDULE FORM (Full-Screen Page — hero scrolls with the form) ───
 function ScheduleForm({
   form, setForm, focusedField, setFocusedField,
   selectedTeacher, setSelectedTeacher, selectedStudents, setSelectedStudents,
@@ -547,134 +547,133 @@ function ScheduleForm({
     <View style={{ flex: 1, backgroundColor: '#F8F7FC' }}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── HERO HEADER ── */}
-      <View style={[formStyles.heroWrap, { paddingTop: Math.max(insets.top, 20) }]}>
-        <LinearGradient
-          colors={['#FF4F8B', '#FF79AD', '#A8EDEA']}
-          style={StyleSheet.absoluteFillObject}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        />
-        <View style={formStyles.deco1} />
-        <View style={formStyles.deco2} />
-        <View style={formStyles.deco3} />
-
-        <RNTouchableOpacity style={formStyles.backBtn} onPress={onClose} activeOpacity={0.8}>
-          <Ionicons name="arrow-back" size={20} color="#FF4F8B" />
-        </RNTouchableOpacity>
-
-        <View style={formStyles.heroRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={formStyles.heroLabel}>Schedule</Text>
-            <Text style={formStyles.heroTitle}>New Class</Text>
-            <Text style={formStyles.heroSub}>Create and organize your{'\n'}classroom session.</Text>
-          </View>
-          {/* Illustration card — replace with <Image> if you have the asset */}
-          <View style={formStyles.illustrationWrap}>
-            <View style={formStyles.illustBg}>
-              <Ionicons name="calendar" size={44} color="#FF4F8B" style={{ opacity: 0.9 }} />
-            </View>
-            <View style={formStyles.illustStar1}>
-              <Ionicons name="star" size={12} color="#FFD700" />
-            </View>
-            <View style={formStyles.illustStar2}>
-              <Ionicons name="star" size={8} color="#FFD700" />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* ── SCROLLABLE FORM BODY ── */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom + 120, 140) }}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 120, 140) }}
         >
-      {/* CLASS DETAILS */}
-<SectionBlock section={S[0]}>
-  <FieldCard
-    icon="text-outline" iconColor={S[0].accent} placeholder="Title"
-    value={form.title} onChangeText={(v) => setForm({ ...form, title: v })}
-    focused={focusedField === 'title'}
-    onFocus={() => setFocusedField('title')} onBlur={() => setFocusedField(null)}
-  />
-  <FieldCard
-    icon="book-outline" iconColor={S[0].accent} placeholder="Subject"
-    value={form.subject} onChangeText={(v) => setForm({ ...form, subject: v })}
-    focused={focusedField === 'subject'}
-    onFocus={() => setFocusedField('subject')} onBlur={() => setFocusedField(null)}
-  />
-  <SelectorCard icon="school-outline" iconColor={S[0].accent} placeholder="Course" value={form.course} onPress={onOpenCourse} />
-  <SelectorCard icon="stats-chart-outline" iconColor={S[0].accent} placeholder="Grade" value={form.grade} onPress={onOpenGrade} />
-</SectionBlock>
-
-{/* PARTICIPANTS */}
-<SectionBlock section={S[1]}>
-  {isTeacher ? (
-    <View style={[fieldStyles.wrap, { backgroundColor: '#F0FFFE' }]}>
-      <Ionicons name="person-circle-outline" size={20} color={S[1].accent} style={fieldStyles.icon} />
-      <Text style={[fieldStyles.input, { color: '#1E293B' }]}>{selectedTeacher?.name || 'You'}</Text>
-    </View>
-  ) : (
-    <SelectorCard icon="person-outline" iconColor={S[1].accent} placeholder="Teacher *" value={selectedTeacher?.name} onPress={onOpenTeacher} />
-  )}
-  <SelectorCard
-    icon="people-outline" iconColor={S[1].accent}
-    placeholder="Students"
-    value={selectedStudents.length ? `${selectedStudents.length} student(s) selected` : ''}
-    onPress={onOpenStudents}
-  />
-</SectionBlock>
-
-          {/* SCHEDULE */}
-          <SectionBlock section={S[2]}>
-            <SelectorCard icon="calendar-outline" iconColor={S[2].accent} placeholder="Date *" value={form.scheduledDate} onPress={onOpenDate} />
-            <SelectorCard icon="time-outline" iconColor={S[2].accent} placeholder="Time *" value={form.scheduledTime} onPress={onOpenTime} />
-            <FieldCard
-              icon="hourglass-outline" iconColor={S[2].accent} placeholder="Duration (minutes)"
-              value={form.durationMinutes} onChangeText={(v) => setForm({ ...form, durationMinutes: v })}
-              keyboardType="numeric" focused={focusedField === 'duration'}
-              onFocus={() => setFocusedField('duration')} onBlur={() => setFocusedField(null)}
+          {/* ── HERO HEADER (now scrolls with the page) ── */}
+          <View style={[formStyles.heroWrap, { paddingTop: Math.max(insets.top, 20) }]}>
+            <LinearGradient
+              colors={['#F857A6', '#FF6CAB', '#2DD4BF']}
+              style={StyleSheet.absoluteFillObject}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             />
-          </SectionBlock>
+            <View style={formStyles.deco1} />
+            <View style={formStyles.deco2} />
+            <View style={formStyles.deco3} />
 
-          {/* MEETING DETAILS */}
-          <SectionBlock section={S[3]}>
-            <Text style={[sectionStyles.fieldLabel, { color: S[3].accent }]}>Google Meet Link</Text>
-            <FieldCard
-              icon="link-outline" iconColor={S[3].accent}
-              placeholder="https://meet.google.com/..."
-              value={form.googleMeetLink} onChangeText={(v) => setForm({ ...form, googleMeetLink: v })}
-              focused={focusedField === 'googleMeetLink'}
-              onFocus={() => setFocusedField('googleMeetLink')} onBlur={() => setFocusedField(null)}
-              keyboardType="url"
-            />
-            <Text style={[sectionStyles.fieldLabel, { color: S[3].accent }]}>Zoom Meeting Link</Text>
-            <FieldCard
-              icon="videocam-outline" iconColor={S[3].accent}
-              placeholder="https://zoom.us/j/..."
-              value={form.zoomMeetingLink} onChangeText={(v) => setForm({ ...form, zoomMeetingLink: v })}
-              focused={focusedField === 'zoomMeetingLink'}
-              onFocus={() => setFocusedField('zoomMeetingLink')} onBlur={() => setFocusedField(null)}
-              keyboardType="url"
-            />
-          </SectionBlock>
-
-          <View style={formStyles.actionBar}>
-            <RNTouchableOpacity style={formStyles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
-              <Text style={formStyles.cancelText}>Cancel</Text>
+            <RNTouchableOpacity style={formStyles.backBtn} onPress={onClose} activeOpacity={0.8}>
+              <Ionicons name="arrow-back" size={20} color="#FF4F8B" />
             </RNTouchableOpacity>
-            <RNTouchableOpacity activeOpacity={0.9} onPress={onSubmit} style={{ flex: 1 }}>
-              <LinearGradient
-                colors={['#FF4F8B', '#FF79AD']}
-                style={formStyles.submitBtn}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              >
-                <Ionicons name="calendar" size={18} color="#FFF" style={{ marginRight: 8 }} />
-                <Text style={formStyles.submitText}>Schedule Class</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFF" style={{ marginLeft: 8 }} />
-              </LinearGradient>
-            </RNTouchableOpacity>
+
+            <View style={formStyles.heroRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={formStyles.heroTitle}>New Class</Text>
+              </View>
+              <View style={formStyles.illustrationWrap}>
+                <View style={formStyles.illustBg}>
+                  <Ionicons name="calendar" size={26} color="#FF4F8B" />
+                </View>
+                <View style={formStyles.illustStar1}>
+                  <Ionicons name="star" size={12} color="#FFD700" />
+                </View>
+                <View style={formStyles.illustStar2}>
+                  <Ionicons name="star" size={8} color="#FFD700" />
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* ── FORM BODY ── */}
+          <View style={{ padding: 16 }}>
+            {/* CLASS DETAILS */}
+            <SectionBlock section={S[0]}>
+              <FieldCard
+                icon="text-outline" iconColor={S[0].accent} placeholder="Title"
+                value={form.title} onChangeText={(v) => setForm({ ...form, title: v })}
+                focused={focusedField === 'title'}
+                onFocus={() => setFocusedField('title')} onBlur={() => setFocusedField(null)}
+              />
+              <FieldCard
+                icon="book-outline" iconColor={S[0].accent} placeholder="Subject"
+                value={form.subject} onChangeText={(v) => setForm({ ...form, subject: v })}
+                focused={focusedField === 'subject'}
+                onFocus={() => setFocusedField('subject')} onBlur={() => setFocusedField(null)}
+              />
+              <SelectorCard icon="school-outline" iconColor={S[0].accent} placeholder="Course" value={form.course} onPress={onOpenCourse} />
+              <SelectorCard icon="stats-chart-outline" iconColor={S[0].accent} placeholder="Grade" value={form.grade} onPress={onOpenGrade} />
+            </SectionBlock>
+
+            {/* PARTICIPANTS */}
+            <SectionBlock section={S[1]}>
+              {isTeacher ? (
+                <View style={[fieldStyles.wrap, { backgroundColor: '#F0FFFE' }]}>
+                  <Ionicons name="person-circle-outline" size={20} color={S[1].accent} style={fieldStyles.icon} />
+                  <Text style={[fieldStyles.input, { color: '#1E293B' }]}>{selectedTeacher?.name || 'You'}</Text>
+                </View>
+              ) : (
+                <SelectorCard icon="person-outline" iconColor={S[1].accent} placeholder="Teacher *" value={selectedTeacher?.name} onPress={onOpenTeacher} />
+              )}
+              <SelectorCard
+                icon="people-outline" iconColor={S[1].accent}
+                placeholder="Students"
+                value={selectedStudents.length ? `${selectedStudents.length} student(s) selected` : ''}
+                onPress={onOpenStudents}
+              />
+            </SectionBlock>
+
+            {/* SCHEDULE */}
+            <SectionBlock section={S[2]}>
+              <SelectorCard icon="calendar-outline" iconColor={S[2].accent} placeholder="Date *" value={form.scheduledDate} onPress={onOpenDate} />
+              <SelectorCard icon="time-outline" iconColor={S[2].accent} placeholder="Time *" value={form.scheduledTime} onPress={onOpenTime} />
+              <FieldCard
+                icon="hourglass-outline" iconColor={S[2].accent} placeholder="Duration (minutes)"
+                value={form.durationMinutes} onChangeText={(v) => setForm({ ...form, durationMinutes: v })}
+                keyboardType="numeric" focused={focusedField === 'duration'}
+                onFocus={() => setFocusedField('duration')} onBlur={() => setFocusedField(null)}
+              />
+            </SectionBlock>
+
+            {/* MEETING DETAILS */}
+            <SectionBlock section={S[3]}>
+              <Text style={[sectionStyles.fieldLabel, { color: S[3].accent }]}>Google Meet Link</Text>
+              <FieldCard
+                icon="link-outline" iconColor={S[3].accent}
+                placeholder="https://meet.google.com/..."
+                value={form.googleMeetLink} onChangeText={(v) => setForm({ ...form, googleMeetLink: v })}
+                focused={focusedField === 'googleMeetLink'}
+                onFocus={() => setFocusedField('googleMeetLink')} onBlur={() => setFocusedField(null)}
+                keyboardType="url"
+              />
+              <Text style={[sectionStyles.fieldLabel, { color: S[3].accent }]}>Zoom Meeting Link</Text>
+              <FieldCard
+                icon="videocam-outline" iconColor={S[3].accent}
+                placeholder="https://zoom.us/j/..."
+                value={form.zoomMeetingLink} onChangeText={(v) => setForm({ ...form, zoomMeetingLink: v })}
+                focused={focusedField === 'zoomMeetingLink'}
+                onFocus={() => setFocusedField('zoomMeetingLink')} onBlur={() => setFocusedField(null)}
+                keyboardType="url"
+              />
+            </SectionBlock>
+
+            <View style={formStyles.actionBar}>
+              <RNTouchableOpacity style={formStyles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+                <Text style={formStyles.cancelText}>Cancel</Text>
+              </RNTouchableOpacity>
+              <RNTouchableOpacity activeOpacity={0.9} onPress={onSubmit} style={{ flex: 1 }}>
+                <LinearGradient
+                  colors={['#FF4F8B', '#FF79AD']}
+                  style={formStyles.submitBtn}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                >
+                  <Ionicons name="calendar" size={18} color="#FFF" style={{ marginRight: 8 }} />
+                  <Text style={formStyles.submitText}>Schedule Class</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFF" style={{ marginLeft: 8 }} />
+                </LinearGradient>
+              </RNTouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -990,25 +989,41 @@ const formStyles = StyleSheet.create({
     shadowOpacity: 0.2, shadowRadius: 6, elevation: 4,
   },
   heroRow: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 24, paddingBottom: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingBottom: 8,
   },
   heroLabel: {
     fontSize: 12, color: 'rgba(255,255,255,0.85)',
     fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2,
   },
-  heroTitle: { fontSize: 34, fontWeight: '900', color: '#FFF', letterSpacing: -1, lineHeight: 38 },
+  heroTitle: { fontSize: 28, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
   heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 6, lineHeight: 18 },
-  illustrationWrap: { width: 110, height: 110, position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  illustrationWrap: { width: 70, height: 70, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   illustBg: {
-    width: 90, height: 90, borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FF4F8B', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF4F8B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  illustStar1: { position: 'absolute', top: 4, right: 8 },
-  illustStar2: { position: 'absolute', bottom: 14, left: 2 },
+  illustStar1: {
+    position: 'absolute',
+    top: 2,
+    right: 6,
+  },
+  illustStar2: {
+    position: 'absolute',
+    bottom: 8,
+    left: 2,
+  },
   actionBar: {
     flexDirection: 'row', gap: 12,
     paddingTop: 4,

@@ -6,6 +6,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity as RNTouchableOpac
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -17,6 +19,10 @@ import {
   processAllSalariesAPI,
   setTeacherSalaryConfigAPI,
   getSalaryReportsAPI,
+  editSalaryPaymentAPI,
+  deleteSalaryPaymentAPI,
+  downloadSalaryReportAPI,
+  getTeacherSalarySlipAPI,
 } from '../../services/api';
 
 const TouchableOpacity = (props) => {
@@ -28,7 +34,50 @@ const TouchableOpacity = (props) => {
   );
 };
 
+// Printable salary components — mirrors backend EARNING_FIELDS / DEDUCTION_FIELDS
+const EARNING_FIELDS = [
+  { key: 'baseSalary', label: 'Base Salary' },
+  { key: 'groupTuitionSalary', label: 'Group Tuition Salary' },
+  { key: 'individualTuitionSalary', label: 'Individual Tuition Salary' },
+  { key: 'hourlyTuitionSalary', label: 'Hourly Tuition Salary' },
+  { key: 'weeklyTuitionSalary', label: 'Weekly Tuition Salary' },
+  { key: 'performanceBonus', label: 'Performance Bonus' },
+  { key: 'specialAllowance', label: 'Special Allowance' },
+];
+const DEDUCTION_FIELDS = [
+  { key: 'providentFund', label: 'Provident Fund' },
+  { key: 'taxDeduction', label: 'Tax Deduction' },
+  { key: 'otherDeductions', label: 'Other Deductions' },
+  { key: 'attendanceDeductionAmount', label: 'Attendance Deduction' },
+];
+const ALL_COMPONENT_KEYS = [...EARNING_FIELDS, ...DEDUCTION_FIELDS].map((f) => f.key);
+
+const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return global.btoa ? global.btoa(binary) : Buffer.from(binary, 'binary').toString('base64');
+};
+
+const savePdfAndShare = async (arrayBuffer, filename) => {
+  const base64 = arrayBufferToBase64(arrayBuffer);
+  const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+  await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: filename });
+  }
+  return fileUri;
+};
+
 const emptyConfig = {
+  groupTuitionSalary: '',
+  individualTuitionSalary: '',
+  hourlyTuitionSalary: '',
+  weeklyTuitionSalary: '',
   baseSalary: '',
   performanceBonus: '',
   specialAllowance: '',
@@ -44,6 +93,7 @@ const emptyConfig = {
   daysInMonth: '26',
   daysPresent: '26',
   deductionPerDay: '0',
+  effectiveDate: '',
 };
 
 export default function SalaryManagementScreen({ navigation, route }) {
@@ -68,8 +118,21 @@ export default function SalaryManagementScreen({ navigation, route }) {
   const [payTxnId, setPayTxnId] = useState('');
   const [payProofImage, setPayProofImage] = useState('');
   const [payRemarks, setPayRemarks] = useState('');
+  const [processingDate, setProcessingDate] = useState('');
+  const [salaryDate, setSalaryDate] = useState('');
   const [uploadingProof, setUploadingProof] = useState(false);
   const [processingPay, setProcessingPay] = useState(false);
+
+  // Edit payment state
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [savingPaymentEdit, setSavingPaymentEdit] = useState(false);
+
+  // Download / component selection state
+  const [downloadingReport, setDownloadingReport] = useState(false);
+  const [downloadingSlipId, setDownloadingSlipId] = useState(null);
+  const [componentModalFor, setComponentModalFor] = useState(null); // 'single' | 'bulk' | null
+  const [componentModalTeacher, setComponentModalTeacher] = useState(null);
+  const [selectedComponents, setSelectedComponents] = useState(ALL_COMPONENT_KEYS);
 
   const bgColor = Colors.surface.light;
   const cardBg = Colors.white;
@@ -184,6 +247,8 @@ export default function SalaryManagementScreen({ navigation, route }) {
         transactionId: payTxnId,
         proofImage: payProofImage,
         remarks: payRemarks,
+        processingDate,
+        salaryDate,
       });
       Toast.show({ type: 'success', text1: 'Payment processed successfully!' });
       setActivePayTeacher(null);
@@ -194,6 +259,101 @@ export default function SalaryManagementScreen({ navigation, route }) {
     } finally {
       setProcessingPay(false);
     }
+  };
+
+  const openEditPayment = (payment) => {
+    setEditingPayment({
+      transactionId: activePayTeacher._id,
+      paymentId: payment._id,
+      amount: String(payment.amount || ''),
+      method: payment.method || 'Cash',
+      txnId: payment.transactionId || '',
+      remarks: payment.remarks || '',
+    });
+  };
+
+  const handleSavePaymentEdit = async () => {
+    if (!editingPayment) return;
+    const amount = Number(editingPayment.amount);
+    if (isNaN(amount) || amount <= 0) {
+      Toast.show({ type: 'error', text1: 'Invalid amount' });
+      return;
+    }
+    setSavingPaymentEdit(true);
+    try {
+      await editSalaryPaymentAPI(editingPayment.transactionId, editingPayment.paymentId, {
+        amount,
+        method: editingPayment.method,
+        transactionId: editingPayment.txnId,
+        remarks: editingPayment.remarks,
+      });
+      Toast.show({ type: 'success', text1: 'Payment updated' });
+      setEditingPayment(null);
+      setActivePayTeacher(null);
+      loadData();
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Update failed', text2: error.response?.data?.message || 'Unable to update payment' });
+    } finally {
+      setSavingPaymentEdit(false);
+    }
+  };
+
+  const handleDeletePayment = async (payment) => {
+    try {
+      await deleteSalaryPaymentAPI(activePayTeacher._id, payment._id);
+      Toast.show({ type: 'success', text1: 'Payment removed' });
+      setActivePayTeacher(null);
+      loadData();
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Delete failed', text2: error.response?.data?.message || 'Unable to remove payment' });
+    }
+  };
+
+  const handleDownloadReport = async (components) => {
+    setDownloadingReport(true);
+    try {
+      const { data } = await downloadSalaryReportAPI(`${month} ${year}`, components);
+      const filename = `salary-report-${month}-${year}.pdf`.toLowerCase();
+      await savePdfAndShare(data, filename);
+      Toast.show({ type: 'success', text1: 'Report ready', text2: 'Choose where to save or share it.' });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Download failed', text2: error.response?.data?.message || 'Unable to generate report' });
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
+  const handleDownloadSlip = async (teacher, components) => {
+    setDownloadingSlipId(teacher.teacherId);
+    try {
+      const { data } = await getTeacherSalarySlipAPI(teacher.teacherId, `${month} ${year}`, components);
+      const filename = `salary-slip-${teacher.teacherName}-${month}-${year}.pdf`.replace(/\s+/g, '-').toLowerCase();
+      await savePdfAndShare(data, filename);
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Download failed', text2: error.response?.data?.message || 'Unable to fetch slip' });
+    } finally {
+      setDownloadingSlipId(null);
+    }
+  };
+
+  const toggleComponent = (key) => {
+    setSelectedComponents((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
+
+  const openComponentModal = (mode, teacher = null) => {
+    setComponentModalFor(mode);
+    setComponentModalTeacher(teacher);
+    setSelectedComponents(ALL_COMPONENT_KEYS);
+  };
+
+  const handleConfirmComponentSelection = async () => {
+    if (componentModalFor === 'single' && componentModalTeacher) {
+      await handleDownloadSlip(componentModalTeacher, selectedComponents);
+    } else if (componentModalFor === 'bulk') {
+      await handleDownloadReport(selectedComponents);
+    }
+    setComponentModalFor(null);
+    setComponentModalTeacher(null);
   };
 
   const reportCards = useMemo(() => [
@@ -251,6 +411,19 @@ export default function SalaryManagementScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => openComponentModal('bulk')} disabled={downloadingReport}>
+            {downloadingReport ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
+                <Text style={styles.secondaryBtnText}>Download Full Salary Report (PDF)</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Salary Table</Text>
           {teachers.length ? teachers.map((teacher) => (
@@ -260,9 +433,36 @@ export default function SalaryManagementScreen({ navigation, route }) {
                 <Text style={[styles.teacherMeta, { color: textSec }]}>{teacher.teacherEmail || '-'} • {teacher.teacherMobile || '-'}</Text>
                 <Text style={[styles.teacherMeta, { color: textSec }]}>Net: {formatCurrency(teacher.netSalary || 0)} • Status: {teacher.paymentStatus?.toUpperCase() || 'PENDING'}</Text>
                 <Text style={[styles.teacherMeta, { color: textSec }]}>Paid: {formatCurrency(teacher.paidAmount || 0)} • Bank: {teacher.bankName || teacher.teacher?.salary?.bankName || '-'}</Text>
+                <Text style={[styles.teacherMeta, { color: textSec }]}>
+                  Processed: {teacher.processingDate ? formatDate(teacher.processingDate) : '-'} • Salary Date: {teacher.salaryDate ? formatDate(teacher.salaryDate) : '-'}
+                </Text>
               </View>
               <View style={{ gap: 8 }}>
-                <TouchableOpacity style={styles.smallBtn} onPress={() => { setActiveTeacher(teacher); setConfig({ ...emptyConfig, baseSalary: String(teacher.baseSalary || ''), performanceBonus: String(teacher.performanceBonus || ''), specialAllowance: String(teacher.specialAllowance || ''), providentFund: String(teacher.providentFund || ''), taxDeduction: String(teacher.taxDeduction || ''), otherDeductions: String(teacher.otherDeductions || ''), bankAccount: teacher.bankAccount || '', bankName: teacher.bankName || '', ifscCode: teacher.ifscCode || '', accountHolder: teacher.accountHolder || teacher.teacherName || '', paymentMode: teacher.paymentMode || 'bank_transfer' }); }}>
+                <TouchableOpacity
+                  style={styles.smallBtn}
+                  onPress={() => {
+                    setActiveTeacher(teacher);
+                    setConfig({
+                      ...emptyConfig,
+                      groupTuitionSalary: String(teacher.groupTuitionSalary || ''),
+                      individualTuitionSalary: String(teacher.individualTuitionSalary || ''),
+                      hourlyTuitionSalary: String(teacher.hourlyTuitionSalary || ''),
+                      weeklyTuitionSalary: String(teacher.weeklyTuitionSalary || ''),
+                      baseSalary: String(teacher.baseSalary || ''),
+                      performanceBonus: String(teacher.performanceBonus || ''),
+                      specialAllowance: String(teacher.specialAllowance || ''),
+                      providentFund: String(teacher.providentFund || ''),
+                      taxDeduction: String(teacher.taxDeduction || ''),
+                      otherDeductions: String(teacher.otherDeductions || ''),
+                      bankAccount: teacher.bankAccount || '',
+                      bankName: teacher.bankName || '',
+                      ifscCode: teacher.ifscCode || '',
+                      accountHolder: teacher.accountHolder || teacher.teacherName || '',
+                      paymentMode: teacher.paymentMode || 'bank_transfer',
+                      effectiveDate: teacher.effectiveDate ? String(teacher.effectiveDate).slice(0, 10) : '',
+                    });
+                  }}
+                >
                   <Text style={styles.smallBtnText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -274,9 +474,23 @@ export default function SalaryManagementScreen({ navigation, route }) {
                     setPayTxnId('');
                     setPayProofImage('');
                     setPayRemarks('');
+                    const today = new Date().toISOString().slice(0, 10);
+                    setProcessingDate(today);
+                    setSalaryDate(today);
                   }}
                 >
                   <Text style={styles.smallBtnText}>Pay Now</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.smallBtn, { backgroundColor: Colors.info || '#2E86DE' }]}
+                  onPress={() => openComponentModal('single', teacher)}
+                  disabled={downloadingSlipId === teacher.teacherId}
+                >
+                  {downloadingSlipId === teacher.teacherId ? (
+                    <ActivityIndicator size="small" color={Colors.white} />
+                  ) : (
+                    <Text style={styles.smallBtnText}>Slip</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -300,6 +514,10 @@ export default function SalaryManagementScreen({ navigation, route }) {
           <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} style={styles.modalSheet} contentContainerStyle={{ padding: 20 }}>
             <Text style={styles.modalTitle}>Salary Config - {activeTeacher?.teacherName}</Text>
             {[
+              ['Group Tuition Salary (optional)', 'groupTuitionSalary'],
+              ['Individual Tuition Salary (optional)', 'individualTuitionSalary'],
+              ['Hourly Tuition Salary (optional)', 'hourlyTuitionSalary'],
+              ['Weekly Tuition Salary (optional)', 'weeklyTuitionSalary'],
               ['Base Salary', 'baseSalary'],
               ['Performance Bonus', 'performanceBonus'],
               ['Special Allowance', 'specialAllowance'],
@@ -311,6 +529,7 @@ export default function SalaryManagementScreen({ navigation, route }) {
               ['IFSC', 'ifscCode'],
               ['Account Holder', 'accountHolder'],
               ['Payment Mode', 'paymentMode'],
+              ['Configuration Effective Date (YYYY-MM-DD)', 'effectiveDate'],
             ].map(([label, key]) => (
               <View key={key} style={{ marginBottom: 10 }}>
                 <Text style={styles.label}>{label}</Text>
@@ -355,6 +574,32 @@ export default function SalaryManagementScreen({ navigation, route }) {
               </View>
             </View>
 
+            {Array.isArray(activePayTeacher?.payments) && activePayTeacher.payments.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.label}>Payment History</Text>
+                {activePayTeacher.payments.map((payment) => (
+                  <View key={payment._id} style={styles.paymentHistoryRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.paymentHistoryAmount}>{formatCurrency(payment.amount)} · {payment.method}</Text>
+                      <Text style={styles.paymentHistoryMeta}>
+                        {payment.transactionId ? `Txn: ${payment.transactionId} · ` : ''}
+                        {formatDate(payment.paidAt)}
+                      </Text>
+                      {!!payment.remarks && <Text style={styles.paymentHistoryMeta}>{payment.remarks}</Text>}
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity style={styles.paymentEditBtn} onPress={() => openEditPayment(payment)}>
+                        <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.paymentEditBtn, { backgroundColor: '#ff3d7118' }]} onPress={() => handleDeletePayment(payment)}>
+                        <Ionicons name="trash-outline" size={14} color="#ff3d71" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <View style={{ marginBottom: 14 }}>
               <Text style={styles.label}>Paying Now (₹)</Text>
               <TextInput
@@ -365,6 +610,29 @@ export default function SalaryManagementScreen({ navigation, route }) {
                 placeholder="Enter amount"
                 placeholderTextColor={Colors.mediumGray}
               />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Processing Date</Text>
+                <TextInput
+                  style={styles.input}
+                  value={processingDate}
+                  onChangeText={setProcessingDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.mediumGray}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Salary Date (Effective)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={salaryDate}
+                  onChangeText={setSalaryDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.mediumGray}
+                />
+              </View>
             </View>
 
             <View style={styles.paymentRowSummary}>
@@ -390,7 +658,6 @@ export default function SalaryManagementScreen({ navigation, route }) {
               </View>
             </View>
 
-            {/* Payment Method Selection Pills */}
             <View style={{ marginBottom: 14 }}>
               <Text style={styles.label}>Payment Method</Text>
               <View style={styles.methodContainer}>
@@ -409,7 +676,6 @@ export default function SalaryManagementScreen({ navigation, route }) {
               </View>
             </View>
 
-            {/* Transaction ID if not Cash */}
             {payMethod !== 'Cash' && (
               <View style={{ marginBottom: 14 }}>
                 <Text style={styles.label}>Transaction ID / Reference Number</Text>
@@ -424,7 +690,6 @@ export default function SalaryManagementScreen({ navigation, route }) {
               </View>
             )}
 
-            {/* Receipt Proof Upload */}
             <View style={{ marginBottom: 14 }}>
               <Text style={styles.label}>Receipt Proof Image</Text>
               {uploadingProof ? (
@@ -475,6 +740,116 @@ export default function SalaryManagementScreen({ navigation, route }) {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Edit Payment Modal */}
+      <Modal visible={!!editingPayment} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalSheet} contentContainerStyle={{ padding: 20 }}>
+            <Text style={styles.modalTitle}>Edit Payment Record</Text>
+            <Text style={[styles.modalSubTitle, { color: textSec, marginBottom: 16 }]}>
+              Correct a mistaken or incorrectly recorded payment
+            </Text>
+
+            <View style={{ marginBottom: 14 }}>
+              <Text style={styles.label}>Amount (₹)</Text>
+              <TextInput
+                style={styles.input}
+                value={editingPayment?.amount ?? ''}
+                onChangeText={(v) => setEditingPayment((p) => ({ ...p, amount: v }))}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={{ marginBottom: 14 }}>
+              <Text style={styles.label}>Payment Method</Text>
+              <View style={styles.methodContainer}>
+                {['Cash', 'UPI', 'Bank Transfer', 'Net Banking'].map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.methodPill, editingPayment?.method === m && styles.methodPillActive]}
+                    onPress={() => setEditingPayment((p) => ({ ...p, method: m }))}
+                  >
+                    <Text style={[styles.methodText, editingPayment?.method === m && styles.methodTextActive]}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 14 }}>
+              <Text style={styles.label}>Transaction ID / Reference</Text>
+              <TextInput
+                style={styles.input}
+                value={editingPayment?.txnId ?? ''}
+                onChangeText={(v) => setEditingPayment((p) => ({ ...p, txnId: v }))}
+              />
+            </View>
+
+            <View style={{ marginBottom: 18 }}>
+              <Text style={styles.label}>Remarks</Text>
+              <TextInput
+                style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
+                value={editingPayment?.remarks ?? ''}
+                onChangeText={(v) => setEditingPayment((p) => ({ ...p, remarks: v }))}
+                multiline
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingPayment(null)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSavePaymentEdit} disabled={savingPaymentEdit}>
+                {savingPaymentEdit ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Component Selection Modal (for slip / bulk report generation) */}
+      <Modal visible={!!componentModalFor} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalSheet} contentContainerStyle={{ padding: 20 }}>
+            <Text style={styles.modalTitle}>Select Salary Components</Text>
+            <Text style={[styles.modalSubTitle, { color: textSec, marginBottom: 16 }]}>
+              Choose which components to include in the {componentModalFor === 'bulk' ? 'report' : 'slip'}
+            </Text>
+
+            <Text style={[styles.label, { marginTop: 4 }]}>Earnings</Text>
+            {EARNING_FIELDS.map((f) => (
+              <TouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
+                <Ionicons
+                  name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
+                />
+                <Text style={styles.checkRowText}>{f.label}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <Text style={[styles.label, { marginTop: 14 }]}>Deductions</Text>
+            {DEDUCTION_FIELDS.map((f) => (
+              <TouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
+                <Ionicons
+                  name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
+                />
+                <Text style={styles.checkRowText}>{f.label}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setComponentModalFor(null); setComponentModalTeacher(null); }}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleConfirmComponentSelection}>
+                <Text style={styles.saveBtnText}>Generate & Download</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -513,26 +888,31 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 2, backgroundColor: Colors.pink, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   saveBtnText: { color: Colors.white, fontWeight: '800' },
 
-  // Pay Now summary block styles
   paymentRowSummary: { flexDirection: 'row', gap: 12, justifyContent: 'space-between', marginBottom: 14 },
   paySummaryBlock: { flex: 1, backgroundColor: '#f4f6f8', padding: 12, borderRadius: 12 },
   paySummaryLabel: { fontSize: 11, fontWeight: '700', color: '#8f9bb3', marginBottom: 4 },
   paySummaryVal: { fontSize: 15, fontWeight: '800', color: Colors.navy },
   statusBadgePay: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
   statusBadgeTextPay: { fontSize: 12, fontWeight: '800' },
-  
-  // Payment methods container
+
   methodContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   methodPill: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, backgroundColor: '#f4f6f8', borderWidth: 1, borderColor: '#e4e9f2' },
   methodPillActive: { backgroundColor: Colors.pink, borderColor: Colors.pink },
   methodText: { fontSize: 13, fontWeight: '700', color: Colors.navy },
   methodTextActive: { color: Colors.white },
 
-  // Upload proof styling
   uploadArea: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.primary, backgroundColor: Colors.primary + '0a', paddingHorizontal: 12 },
   uploadBtnText: { color: Colors.primary, fontWeight: '700', fontSize: 13, marginLeft: 8 },
   proofPreviewArea: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   proofImagePreview: { width: 80, height: 80, borderRadius: 12, borderWidth: 1, borderColor: '#e4e9f2' },
   removeProofBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff3d71', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   removeProofText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
+
+  paymentHistoryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f4f6f8', borderRadius: 10, padding: 10, marginBottom: 8 },
+  paymentHistoryAmount: { fontSize: 13, fontWeight: '700', color: Colors.navy },
+  paymentHistoryMeta: { fontSize: 11, color: '#8f9bb3', marginTop: 2 },
+  paymentEditBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.primary + '18', justifyContent: 'center', alignItems: 'center' },
+
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  checkRowText: { fontSize: 14, color: Colors.text.light, fontWeight: '600' },
 });

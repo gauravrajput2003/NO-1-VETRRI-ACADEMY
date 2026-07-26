@@ -6,7 +6,9 @@ const salaryPaymentSchema = new mongoose.Schema({
   transactionId: { type: String, default: '' },
   proofImage: { type: String, default: '' },
   remarks: { type: String, default: '' },
-  paidAt: { type: Date, default: Date.now }
+  paidAt: { type: Date, default: Date.now },
+  processingDate: { type: Date, default: Date.now },
+  salaryDate: { type: Date, default: Date.now },
 });
 
 const salaryTransactionSchema = new mongoose.Schema(
@@ -19,6 +21,12 @@ const salaryTransactionSchema = new mongoose.Schema(
     year: { type: Number, required: true },
     monthYear: { type: String, required: true },
 
+    // New optional tuition-based earning components
+    groupTuitionSalary: { type: Number, default: 0 },
+    individualTuitionSalary: { type: Number, default: 0 },
+    hourlyTuitionSalary: { type: Number, default: 0 },
+    weeklyTuitionSalary: { type: Number, default: 0 },
+
     baseSalary: { type: Number, default: 0 },
     performanceBonus: { type: Number, default: 0 },
     specialAllowance: { type: Number, default: 0 },
@@ -27,6 +35,7 @@ const salaryTransactionSchema = new mongoose.Schema(
     providentFund: { type: Number, default: 0 },
     taxDeduction: { type: Number, default: 0 },
     otherDeductions: { type: Number, default: 0 },
+    attendanceDeductionAmount: { type: Number, default: 0 },
     totalDeductions: { type: Number, default: 0 },
 
     netSalary: { type: Number, default: 0 },
@@ -36,6 +45,10 @@ const salaryTransactionSchema = new mongoose.Schema(
     paidAmount: { type: Number, default: 0 },
     paymentMethod: { type: String, default: 'bank_transfer' },
     transactionId: { type: String, default: '' },
+
+    // New: track when this salary was processed vs. its actual effective/salary date
+    processingDate: { type: Date },
+    salaryDate: { type: Date },
 
     payments: [salaryPaymentSchema],
 
