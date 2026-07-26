@@ -80,9 +80,7 @@ const getTeacherDashboard = async (req, res) => {
   }
 };
 
-// @desc    Get teacher's students
-// @route   GET /api/teacher/students
-// @access  Teacher
+
 const getMyStudents = async (req, res) => {
   try {
     const studentIds = await getTeacherStudentFilter(req.user._id);

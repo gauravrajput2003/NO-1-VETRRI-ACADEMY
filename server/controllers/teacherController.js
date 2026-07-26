@@ -28,10 +28,11 @@ const getMaterialTypeFromMime = (mimeType = '') => {
   return 'image';
 };
 
-const getTeacherStudentFilter = async () => {
+const getTeacherStudentFilter = async (teacherId) => {
   const students = await User.find({
     role: 'student',
     isActive: true,
+    assignedTeacher: teacherId,
   }).select('_id');
 
   return students.map((student) => student._id.toString());
@@ -53,7 +54,7 @@ const getTeacherDashboard = async (req, res) => {
         teacherId,
         scheduledDate: { $gte: today, $lt: tomorrow },
       }).select('-meetLink').populate('studentIds', 'name grade'),
-      getTeacherStudentFilter(),
+      getTeacherStudentFilter(teacherId),
       LeaveApplication.countDocuments({ applicant: teacherId, status: 'pending' }),
       StudyMaterial.countDocuments({ teacher: teacherId }),
       LeaveApplication.find({
@@ -84,8 +85,7 @@ const getTeacherDashboard = async (req, res) => {
 // @access  Teacher
 const getMyStudents = async (req, res) => {
   try {
-    // Students expose their info to teacher, but NOT phone/email to students
-    const studentIds = await getTeacherStudentFilter();
+    const studentIds = await getTeacherStudentFilter(req.user._id);
 
     const students = await User.find({
       _id: { $in: studentIds },
