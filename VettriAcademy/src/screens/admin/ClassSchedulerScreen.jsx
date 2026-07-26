@@ -344,10 +344,10 @@ export default function ClassSchedulerScreen({ navigation }) {
     } : null);
   };
 
-  const handleCreate = async () => {
+ const handleCreate = async () => {
     const tid = form.teacherId || (isTeacher ? loggedInTeacherId : '');
-    if (!form.title || !tid || !selectedStudents.length || !form.course || !form.subject || !form.grade || !form.scheduledDate || !form.scheduledTime) {
-      Toast.show({ type: 'error', text1: 'Fill all required fields' }); return;
+    if (!tid || !form.scheduledDate || !form.scheduledTime) {
+      Toast.show({ type: 'error', text1: 'Please select date, time and teacher' }); return;
     }
     if (!isValidOptionalUrl(form.googleMeetLink) || !isValidOptionalUrl(form.zoomMeetingLink)) {
       Toast.show({ type: 'error', text1: 'Invalid meeting link', text2: 'Please enter a valid URL.' }); return;
@@ -590,41 +590,41 @@ function ScheduleForm({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom + 120, 140) }}
         >
-          {/* CLASS DETAILS */}
-          <SectionBlock section={S[0]}>
-            <FieldCard
-              icon="text-outline" iconColor={S[0].accent} placeholder="Title *"
-              value={form.title} onChangeText={(v) => setForm({ ...form, title: v })}
-              focused={focusedField === 'title'}
-              onFocus={() => setFocusedField('title')} onBlur={() => setFocusedField(null)}
-            />
-            <FieldCard
-              icon="book-outline" iconColor={S[0].accent} placeholder="Subject *"
-              value={form.subject} onChangeText={(v) => setForm({ ...form, subject: v })}
-              focused={focusedField === 'subject'}
-              onFocus={() => setFocusedField('subject')} onBlur={() => setFocusedField(null)}
-            />
-            <SelectorCard icon="school-outline" iconColor={S[0].accent} placeholder="Course *" value={form.course} onPress={onOpenCourse} />
-            <SelectorCard icon="stats-chart-outline" iconColor={S[0].accent} placeholder="Grade *" value={form.grade} onPress={onOpenGrade} />
-          </SectionBlock>
+      {/* CLASS DETAILS */}
+<SectionBlock section={S[0]}>
+  <FieldCard
+    icon="text-outline" iconColor={S[0].accent} placeholder="Title"
+    value={form.title} onChangeText={(v) => setForm({ ...form, title: v })}
+    focused={focusedField === 'title'}
+    onFocus={() => setFocusedField('title')} onBlur={() => setFocusedField(null)}
+  />
+  <FieldCard
+    icon="book-outline" iconColor={S[0].accent} placeholder="Subject"
+    value={form.subject} onChangeText={(v) => setForm({ ...form, subject: v })}
+    focused={focusedField === 'subject'}
+    onFocus={() => setFocusedField('subject')} onBlur={() => setFocusedField(null)}
+  />
+  <SelectorCard icon="school-outline" iconColor={S[0].accent} placeholder="Course" value={form.course} onPress={onOpenCourse} />
+  <SelectorCard icon="stats-chart-outline" iconColor={S[0].accent} placeholder="Grade" value={form.grade} onPress={onOpenGrade} />
+</SectionBlock>
 
-          {/* PARTICIPANTS */}
-          <SectionBlock section={S[1]}>
-            {isTeacher ? (
-              <View style={[fieldStyles.wrap, { backgroundColor: '#F0FFFE' }]}>
-                <Ionicons name="person-circle-outline" size={20} color={S[1].accent} style={fieldStyles.icon} />
-                <Text style={[fieldStyles.input, { color: '#1E293B' }]}>{selectedTeacher?.name || 'You'}</Text>
-              </View>
-            ) : (
-              <SelectorCard icon="person-outline" iconColor={S[1].accent} placeholder="Teacher *" value={selectedTeacher?.name} onPress={onOpenTeacher} />
-            )}
-            <SelectorCard
-              icon="people-outline" iconColor={S[1].accent}
-              placeholder="Students *"
-              value={selectedStudents.length ? `${selectedStudents.length} student(s) selected` : ''}
-              onPress={onOpenStudents}
-            />
-          </SectionBlock>
+{/* PARTICIPANTS */}
+<SectionBlock section={S[1]}>
+  {isTeacher ? (
+    <View style={[fieldStyles.wrap, { backgroundColor: '#F0FFFE' }]}>
+      <Ionicons name="person-circle-outline" size={20} color={S[1].accent} style={fieldStyles.icon} />
+      <Text style={[fieldStyles.input, { color: '#1E293B' }]}>{selectedTeacher?.name || 'You'}</Text>
+    </View>
+  ) : (
+    <SelectorCard icon="person-outline" iconColor={S[1].accent} placeholder="Teacher *" value={selectedTeacher?.name} onPress={onOpenTeacher} />
+  )}
+  <SelectorCard
+    icon="people-outline" iconColor={S[1].accent}
+    placeholder="Students"
+    value={selectedStudents.length ? `${selectedStudents.length} student(s) selected` : ''}
+    onPress={onOpenStudents}
+  />
+</SectionBlock>
 
           {/* SCHEDULE */}
           <SectionBlock section={S[2]}>

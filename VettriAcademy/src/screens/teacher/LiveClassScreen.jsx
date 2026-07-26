@@ -175,33 +175,48 @@ export default function LiveClassScreen({ navigation, route }) {
     ? allClasses
     : allClasses.filter((c) => c.status === activeTab);
 
+  const getScheduledMeetingLink = (cls) => (cls?.googleMeetLink || cls?.zoomMeetingLink || cls?.meetLink || '').trim();
+  const getScheduledMeetingType = (cls) => (cls?.googleMeetLink ? 'googlemeet' : cls?.zoomMeetingLink ? 'zoom' : cls?.meetLinkType || 'googlemeet');
   const linkValidation = validateMeetLink(meetLink);
 
   const handleGoLive = (cls) => {
+    const scheduledLink = getScheduledMeetingLink(cls);
+    const scheduledType = getScheduledMeetingType(cls);
     setSelectedClass(cls);
-    setMeetLink('');
-    setMeetLinkType('googlemeet');
+    setMeetLink(scheduledLink);
+    setMeetLinkType(scheduledType);
+
+    if (scheduledLink && validateMeetLink(scheduledLink).valid) {
+      confirmGoLive(cls, scheduledLink, scheduledType);
+      return;
+    }
+
     setShowModal(true);
   };
 
-  const confirmGoLive = async () => {
-    if (!linkValidation.valid) {
-      Toast.show({ type: 'error', text1: 'Invalid Link', text2: linkValidation.error || 'Please enter a valid meeting link' });
+  const confirmGoLive = async (classOverride, linkOverride, typeOverride) => {
+    const classToStart = classOverride || selectedClass;
+    const linkToUse = String(linkOverride || meetLink || '').trim();
+    const typeToUse = typeOverride || meetLinkType;
+    const validation = validateMeetLink(linkToUse);
+
+    if (!classToStart || !validation.valid) {
+      Toast.show({ type: 'error', text1: 'Invalid Link', text2: validation.error || 'Please enter a valid meeting link' });
       return;
     }
     Keyboard.dismiss();
     setIsStarting(true);
     try {
-      const result = await dispatch(startLiveClass({ classId: selectedClass._id, meetLink: meetLink.trim(), meetLinkType }));
+      const result = await dispatch(startLiveClass({ classId: classToStart._id, meetLink: linkToUse, meetLinkType: typeToUse }));
       if (startLiveClass.fulfilled.match(result)) {
         Toast.show({ type: 'success', text1: '🔴 Class is LIVE!', text2: 'Students have been notified' });
         setShowModal(false);
         setMeetLink('');
         dispatch(fetchTodayClasses());
         navigation.navigate('LiveMonitor', {
-          classId: selectedClass._id,
-          meetLink: meetLink.trim(),
-          className: selectedClass.title || selectedClass.subject,
+          classId: classToStart._id,
+          meetLink: linkToUse,
+          className: classToStart.title || classToStart.subject,
         });
       } else {
         Toast.show({ type: 'error', text1: 'Failed to Start', text2: result.payload || 'Something went wrong' });
@@ -472,7 +487,7 @@ export default function LiveClassScreen({ navigation, route }) {
               <ScaleBtn
                 activeScale={(!meetLink.trim() || !linkValidation.valid || isStarting) ? 1 : 0.96}
                 style={[styles.startBtnWrap, (!meetLink.trim() || !linkValidation.valid || isStarting) && { opacity: 0.5 }]}
-                onPress={confirmGoLive}
+                onPress={() => confirmGoLive()}
                 disabled={!meetLink.trim() || !linkValidation.valid || isStarting}
               >
                 <LinearGradient colors={['#FF4D8D', '#FF6AA2']} style={styles.startBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>

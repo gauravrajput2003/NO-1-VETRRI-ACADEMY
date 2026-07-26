@@ -13,6 +13,8 @@ import { endLiveClass, fetchLiveMonitorData, sendLiveClassMessage, applyLiveStud
 import { fetchTodayClasses } from '../../redux/slices/classesSlice';
 import { onSocketEvent, joinRoom, leaveRoom, getSocket } from '../../services/socket';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 const TouchableOpacity = (props) => {
   const { particleCount = 20, size = "small", colors, children, ...rest } = props;

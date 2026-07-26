@@ -1,16 +1,7 @@
-import React, { createContext, useContext, useRef, useCallback } from 'react';
-import { Animated } from 'react-native';
+import React, { createContext, useContext, useRef, useCallback,useEffect } from 'react';
+import { Animated ,Keyboard,Platform} from 'react-native';
 
-/**
- * TabBarVisibility Context
- *
- * Provides a shared animated visibility state for the bottom tab bar.
- * Screens use `useTabBarScroll()` to get an onScroll handler.
- * The CustomTabBar reads translateY/opacity to animate in/out.
- *
- * This decouples scroll detection from the tab bar component,
- * allowing ANY scrollable screen to control tab bar visibility.
- */
+
 
 const SCROLL_THRESHOLD = 12;
 const ANIMATION_DURATION = 250;
@@ -92,6 +83,23 @@ export function TabBarVisibilityProvider({ children, tabBarHeight = 100 }) {
     },
     [show, hide]
   );
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const subShow = Keyboard.addListener(showEvent, () => {
+      hide();
+    });
+    const subHide = Keyboard.addListener(hideEvent, () => {
+      show();
+    });
+
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, [hide, show]);
 
   return (
     <TabBarVisibilityContext.Provider value={{ translateY, opacity, onScroll, show, hide }}>

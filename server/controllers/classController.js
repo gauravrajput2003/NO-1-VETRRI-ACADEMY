@@ -5,8 +5,57 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const cloudinary = require('../config/cloudinary');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
+const notificationService = require('../services/notificationService');
 
 // ─── Admin: Create Schedule ───────────────────────────────────────────────────
+const normalizeCourse = (value) => {
+  const raw = String(value || '').trim();
+  const courseMap = {
+    CBSE: 'CBSE',
+    Matric: 'Matric',
+    Matriculation: 'Matric',
+    Engineering: 'Engineering',
+    'Arts College': 'Arts',
+    Arts: 'Arts',
+    Language: 'Language',
+    'Spoken English/Hindi': 'Language',
+    'Computer Course': 'Language',
+    Competitive: 'Competitive',
+    'Competition Exam': 'Competitive',
+    'TET & TRB': 'Competitive',
+    Others: 'Competitive',
+  };
+  return courseMap[raw] || raw;
+};
+
+const notifyStudentsClassScheduled = async ({ req, schedule }) => {
+  const recipientIds = [...new Set((schedule.studentIds || []).map((id) => String(id)).filter(Boolean))];
+  if (!recipientIds.length) return;
+
+  const classDate = schedule.scheduledDate
+    ? new Date(schedule.scheduledDate).toLocaleDateString('en-IN')
+    : 'the scheduled date';
+
+  await notificationService.sendBulkNotifications({
+    recipientIds,
+    senderId: req.user._id,
+    type: 'class_reminder',
+    title: 'Class Scheduled',
+    message: `${schedule.title || schedule.subject} is scheduled for ${classDate} at ${schedule.scheduledTime}.`,
+    link: '/student/classes',
+    data: {
+      classId: schedule._id,
+      route: 'Classes',
+      scheduledDate: schedule.scheduledDate,
+      scheduledTime: schedule.scheduledTime,
+      type: 'class_reminder',
+    },
+    referenceId: schedule._id,
+    referenceType: 'ClassSchedule',
+    io: req.app.get('io'),
+  });
+};
+
 const createSchedule = async (req, res) => {
   try {
     const {
@@ -30,6 +79,15 @@ const createSchedule = async (req, res) => {
       return res.status(400).json({ success: false, message: 'scheduledTime must be in HH:MM format' });
     }
 
+    // course is optional now — only validate/normalize if the user actually picked one
+    let normalizedCourse = '';
+    if (course && String(course).trim()) {
+      normalizedCourse = normalizeCourse(course);
+      if (!['CBSE', 'Matric', 'Engineering', 'Arts', 'Language', 'Competitive'].includes(normalizedCourse)) {
+        return res.status(400).json({ success: false, message: 'Invalid course selected' });
+      }
+    }
+
     const parsedScheduledDate = new Date(scheduledDate);
     if (Number.isNaN(parsedScheduledDate.getTime())) {
       return res.status(400).json({ success: false, message: 'scheduledDate is invalid' });
@@ -48,7 +106,7 @@ const createSchedule = async (req, res) => {
     }
 
     const schedule = await ClassSchedule.create({
-      title, course, board, subject, grade,
+      title: title || '', course: normalizedCourse, board, subject: subject || '', grade: grade || '',
       teacherId, studentIds,
       scheduledDate: parsedScheduledDate,
       scheduledTime, durationMinutes: durationMinutes || 60,
@@ -56,6 +114,10 @@ const createSchedule = async (req, res) => {
       dayOfWeek, academicYear, batch,
       googleMeetLink: String(googleMeetLink || '').trim(),
       zoomMeetingLink: String(zoomMeetingLink || '').trim(),
+    });
+
+    notifyStudentsClassScheduled({ req, schedule }).catch((error) => {
+      console.error('[ClassSchedule] Failed to notify students:', error.message);
     });
 
     res.status(201).json({ success: true, schedule });
@@ -184,11 +246,6 @@ const goLive = async (req, res) => {
     const classId = req.params.id;
     const io = req.app.get('io');
 
-    // Validate URL format
-    try { new URL(meetLink); } catch {
-      return res.status(400).json({ success: false, message: 'Invalid meeting link URL.' });
-    }
-
     const cls = await ClassSchedule.findById(classId);
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
     if (cls.teacherId.toString() !== req.user._id.toString()) {
@@ -198,18 +255,25 @@ const goLive = async (req, res) => {
       return res.status(400).json({ success: false, message: `Class is already ${cls.status}.` });
     }
 
+    const resolvedMeetLink = String(meetLink || cls.googleMeetLink || cls.zoomMeetingLink || '').trim();
+    const resolvedMeetLinkType = meetLinkType || (cls.googleMeetLink ? 'googlemeet' : cls.zoomMeetingLink ? 'zoom' : 'googlemeet');
+
+    try { new URL(resolvedMeetLink); } catch {
+      return res.status(400).json({ success: false, message: 'Invalid meeting link URL.' });
+    }
+
     // Update class status + store meetLink securely
     cls.status = 'live';
-    cls.meetLink = meetLink;
-    cls.meetLinkType = meetLinkType || 'googlemeet';
+    cls.meetLink = resolvedMeetLink;
+    cls.meetLinkType = resolvedMeetLinkType;
     await cls.save();
 
     // Create LiveSession
     const session = await LiveSession.create({
       classId,
       teacherId: req.user._id,
-      meetLink,
-      meetLinkType: meetLinkType || 'googlemeet',
+      meetLink: resolvedMeetLink,
+      meetLinkType: resolvedMeetLinkType,
       isLive: true,
       startedAt: new Date(),
     });

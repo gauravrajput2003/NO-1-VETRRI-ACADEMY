@@ -3,18 +3,17 @@ const mongoose = require('mongoose');
 const classScheduleSchema = new mongoose.Schema(
   {
     title: { type: String, trim: true },
-    course: {
-      type: String,
-      enum: ['CBSE', 'Matric', 'Engineering', 'Arts', 'Language', 'Competitive'],
-      required: true,
-    },
+  course: {
+  type: String,
+  enum: ['CBSE', 'Matric', 'Engineering', 'Arts', 'Language', 'Competitive', ''],
+  default: '',
+},
     board: {
       type: String,
       enum: ['CBSE', 'State Board', 'Arts College', 'Eng College', 'TNPSC', 'TRB', 'TET', ''],
     },
-    subject: { type: String, required: true, trim: true },
-    grade: { type: String, required: true },
-    teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+subject: { type: String, trim: true, default: '' },
+grade: { type: String, default: '' },    teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     studentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     scheduledDate: { type: Date, required: true },
     scheduledTime: { type: String, required: true }, // HH:MM (24h)

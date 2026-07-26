@@ -3,9 +3,9 @@ const Doubt = require('../models/Doubt');
 const DoubtReply = require('../models/DoubtReply');
 const DoubtAuditLog = require('../models/DoubtAuditLog');
 const DoubtSetting = require('../models/DoubtSetting');
-const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
+const { sendBulkNotifications } = require('../services/notificationService');
 
 const VALID_ATTACHMENT_MIMES = {
 	image: ['image/jpeg', 'image/png'],
@@ -135,33 +135,30 @@ const buildDoubtQuery = (user, query) => {
 
 const emitNotificationAndSocket = async ({ req, recipients, title, message, type, data }) => {
 	if (!Array.isArray(recipients) || !recipients.length) return;
+
+	const uniqueRecipients = [...new Set(recipients.map((id) => String(id)).filter(Boolean))];
+	if (!uniqueRecipients.length) return;
+
 	const io = req.app.get('io');
-	const payloads = recipients.map((recipient) => ({
-		recipient,
-		sender: req.user._id,
+	const doubtId = data?.doubtId ? String(data.doubtId) : undefined;
+
+	await sendBulkNotifications({
+		recipientIds: uniqueRecipients,
+		senderId: req.user._id,
 		type,
 		title,
 		message,
-		data,
-	}));
-
-	const created = await Notification.insertMany(payloads, { ordered: false });
-
-	if (io) {
-		created.forEach((notif) => {
-			io.to(`user:${notif.recipient}`).emit('notification:new', {
-				_id: notif._id,
-				recipient: notif.recipient,
-				sender: notif.sender,
-				type: notif.type,
-				title: notif.title,
-				message: notif.message,
-				data: notif.data,
-				isRead: false,
-				createdAt: notif.createdAt,
-			});
-		});
-	}
+		link: doubtId ? 'DoubtDetail' : data?.route || 'DoubtCenter',
+		data: {
+			...data,
+			doubtId,
+			route: data?.route || (doubtId ? 'DoubtDetail' : 'DoubtCenter'),
+			type,
+		},
+		referenceId: doubtId || undefined,
+		referenceType: doubtId ? 'Doubt' : undefined,
+		io,
+	});
 };
 
 const getTeacherSearch = async (req, res) => {
@@ -448,8 +445,11 @@ const addReply = async (req, res) => {
 			req,
 			recipients,
 			type: 'doubt_reply',
-			title: 'New Doubt Reply',
-			message: `${req.user.displayName || req.user.name} replied on: ${doubt.title}`,
+			title: req.user.role === 'student' ? 'Student Follow-up on Doubt' : 'New Doubt Reply',
+			message:
+				req.user.role === 'student'
+					? `${req.user.displayName || req.user.name} asked a follow-up on: ${doubt.title}`
+					: `${req.user.displayName || req.user.name} replied on: ${doubt.title}`,
 			data: { doubtId: doubt._id, route: 'DoubtDetail' },
 		});
 

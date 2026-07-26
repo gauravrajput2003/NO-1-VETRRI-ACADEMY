@@ -36,6 +36,7 @@ import { joinRoom, leaveRoom, onSocketEvent } from '../../services/socket';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 
 // ---- BRAND PALETTE: teal + pink + golden + white ----
 const D = {
@@ -432,7 +433,7 @@ export default function DoubtThreadScreen({ route, navigation }) {
   };
   const statusPill = statusPillColors[currentDoubt.status] || statusPillColors.open;
 
-  return (
+ return (
     <View style={styles.container}>
       <LinearGradient
         colors={[D.pink, D.teal]}
@@ -456,107 +457,114 @@ export default function DoubtThreadScreen({ route, navigation }) {
         ) : null}
       </LinearGradient>
 
-      <FlatList
-        onScroll={onTabBarScroll}
-        scrollEventThrottle={16}
-        data={replies}
-        keyExtractor={(item) => item._id}
-        renderItem={renderReply}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding + 130 }}
-        refreshControl={<RefreshControl refreshing={loadingDetail} onRefresh={loadDetail} colors={[D.pink]} />}
-        ListHeaderComponent={(
-          <View style={[styles.rootCard, { backgroundColor: D.white, borderLeftColor: D.pink }]}>
-            <Text style={styles.rootTitle}>{currentDoubt.title}</Text>
-            <Text style={styles.rootDesc}>{currentDoubt.description}</Text>
-            {!!currentDoubt.attachments?.length && (
-              <View style={styles.replyAttachWrap}>
-                {currentDoubt.attachments.map((att, idx) => (
-                  <View key={`${att.publicId || idx}-${idx}`}>
-                    <AttachmentChip attachment={att} onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })} />
-                    {att.attachmentType === 'audio' ? <AudioAttachmentPlayer attachment={att} /> : null}
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-      />
-
-      {(canMarkResolved || canClose) && (
-        <View style={styles.statusBar}>
-          {canMarkResolved ? (
-            <ParticleWrapper particleCount={12} size="small" style={{ flex: 1 }}>
-              <TouchableOpacity style={styles.statusBtnWrap} onPress={() => onUpdateStatus('resolved')} activeOpacity={0.9}>
-                <LinearGradient colors={[D.teal, D.tealDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.statusBtn}>
-                  <Ionicons name="checkmark-circle" size={18} color={D.white} />
-                  <Text style={styles.statusBtnText}>Mark Resolved</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </ParticleWrapper>
-          ) : null}
-          {canClose ? (
-            <ParticleWrapper particleCount={12} size="small" style={{ flex: 1 }}>
-              <TouchableOpacity style={styles.statusBtnSecondary} onPress={() => onUpdateStatus('closed')}>
-                <Ionicons name="lock-closed" size={16} color={D.ink} />
-                <Text style={styles.statusBtnSecondaryText}>Close</Text>
-              </TouchableOpacity>
-            </ParticleWrapper>
-          ) : null}
-        </View>
-      )}
-
-      <View style={[styles.composer, { paddingBottom: Math.max(12, bottomPadding) }]}>
-        {replyAttachments.length ? (
-          <View style={styles.pendingWrap}>
-            {replyAttachments.map((f, idx) => (
-              <View key={`${f.name}-${idx}`} style={styles.pendingChip}>
-                <Ionicons name="document-attach" size={15} color={D.muted} style={{ marginRight: 6 }} />
-                <Text style={styles.pendingText} numberOfLines={1}>{f.name}</Text>
-                <TouchableOpacity onPress={() => setReplyAttachments((prev) => prev.filter((_, i) => i !== idx))}>
-                  <Ionicons name="close-circle" size={17} color={D.pink} />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        <View style={styles.composerRow}>
-          <TouchableOpacity style={styles.iconBtn} onPress={onPickAttachment}>
-            <Ionicons name="attach" size={22} color={D.tealDark} />
-          </TouchableOpacity>
-
-          <TextInput
-            style={styles.composerInput}
-            placeholder="Write reply..."
-            placeholderTextColor={D.muted}
-            value={message}
-            onChangeText={setMessage}
-            multiline
-          />
-
-          {!recording ? (
-            <TouchableOpacity style={styles.iconBtn} onPress={startRecording}>
-              <Ionicons name="mic" size={22} color={D.tealDark} />
-            </TouchableOpacity>
-          ) : (
-            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-              <TouchableOpacity style={styles.iconBtn} onPress={pauseOrResumeRecording}>
-                <Ionicons name={recordingPaused ? 'play' : 'pause'} size={20} color={D.tealDark} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: D.pinkLight }]} onPress={stopRecording}>
-                <Ionicons name="stop" size={20} color={D.pinkDark} />
-              </TouchableOpacity>
-              <Text style={styles.recordingTimeText}>{recordingDurationSec}s</Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <FlatList
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
+          data={replies}
+          keyExtractor={(item) => item._id}
+          renderItem={renderReply}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding + 130 }}
+          refreshControl={<RefreshControl refreshing={loadingDetail} onRefresh={loadDetail} colors={[D.pink]} />}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={(
+            <View style={[styles.rootCard, { backgroundColor: D.white, borderLeftColor: D.pink }]}>
+              <Text style={styles.rootTitle}>{currentDoubt.title}</Text>
+              <Text style={styles.rootDesc}>{currentDoubt.description}</Text>
+              {!!currentDoubt.attachments?.length && (
+                <View style={styles.replyAttachWrap}>
+                  {currentDoubt.attachments.map((att, idx) => (
+                    <View key={`${att.publicId || idx}-${idx}`}>
+                      <AttachmentChip attachment={att} onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })} />
+                      {att.attachmentType === 'audio' ? <AudioAttachmentPlayer attachment={att} /> : null}
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           )}
+        />
 
-          <TouchableOpacity onPress={onSendReply} disabled={replying || uploading} activeOpacity={0.9}>
-            <LinearGradient colors={[D.pink, D.pinkDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sendBtn}>
-              {replying || uploading ? <ActivityIndicator size="small" color={D.white} /> : <Ionicons name="send" size={20} color={D.white} />}
-            </LinearGradient>
-          </TouchableOpacity>
+        {(canMarkResolved || canClose) && (
+          <View style={styles.statusBar}>
+            {canMarkResolved ? (
+              <ParticleWrapper particleCount={12} size="small" style={{ flex: 1 }}>
+                <TouchableOpacity style={styles.statusBtnWrap} onPress={() => onUpdateStatus('resolved')} activeOpacity={0.9}>
+                  <LinearGradient colors={[D.teal, D.tealDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.statusBtn}>
+                    <Ionicons name="checkmark-circle" size={18} color={D.white} />
+                    <Text style={styles.statusBtnText}>Mark Resolved</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </ParticleWrapper>
+            ) : null}
+            {canClose ? (
+              <ParticleWrapper particleCount={12} size="small" style={{ flex: 1 }}>
+                <TouchableOpacity style={styles.statusBtnSecondary} onPress={() => onUpdateStatus('closed')}>
+                  <Ionicons name="lock-closed" size={16} color={D.ink} />
+                  <Text style={styles.statusBtnSecondaryText}>Close</Text>
+                </TouchableOpacity>
+              </ParticleWrapper>
+            ) : null}
+          </View>
+        )}
+
+        <View style={[styles.composer, { paddingBottom: Math.max(12, bottomPadding) }]}>
+          {replyAttachments.length ? (
+            <View style={styles.pendingWrap}>
+              {replyAttachments.map((f, idx) => (
+                <View key={`${f.name}-${idx}`} style={styles.pendingChip}>
+                  <Ionicons name="document-attach" size={15} color={D.muted} style={{ marginRight: 6 }} />
+                  <Text style={styles.pendingText} numberOfLines={1}>{f.name}</Text>
+                  <TouchableOpacity onPress={() => setReplyAttachments((prev) => prev.filter((_, i) => i !== idx))}>
+                    <Ionicons name="close-circle" size={17} color={D.pink} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.composerRow}>
+            <TouchableOpacity style={styles.iconBtn} onPress={onPickAttachment}>
+              <Ionicons name="attach" size={22} color={D.tealDark} />
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.composerInput}
+              placeholder="Write reply..."
+              placeholderTextColor={D.muted}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+            />
+
+            {!recording ? (
+              <TouchableOpacity style={styles.iconBtn} onPress={startRecording}>
+                <Ionicons name="mic" size={22} color={D.tealDark} />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <TouchableOpacity style={styles.iconBtn} onPress={pauseOrResumeRecording}>
+                  <Ionicons name={recordingPaused ? 'play' : 'pause'} size={20} color={D.tealDark} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.iconBtn, { backgroundColor: D.pinkLight }]} onPress={stopRecording}>
+                  <Ionicons name="stop" size={20} color={D.pinkDark} />
+                </TouchableOpacity>
+                <Text style={styles.recordingTimeText}>{recordingDurationSec}s</Text>
+              </View>
+            )}
+
+            <TouchableOpacity onPress={onSendReply} disabled={replying || uploading} activeOpacity={0.9}>
+              <LinearGradient colors={[D.pink, D.pinkDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sendBtn}>
+                {replying || uploading ? <ActivityIndicator size="small" color={D.white} /> : <Ionicons name="send" size={20} color={D.white} />}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       <Modal visible={assignModalOpen} transparent animationType="slide" onRequestClose={() => setAssignModalOpen(false)}>
         <View style={styles.modalBackdrop}>
