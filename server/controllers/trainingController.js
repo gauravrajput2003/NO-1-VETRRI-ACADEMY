@@ -27,8 +27,9 @@ const uploadTrainingVideo = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file received by server. Ensure Content-Type is multipart/form-data and field name is "video".' });
     }
 
-    const { title, description, category, isMandatory, order, thumbnailUrl } = req.body;
+    const { title, description, category, isMandatory, order, thumbnailUrl,targetAudience } = req.body;
     if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
+   
 
     // Upload to Cloudinary from disk — force resource_type video regardless of MIME
     const result = await cloudinary.uploader.upload(tempFilePath, {
@@ -49,18 +50,19 @@ const uploadTrainingVideo = async (req, res) => {
       nextOrder = (last?.order || 0) + 1;
     }
 
-    const video = await TrainingVideo.create({
+const video = await TrainingVideo.create({
       title,
       description,
       cloudinaryUrl: result.secure_url,
       cloudinaryPublicId: result.public_id,
-      videoUrl: result.secure_url,      // also set videoUrl for unified player
+      videoUrl: result.secure_url,
       thumbnailUrl: thumbnailUrl || autoThumb,
       duration: result.duration || 0,
       isMandatory: isMandatory === 'true' || isMandatory === true,
       uploadedBy: req.user._id,
       order: nextOrder,
       category: category || 'getting-started',
+      targetAudience: targetAudience || 'both',
       isActive: true,
     });
 
@@ -76,7 +78,7 @@ const uploadTrainingVideo = async (req, res) => {
 // ─── ADMIN: Upload Training Video by URL (no file) ───────────────────────────
 const uploadTrainingVideoByUrl = async (req, res) => {
   try {
-    const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration } = req.body;
+    const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration ,targetAudience} = req.body;
 
     if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
     if (!videoUrl) return res.status(400).json({ success: false, message: 'videoUrl is required.' });
@@ -149,8 +151,9 @@ const getAllVideosAdmin = async (req, res) => {
 // ─── ADMIN: Edit Training Video ───────────────────────────────────────────────
 const editTrainingVideo = async (req, res) => {
   try {
-    const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration, isActive } = req.body;
+    const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration, isActive,targetAudience  } = req.body;
     const video = await TrainingVideo.findById(req.params.id);
+        if (targetAudience !== undefined) video.targetAudience = targetAudience;
     if (!video) return res.status(404).json({ success: false, message: 'Video not found.' });
 
     if (title !== undefined) video.title = title;
@@ -212,7 +215,11 @@ const getTrainingVideos = async (req, res) => {
     const filter = { isActive: true };
     if (category && category !== 'all') filter.category = category;
     if (search) filter.title = { $regex: search, $options: 'i' };
-
+  if (req.user.role === 'teacher') {
+      filter.targetAudience = { $in: ['teacher', 'both'] };
+    } else if (req.user.role === 'student') {
+      filter.targetAudience = { $in: ['student', 'both'] };
+    }
     const videos = await TrainingVideo.find(filter).sort({ order: 1, createdAt: -1 });
 
     const progressList = await TrainingVideoProgress.find({ teacherId: req.user._id });
@@ -382,7 +389,24 @@ const getProgressMatrix = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
+// ─── ONE-TIME MIGRATION: backfill targetAudience on old videos ───────────────
+// TEMPORARY — remove this function and its route after running once.
+const migrateTargetAudience = async (req, res) => {
+  try {
+    const result = await TrainingVideo.updateMany(
+      { targetAudience: { $exists: false } },
+      { $set: { targetAudience: 'both' } }
+    );
+    res.json({
+      success: true,
+      message: 'Migration complete',
+      matched: result.matchedCount ?? result.n,
+      modified: result.modifiedCount ?? result.nModified,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 module.exports = {
   // Admin
   uploadTrainingVideo,
@@ -393,6 +417,7 @@ module.exports = {
   reorderVideos,
   deleteTrainingVideo,
   getProgressMatrix,
+  migrateTargetAudience,//temprory
   // Teacher
   getTrainingVideos,
   markVideoComplete,

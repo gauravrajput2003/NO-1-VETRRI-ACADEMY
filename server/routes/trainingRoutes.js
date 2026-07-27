@@ -13,12 +13,21 @@ const {
   reorderVideos,
   deleteTrainingVideo,
   getProgressMatrix,
-  // Teacher
+  // Teacher/Student
   getTrainingVideos,
   markVideoComplete,
   updateWatchProgress,
   getIncompleteMandatoryCount,
 } = require('../controllers/trainingController');
+
+// Allow any of the given roles — used to open shared endpoints to students too,
+// without touching existing teacherOnly/adminOnly middleware used elsewhere.
+const allowRoles = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
+  next();
+};
 
 // ─── IMPORTANT: Static routes must come BEFORE parameterized routes ────────────
 
@@ -28,11 +37,11 @@ router.get('/progress', verifyToken, adminOnly, getProgressMatrix);
 router.post('/url', verifyToken, adminOnly, uploadTrainingVideoByUrl);
 router.post('/reorder', verifyToken, adminOnly, reorderVideos);
 
-// Teacher — static routes
-router.get('/incomplete-mandatory', verifyToken, teacherOnly, getIncompleteMandatoryCount);
+// Teacher/Student — static routes (widened from teacherOnly)
+router.get('/incomplete-mandatory', verifyToken, allowRoles('teacher', 'student'), getIncompleteMandatoryCount);
 
-// Teacher/Admin — shared list (teacher sees active only, admin sees all via /admin/all)
-router.get('/', verifyToken, teacherOrAdmin, getTrainingVideos);
+// Teacher/Student/Admin — shared list (teacher & student see active only, admin sees all via /admin/all)
+router.get('/', verifyToken, allowRoles('teacher', 'student', 'admin'), getTrainingVideos);
 
 // Admin — file upload (with multer error handling)
 const multerUpload = (req, res, next) => {
@@ -48,9 +57,9 @@ router.post('/', verifyToken, adminOnly, multerUpload, uploadTrainingVideo);
 
 // ─── Parameterized routes (must be last) ─────────────────────────────────────
 
-// Teacher routes
-router.patch('/:id/complete', verifyToken, teacherOnly, markVideoComplete);
-router.patch('/:id/progress', verifyToken, teacherOnly, updateWatchProgress);
+// Teacher/Student routes (widened from teacherOnly)
+router.patch('/:id/complete', verifyToken, allowRoles('teacher', 'student'), markVideoComplete);
+router.patch('/:id/progress', verifyToken, allowRoles('teacher', 'student'), updateWatchProgress);
 
 // Admin routes
 router.put('/:id', verifyToken, adminOnly, editTrainingVideo);

@@ -42,6 +42,11 @@ const trainingVideoSchema = new mongoose.Schema(
       ],
       default: 'getting-started',
     },
+      targetAudience: {
+      type: String,
+      enum: ['teacher', 'student', 'both'],
+      default: 'both',
+    },
 
     isActive: { type: Boolean, default: true },
   },
