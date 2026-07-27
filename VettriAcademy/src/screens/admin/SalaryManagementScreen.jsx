@@ -2,12 +2,13 @@ import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity as RNTouchableOpacity, FlatList, Modal, TextInput, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity as RNTouchableOpacity, FlatList, Modal, TextInput, ActivityIndicator, RefreshControl, Image ,Platform} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -63,14 +64,48 @@ const arrayBufferToBase64 = (buffer) => {
 };
 
 const savePdfAndShare = async (arrayBuffer, filename) => {
+  // Web: expo-file-system doesn't apply — trigger a normal browser download instead.
+  if (Platform.OS === 'web') {
+    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return url;
+  }
+
+  // Native (iOS/Android/Expo Go): write to cache, then open the share sheet.
   const base64 = arrayBufferToBase64(arrayBuffer);
   const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-  await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+  // NOTE: use the string literal 'base64' — FileSystem.EncodingType.Base64 is
+  // undefined on some expo-file-system versions and crashes here otherwise.
+  await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: 'base64' });
+
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
     await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: filename });
   }
   return fileUri;
+};
+const buildFileFormData = async (asset, fieldName = 'file') => {
+  const formData = new FormData();
+  const filename = asset.fileName || `proof_${Date.now()}.jpg`;
+  const type = asset.mimeType || 'image/jpeg';
+
+  if (Platform.OS === 'web') {
+    // On web, RN's {uri, name, type} shape doesn't work — real FormData needs a Blob/File.
+    const response = await fetch(asset.uri);
+    const blob = await response.blob();
+    formData.append(fieldName, blob, filename);
+  } else {
+    formData.append(fieldName, { uri: asset.uri, name: filename, type });
+  }
+
+  return formData;
 };
 
 const emptyConfig = {
@@ -185,48 +220,41 @@ export default function SalaryManagementScreen({ navigation, route }) {
     }
   };
 
-  const handlePickProof = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Toast.show({ type: 'error', text1: 'Permission denied', text2: 'Permission to access gallery is required.' });
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets?.[0]) {
-        const asset = result.assets[0];
-        setUploadingProof(true);
-
-        const formData = new FormData();
-        const filename = asset.fileName || `proof_${Date.now()}.jpg`;
-        const type = asset.mimeType || 'image/jpeg';
-        formData.append('file', {
-          uri: asset.uri,
-          name: filename,
-          type: type,
-        });
-
-        const uploadRes = await uploadSalaryProofAPI(formData);
-        if (uploadRes.data?.url) {
-          setPayProofImage(uploadRes.data.url);
-          Toast.show({ type: 'success', text1: 'Proof uploaded!' });
-        } else {
-          throw new Error('No URL returned from upload API');
-        }
-      }
-    } catch (err) {
-      console.error('[Upload Proof Error]:', err);
-      Toast.show({ type: 'error', text1: 'Upload failed', text2: err.message || 'Please try again.' });
-    } finally {
-      setUploadingProof(false);
+const handlePickProof = async () => {
+  try {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Toast.show({ type: 'error', text1: 'Permission denied', text2: 'Permission to access gallery is required.' });
+      return;
     }
-  };
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      setUploadingProof(true);
+
+      const formData = await buildFileFormData(asset, 'file');
+
+      const uploadRes = await uploadSalaryProofAPI(formData);
+      if (uploadRes.data?.url) {
+        setPayProofImage(uploadRes.data.url);
+        Toast.show({ type: 'success', text1: 'Proof uploaded!' });
+      } else {
+        throw new Error('No URL returned from upload API');
+      }
+    }
+  } catch (err) {
+    console.error('[Upload Proof Error]:', err);
+    Toast.show({ type: 'error', text1: 'Upload failed', text2: err.message || 'Please try again.' });
+  } finally {
+    setUploadingProof(false);
+  }
+};
 
   const handleProcessPayment = async () => {
     if (!activePayTeacher) return;
@@ -309,32 +337,34 @@ export default function SalaryManagementScreen({ navigation, route }) {
     }
   };
 
-  const handleDownloadReport = async (components) => {
-    setDownloadingReport(true);
-    try {
-      const { data } = await downloadSalaryReportAPI(`${month} ${year}`, components);
-      const filename = `salary-report-${month}-${year}.pdf`.toLowerCase();
-      await savePdfAndShare(data, filename);
-      Toast.show({ type: 'success', text1: 'Report ready', text2: 'Choose where to save or share it.' });
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Download failed', text2: error.response?.data?.message || 'Unable to generate report' });
-    } finally {
-      setDownloadingReport(false);
-    }
-  };
+const handleDownloadReport = async (components) => {
+  setDownloadingReport(true);
+  try {
+    const { data } = await downloadSalaryReportAPI(`${month} ${year}`, components);
+    const filename = `salary-report-${month}-${year}.pdf`.toLowerCase();
+    await savePdfAndShare(data, filename);
+    Toast.show({ type: 'success', text1: 'Report ready', text2: 'Choose where to save or share it.' });
+  } catch (error) {
+    console.error('[Download Report Error]:', parseApiError(error));
+    Toast.show({ type: 'error', text1: 'Download failed', text2: parseApiError(error) });
+  } finally {
+    setDownloadingReport(false);
+  }
+};
 
-  const handleDownloadSlip = async (teacher, components) => {
-    setDownloadingSlipId(teacher.teacherId);
-    try {
-      const { data } = await getTeacherSalarySlipAPI(teacher.teacherId, `${month} ${year}`, components);
-      const filename = `salary-slip-${teacher.teacherName}-${month}-${year}.pdf`.replace(/\s+/g, '-').toLowerCase();
-      await savePdfAndShare(data, filename);
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Download failed', text2: error.response?.data?.message || 'Unable to fetch slip' });
-    } finally {
-      setDownloadingSlipId(null);
-    }
-  };
+const handleDownloadSlip = async (teacher, components) => {
+  setDownloadingSlipId(teacher.teacherId);
+  try {
+    const { data } = await getTeacherSalarySlipAPI(teacher.teacherId, `${month} ${year}`, components);
+    const filename = `salary-slip-${teacher.teacherName}-${month}-${year}.pdf`.replace(/\s+/g, '-').toLowerCase();
+    await savePdfAndShare(data, filename);
+  } catch (error) {
+    console.error('[Download Slip Error]:', parseApiError(error));
+    Toast.show({ type: 'error', text1: 'Download failed', text2: parseApiError(error) });
+  } finally {
+    setDownloadingSlipId(null);
+  }
+};
 
   const toggleComponent = (key) => {
     setSelectedComponents((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -355,6 +385,21 @@ export default function SalaryManagementScreen({ navigation, route }) {
     setComponentModalFor(null);
     setComponentModalTeacher(null);
   };
+  const parseApiError = (error) => {
+  // When responseType is 'arraybuffer', axios also arraybuffer-encodes error JSON bodies.
+  // Decode it back to text so the real server error message is visible.
+  const data = error?.response?.data;
+  if (data instanceof ArrayBuffer) {
+    try {
+      const text = new TextDecoder().decode(data);
+      const parsed = JSON.parse(text);
+      return parsed.message || text;
+    } catch (e) {
+      return `Server returned ${error.response?.status || 'an error'}`;
+    }
+  }
+  return error?.response?.data?.message || error?.message || 'Unknown error';
+};
 
   const reportCards = useMemo(() => [
     { label: 'Total Payroll', value: summary.totalPayroll || 0, color: Colors.primary },
@@ -815,29 +860,29 @@ export default function SalaryManagementScreen({ navigation, route }) {
               Choose which components to include in the {componentModalFor === 'bulk' ? 'report' : 'slip'}
             </Text>
 
-            <Text style={[styles.label, { marginTop: 4 }]}>Earnings</Text>
-            {EARNING_FIELDS.map((f) => (
-              <TouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
-                <Ionicons
-                  name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
-                  size={20}
-                  color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
-                />
-                <Text style={styles.checkRowText}>{f.label}</Text>
-              </TouchableOpacity>
-            ))}
+         <Text style={[styles.label, { marginTop: 4 }]}>Earnings</Text>
+{EARNING_FIELDS.map((f) => (
+  <RNTouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
+    <Ionicons
+      name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
+      size={20}
+      color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
+    />
+    <Text style={styles.checkRowText}>{f.label}</Text>
+  </RNTouchableOpacity>
+))}
 
-            <Text style={[styles.label, { marginTop: 14 }]}>Deductions</Text>
-            {DEDUCTION_FIELDS.map((f) => (
-              <TouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
-                <Ionicons
-                  name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
-                  size={20}
-                  color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
-                />
-                <Text style={styles.checkRowText}>{f.label}</Text>
-              </TouchableOpacity>
-            ))}
+<Text style={[styles.label, { marginTop: 14 }]}>Deductions</Text>
+{DEDUCTION_FIELDS.map((f) => (
+  <RNTouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
+    <Ionicons
+      name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
+      size={20}
+      color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
+    />
+    <Text style={styles.checkRowText}>{f.label}</Text>
+  </RNTouchableOpacity>
+))}
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => { setComponentModalFor(null); setComponentModalTeacher(null); }}>

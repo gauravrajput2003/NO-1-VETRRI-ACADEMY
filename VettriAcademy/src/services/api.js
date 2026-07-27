@@ -753,6 +753,18 @@ export const uploadDoubtAttachmentAPI = async ({ uri, name, type }) => {
 
   return { data };
 };
+// Training Videos — Student (reuses same shared endpoints as teacher)
+export const getStudentTrainingVideosAPI = (params) =>
+  api.get('/training-videos', { params });
+
+export const markStudentVideoCompleteAPI = (id, watchDuration) =>
+  api.patch(`/training-videos/${id}/complete`, { watchDuration });
+
+export const updateStudentWatchProgressAPI = (id, watchDuration, currentPosition) =>
+  api.patch(`/training-videos/${id}/progress`, { watchDuration, currentPosition });
+
+export const getStudentIncompleteMandatoryCountAPI = () =>
+  api.get('/training-videos/incomplete-mandatory');
 
 // ─── Push Notifications ────────────────────────────────────────────────────────
 /**

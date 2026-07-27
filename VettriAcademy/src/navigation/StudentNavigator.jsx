@@ -31,6 +31,8 @@ import NotesScreen           from '../screens/student/NotesScreen';
 import TopPerformersScreen  from '../screens/student/TopPerformersScreen';
 import DoubtThreadScreen     from '../screens/common/DoubtThreadScreen';
 import HeaderActions         from '../components/HeaderActions';
+import StudentTrainingVideosScreen from '../screens/student/StudentTrainingVideosScreen';
+import StudentVideoPlayerScreen    from '../screens/student/StudentVideoPlayerScreen';
 import {
   fetchDoubts,
   incrementUnreadCount,
@@ -72,7 +74,6 @@ const HEADER_OPTS = {
   headerRight: () => <HeaderActions />,
 };
 
-// ─── Stack Navigators ─────────────────────────────────────────────────────────
 function HomeStack() {
   return (
     <Stack.Navigator>
@@ -94,8 +95,9 @@ function HomeStack() {
       <Stack.Screen name="ExamScores"       component={ExamScoresScreen}      options={{ ...HEADER_OPTS, title: 'Exam Scores' }} />
       <Stack.Screen name="DocumentViewer"   component={DocumentViewerScreen}  options={{ headerShown: false }} />
       <Stack.Screen name="TopPerformers"    component={TopPerformersScreen}   options={{ ...HEADER_OPTS, title: 'Weekly Top Performers' }} />
+      <Stack.Screen name="TrainingVideos"   component={StudentTrainingVideosScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="VideoPlayer"      component={StudentVideoPlayerScreen}    options={{ headerShown: false }} />
     </Stack.Navigator>
-
   );
 }
 

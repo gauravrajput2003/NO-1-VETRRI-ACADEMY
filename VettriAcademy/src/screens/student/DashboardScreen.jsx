@@ -43,6 +43,7 @@ const D = {
   mutedMore: Colors?.gray || '#94A3B8',
 };
 
+
 // Darkens a hex color by a fixed amount — used for the active Explore tile gradient
 function shade(hex, amt = 28) {
   const num = parseInt(hex.replace('#', ''), 16);
@@ -59,6 +60,7 @@ const CATEGORIES = [
   { id: '4', label: 'Attendance', icon: 'calendar',     screen: 'Attendance', tint: D.teal   },
   { id: '5', label: 'Homework',   icon: 'create',       screen: 'Discuss',    tint: D.pink   },
   { id: '6', label: 'Library',    icon: 'library',      screen: 'Materials',  tint: D.golden },
+  { id: '7', label: 'Training',   icon: 'play-circle',  screen: 'TrainingVideos', tint: D.teal },
 ];
 
 function PulseRing({ color }) {

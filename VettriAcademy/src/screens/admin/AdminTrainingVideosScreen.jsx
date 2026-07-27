@@ -117,7 +117,8 @@ export default function AdminTrainingVideosScreen({ navigation }) {
     setUploadProgress(0);
     setShowModal(true);
   };
-  const openEdit = (v) => {
+  const EMPTY_FORM = { title:'', description:'', category:'getting-started', videoUrl:'', thumbnailUrl:'', duration:'', isMandatory:false, targetAudience:'both' };
+ const openEdit = (v) => {
     setEditingId(v._id);
     setSelectedFile(null);
     setUploadMode(v.videoUrl ? 'url' : 'file');
@@ -130,6 +131,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
       thumbnailUrl: v.thumbnailUrl || '',
       duration: v.duration ? String(v.duration) : '',
       isMandatory: v.isMandatory || false,
+      targetAudience: v.targetAudience || 'both',
     });
     setShowModal(true);
   };
@@ -207,6 +209,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
         fd.append('thumbnailUrl', form.thumbnailUrl || '');
         fd.append('duration', String(parseInt(form.duration) || 0));
         fd.append('isMandatory', String(form.isMandatory));
+         fd.append('targetAudience', form.targetAudience || 'both');
         console.log('[Upload] Sending file:', selectedFile.name, selectedFile.mimeType, selectedFile.size, 'platform:', Platform.OS);
         await uploadTrainingVideoFileAPI(fd);
         showToast('Video uploaded successfully!');
@@ -283,6 +286,15 @@ export default function AdminTrainingVideosScreen({ navigation }) {
           <View style={{ flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' }}>
             <View style={[styles.catChip, { backgroundColor:cc+'18' }]}><Text style={[styles.catTxt,{color:cc}]}>{getCatLabel(item.category)}</Text></View>
             {item.isMandatory && <View style={styles.mandChip}><Text style={styles.mandTxt}>★ Mandatory</Text></View>}
+          </View>
+          <View style={{ flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+            <View style={[styles.catChip, { backgroundColor:cc+'18' }]}><Text style={[styles.catTxt,{color:cc}]}>{getCatLabel(item.category)}</Text></View>
+            {item.isMandatory && <View style={styles.mandChip}><Text style={styles.mandTxt}>★ Mandatory</Text></View>}
+            <View style={[styles.audBadge, { backgroundColor: item.targetAudience === 'teacher' ? '#0984E322' : item.targetAudience === 'student' ? '#FF4F8B22' : '#6C5CE722' }]}>
+              <Text style={[styles.audBadgeTxt, { color: item.targetAudience === 'teacher' ? '#0984E3' : item.targetAudience === 'student' ? '#FF4F8B' : '#6C5CE7' }]}>
+                {item.targetAudience === 'teacher' ? '👨‍🏫 Teachers' : item.targetAudience === 'student' ? '🎓 Students' : '👥 Both'}
+              </Text>
+            </View>
           </View>
           <Text style={[styles.cardTitle,{color:txt}]} numberOfLines={2}>{item.title}</Text>
           {item.description ? <Text style={[styles.cardDesc,{color:txtSec}]} numberOfLines={2}>{item.description}</Text> : null}
@@ -449,7 +461,30 @@ export default function AdminTrainingVideosScreen({ navigation }) {
                 <Text style={[styles.label,{color:txt,marginBottom:0}]}>Mark as Mandatory</Text>
                 <Switch value={form.isMandatory} onValueChange={v=>setForm(p=>({...p,isMandatory:v}))} trackColor={{ false:'#ccc', true:Colors.primary+'88' }} thumbColor={form.isMandatory?Colors.primary:'#aaa'} />
               </View>
-
+{/* Target Audience */}
+              <Text style={[styles.label,{color:txtSec, marginTop:4}]}>Target Audience</Text>
+              <View style={styles.audienceRow}>
+                {[
+                  { key: 'both',    label: 'Both',     icon: 'people' },
+                  { key: 'teacher', label: 'Teachers', icon: 'school' },
+                  { key: 'student', label: 'Students',  icon: 'book' },
+                ].map((opt) => {
+                  const active = form.targetAudience === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.audienceChip, active && styles.audienceChipActive]}
+                      onPress={() => setForm(p => ({ ...p, targetAudience: opt.key }))}
+                    >
+                      <Ionicons name={opt.icon} size={15} color={active ? '#fff' : Colors.primary} />
+                      <Text style={[styles.audienceChipTxt, active && styles.audienceChipTxtActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={{ color: Colors.mediumGray, fontSize: 11, marginBottom: 12 }}>
+                Choose who can see this video — Teachers only, Students only, or Both.
+              </Text>
               {/* Upload progress bar */}
               {saving && uploadMode === 'file' && !editingId && (
                 <View style={styles.progressBar}>
@@ -539,4 +574,11 @@ const styles = StyleSheet.create({
   // Progress
   progressBar: { height:6, borderRadius:3, backgroundColor:'#E8E8E8', marginBottom:14, overflow:'hidden' },
   progressFill: { height:'100%', backgroundColor:Colors.primary, borderRadius:3 },
+  audienceRow: { flexDirection:'row', gap:10, marginBottom:6 },
+  audienceChip: { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6, paddingVertical:10, borderRadius:14, borderWidth:2, borderColor:Colors.primary, backgroundColor:'transparent' },
+  audienceChipActive: { backgroundColor:Colors.primary, borderColor:Colors.primary },
+  audienceChipTxt: { fontSize:12, fontWeight:'700', color:Colors.primary },
+  audienceChipTxtActive: { color:'#fff' },
+  audBadge: { paddingHorizontal:8, paddingVertical:3, borderRadius:8, marginBottom:6 },
+  audBadgeTxt: { fontSize:10, fontWeight:'800' },
 });

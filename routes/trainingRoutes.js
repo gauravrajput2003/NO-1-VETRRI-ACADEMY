@@ -15,10 +15,12 @@ const {
   getProgressMatrix,
   // Teacher
   getTrainingVideos,
+  migrateTargetAudience,
   markVideoComplete,
   updateWatchProgress,
   getIncompleteMandatoryCount,
 } = require('../controllers/trainingController');
+
 
 // ─── IMPORTANT: Static routes must come BEFORE parameterized routes ────────────
 
@@ -56,5 +58,8 @@ router.patch('/:id/progress', verifyToken, teacherOnly, updateWatchProgress);
 router.put('/:id', verifyToken, adminOnly, editTrainingVideo);
 router.patch('/:id/toggle', verifyToken, adminOnly, toggleVideoStatus);
 router.delete('/:id', verifyToken, adminOnly, deleteTrainingVideo);
+// TEMPORARY — one-time migration, remove after running once
+router.post('/admin/migrate-target-audience', verifyToken, adminOnly, migrateTargetAudience);
 
 module.exports = router;
+ 
