@@ -286,6 +286,16 @@ export default function ClassSchedulerScreen({ navigation }) {
   const studentPool = isTeacher ? teacherStudents : students;
   const filteredStudents = studentPool.filter((s) => {
     if (s.isActive === false) return false;
+    
+    // STRICT PRIVACY: A schedule can only contain students assigned to the selected teacher.
+    const targetTeacherId = form.teacherId;
+    if (!targetTeacherId) return false;
+    
+    const assignedId = typeof s.assignedTeacher === 'object' ? s.assignedTeacher?._id : s.assignedTeacher;
+    if (assignedId !== targetTeacherId && String(assignedId) !== String(targetTeacherId)) {
+        return false;
+    }
+
     if (form.grade && form.grade !== 'All' && s.grade !== form.grade) return false;
     const q = studentSearchQuery.trim().toLowerCase();
     if (!q) return true;

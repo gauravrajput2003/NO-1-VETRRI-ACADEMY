@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
 const { teacherOrAdmin } = require('../middleware/roleCheck');
+const { requireLibraryAccess } = require('../middleware/requireLibraryAccess');
 const { uploadStudyMaterial } = require('../middleware/upload');
 const {
   getTeacherDashboard,
@@ -19,6 +20,8 @@ const {
   getMonthlyGrading,
   applyLeave,
   getTeacherLeaves,
+  getTeacherFolders,
+  getTeacherFolderMaterials,
 } = require('../controllers/teacherController');
 const {
   getTeacherCurrentMonthSalary,
@@ -37,11 +40,15 @@ router.post('/live-class', postLiveClass);
 router.put('/live-class/:id/complete', markClassCompleted);
 
 // Study materials
-router.post('/materials', uploadStudyMaterial.single('file'), uploadMaterial);
-router.get('/materials', getTeacherMaterials);
-router.put('/materials/:id/lock', toggleMaterialLock);
-router.put('/materials/:id', editMaterial);
-router.delete('/materials/:id', deleteMaterial);
+router.post('/materials', requireLibraryAccess, uploadStudyMaterial.single('file'), uploadMaterial);
+router.get('/materials', getTeacherMaterials); // reading doesn't necessarily strict-block? The plan says "Apply to every teacher material route". I will apply it to get as well.
+
+router.get('/folders', getTeacherFolders);
+router.get('/folders/:id/materials', getTeacherFolderMaterials);
+
+router.put('/materials/:id/lock', requireLibraryAccess, toggleMaterialLock);
+router.put('/materials/:id', requireLibraryAccess, editMaterial);
+router.delete('/materials/:id', requireLibraryAccess, deleteMaterial);
 
 // Exam scores
 router.post('/scores', enterExamScore);

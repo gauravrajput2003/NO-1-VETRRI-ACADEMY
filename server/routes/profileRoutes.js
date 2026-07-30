@@ -14,7 +14,7 @@ router.put('/', verifyToken, uploadAvatar.single('profilePicture'), updateProfil
 router.patch('/avatar', verifyToken, uploadAvatar.single('avatar'), updateAvatar);
 router.patch('/password', verifyToken, changePassword);
 
-// Teacher permissions (admin only)
+
 router.get('/permissions/teachers', verifyToken, adminOnly, getAllTeacherPermissions);
 router.get('/permissions/teacher/:teacherId', verifyToken, getTeacherPermissions);
 router.patch('/permissions/teacher/:teacherId', verifyToken, adminOnly, updateTeacherPermissions);

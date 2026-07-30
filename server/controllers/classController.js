@@ -79,12 +79,23 @@ const createSchedule = async (req, res) => {
       return res.status(400).json({ success: false, message: 'scheduledTime must be in HH:MM format' });
     }
 
-    // course is optional now — only validate/normalize if the user actually picked one
     let normalizedCourse = '';
     if (course && String(course).trim()) {
       normalizedCourse = normalizeCourse(course);
       if (!['CBSE', 'Matric', 'Engineering', 'Arts', 'Language', 'Competitive'].includes(normalizedCourse)) {
         return res.status(400).json({ success: false, message: 'Invalid course selected' });
+      }
+    }
+
+    // PRIVACY ENFORCEMENT: A scheduled class can only contain students assigned strictly to THAT teacher.
+    if (studentIds.length > 0) {
+      const validStudents = await User.countDocuments({
+        _id: { $in: studentIds },
+        assignedTeacher: teacherId,
+        role: 'student'
+      });
+      if (validStudents !== studentIds.length) {
+         return res.status(403).json({ success: false, message: 'You can only schedule classes for your assigned students.' });
       }
     }
 
@@ -590,6 +601,18 @@ const generateYearSchedule = async (req, res) => {
     }
     if (!startDate) {
       return res.status(400).json({ success: false, message: 'startDate is required' });
+    }
+
+    // PRIVACY ENFORCEMENT
+    if (studentIds.length > 0) {
+      const validStudents = await User.countDocuments({
+        _id: { $in: studentIds },
+        assignedTeacher: teacherId,
+        role: 'student'
+      });
+      if (validStudents !== studentIds.length) {
+         return res.status(403).json({ success: false, message: 'You can only schedule classes for your assigned students.' });
+      }
     }
 
     const start = new Date(startDate);

@@ -9,6 +9,7 @@ const studyMaterialSchema = new mongoose.Schema(
     grade: { type: String },
     course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
     teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    folder: { type: mongoose.Schema.Types.ObjectId, ref: 'MaterialFolder' },
 
     // Legacy S3 storage
     s3Key: { type: String }, // e.g., "pdfs/filename.pdf"
@@ -37,6 +38,20 @@ const studyMaterialSchema = new mongoose.Schema(
     // Specific student overrides
     unlockedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     lockedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+
+    // Admin approval workflow
+    approvalStatus: {
+      type: String,
+      enum: ['approved', 'pending_new', 'pending_edit', 'pending_delete', 'rejected'],
+      default: 'approved',
+    },
+    pendingChanges: { type: mongoose.Schema.Types.Mixed, default: null },
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    requestedAt: { type: Date },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: { type: Date },
+    reviewNotes: { type: String },
+    uploadedByRole: { type: String, enum: ['admin', 'teacher'], default: 'teacher' },
   },
   { timestamps: true }
 );

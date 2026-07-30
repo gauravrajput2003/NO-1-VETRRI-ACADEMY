@@ -18,7 +18,24 @@ const {
   getStudentFeeDirectory,
   getStudentFeeHistory,
   recordFeePayment,
+  getAdminMaterials,
+  getPendingMaterials,
+  approveMaterial,
+  rejectMaterial,
+  directEditMaterial,
+  directDeleteMaterial,
+  adminToggleMaterialLock,
+  getLibraryAccessList,
+  approveLibraryAccess,
+  revokeLibraryAccess,
+  getAdminFolders,
+  getAdminFolderMaterials,
+  createFolder,
+  updateFolder,
+  deleteFolder,
 } = require('../controllers/adminController');
+const { uploadMaterial } = require('../controllers/teacherController');
+const { uploadStudyMaterial } = require('../middleware/upload');
 const {
   getAllLeaves,
   updateLeaveStatus,
@@ -84,6 +101,26 @@ router.post('/fees', async (req, res) => {
 // Admissions
 router.get('/admissions', getAdmissions);
 router.put('/admissions/:id', updateAdmission);
+
+// Materials & Library Access
+router.get('/materials', getAdminMaterials);
+router.get('/materials/pending', getPendingMaterials);
+router.post('/materials/:id/approve', approveMaterial);
+router.post('/materials/:id/reject', rejectMaterial);
+router.put('/materials/:id', directEditMaterial);
+router.delete('/materials/:id', directDeleteMaterial);
+router.put('/materials/:id/lock', adminToggleMaterialLock);
+router.post('/materials', uploadStudyMaterial.single('file'), uploadMaterial); // use the unified uploadHandler
+
+router.get('/library-access', getLibraryAccessList);
+router.post('/library-access/:teacherId/approve', approveLibraryAccess);
+router.post('/library-access/:teacherId/revoke', revokeLibraryAccess);
+
+router.get('/folders', getAdminFolders);
+router.get('/folders/:id/materials', getAdminFolderMaterials);
+router.post('/folders', createFolder);
+router.put('/folders/:id', updateFolder);
+router.delete('/folders/:id', deleteFolder);
 
 // Enquiries
 router.get('/enquiries', getEnquiries);

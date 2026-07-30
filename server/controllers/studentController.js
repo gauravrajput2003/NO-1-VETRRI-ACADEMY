@@ -9,6 +9,7 @@ const FeesRecord = require('../models/FeesRecord');
 const AdmissionForm = require('../models/AdmissionForm');
 const Notification = require('../models/Notification');
 const ClassSchedule = require('../models/ClassSchedule');
+const MaterialFolder = require('../models/MaterialFolder');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const s3Client = require('../config/s3');
@@ -18,12 +19,7 @@ const { resolveFileAccessUrl } = require('../utils/downloadHelper');
 const { proxyDownload } = require('../middleware/fileDownloadHandler');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
 
-const isMaterialLockedForStudent = (material, studentId) => {
-  return (
-    material.lockedFor.includes(studentId) ||
-    (material.lockedForAll && !material.unlockedFor.includes(studentId))
-  );
-};
+const { isMaterialAccessibleForStudent } = require('../utils/materialAccess');
 
 /**
  * Resolve material access URL with proper download handling
@@ -159,16 +155,27 @@ const getStudentMaterials = async (req, res) => {
     const student = await User.findById(studentId).select('course grade assignedTeacher');
 
     const materials = await StudyMaterial.find({
-      $or: [
-        { teacher: student.assignedTeacher },
-        { course: student.course },
-      ],
-      lockedFor: { $ne: studentId }, // not explicitly locked for this student
+      approvalStatus: 'approved',
+      $and: [
+        {
+          $or: [
+            { teacher: student.assignedTeacher },
+            { course: student.course },
+          ]
+        },
+        {
+          $or: [
+            { grade: student.grade },
+            { grade: { $in: [null, '', 'all'] } },
+            { grade: { $exists: false } }
+          ]
+        }
+      ]
     }).select('-s3Key -s3Bucket'); // Don't expose S3 keys directly
 
     // Mark which ones are accessible
     const materialsWithAccess = materials.map((m) => {
-      const isLocked = m.lockedForAll && !m.unlockedFor.includes(studentId);
+      const access = isMaterialAccessibleForStudent(m, student);
       return {
         _id: m._id,
         title: m.title,
@@ -184,12 +191,62 @@ const getStudentMaterials = async (req, res) => {
         storageType: m.storageType,
         originalFilename: m.originalFilename,
         extension: m.extension,
-        isLocked,
+        isLocked: !access.allowed,
+        lockReason: access.reason,
         createdAt: m.createdAt,
       };
     });
 
     res.status(200).json({ success: true, materials: materialsWithAccess });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get student's material folder
+// @route   GET /api/student/folder
+// @access  Student
+const getStudentFolder = async (req, res) => {
+  try {
+    const student = await User.findById(req.user._id).select('course grade assignedTeacher');
+    if (!student.grade) {
+      return res.status(404).json({ success: false, message: 'Student grade is not set.' });
+    }
+
+    const folder = await MaterialFolder.findOne({ grade: student.grade });
+    if (!folder) {
+      return res.status(200).json({ success: true, folder: null, materials: [] });
+    }
+
+    const materials = await StudyMaterial.find({
+      folder: folder._id,
+      approvalStatus: 'approved',
+    }).select('-s3Key -s3Bucket');
+
+    const materialsWithAccess = materials.map((m) => {
+      const access = isMaterialAccessibleForStudent(m, student);
+      return {
+        _id: m._id,
+        title: m.title,
+        description: m.description,
+        type: m.type,
+        subject: m.subject,
+        grade: m.grade,
+        mimeType: m.mimeType,
+        fileSize: m.fileSize,
+        fileUrl: m.fileUrl,
+        publicId: m.publicId,
+        resourceType: m.resourceType,
+        storageType: m.storageType,
+        originalFilename: m.originalFilename,
+        extension: m.extension,
+        isLocked: !access.allowed,
+        lockReason: access.reason,
+        createdAt: m.createdAt,
+      };
+    });
+
+    res.status(200).json({ success: true, folder, materials: materialsWithAccess });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -207,12 +264,17 @@ const getMaterialPreviewUrl = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
 
-    const isLocked = isMaterialLockedForStudent(material, studentId);
+    const student = await User.findById(studentId);
+    const access = isMaterialAccessibleForStudent(material, student);
 
-    if (isLocked) {
+    if (!access.allowed) {
+      let msg = 'Access denied.';
+      if (access.reason === 'not_approved_by_admin') msg = 'This material is awaiting admin approval.';
+      else if (access.reason === 'locked_by_teacher') msg = 'This material is locked. Contact your teacher.';
+      else if (access.reason === 'grade_mismatch') msg = 'This material is not available for your class.';
       return res.status(403).json({
         success: false,
-        message: 'This material is locked. Contact your teacher.',
+        message: msg,
       });
     }
 
@@ -260,13 +322,18 @@ const getMaterialDownloadUrl = async (req, res) => {
       });
     }
 
-    // Check if material is locked for this student
-    const isLocked = isMaterialLockedForStudent(material, studentId);
+    // Check if material is accessible for this student
+    const student = await User.findById(studentId);
+    const access = isMaterialAccessibleForStudent(material, student);
 
-    if (isLocked) {
+    if (!access.allowed) {
+      let msg = 'Access denied.';
+      if (access.reason === 'not_approved_by_admin') msg = 'This material is awaiting admin approval.';
+      else if (access.reason === 'locked_by_teacher') msg = 'This material is locked. Contact your teacher for access.';
+      else if (access.reason === 'grade_mismatch') msg = 'This material is not available for your class.';
       return res.status(403).json({
         success: false,
-        message: 'This material is locked. Contact your teacher for access.',
+        message: msg,
       });
     }
 
@@ -322,13 +389,18 @@ const downloadMaterialDirect = async (req, res) => {
       });
     }
 
-    // Check if material is locked for this student
-    const isLocked = isMaterialLockedForStudent(material, studentId);
+    // Check if material is accessible for this student
+    const student = await User.findById(studentId);
+    const access = isMaterialAccessibleForStudent(material, student);
 
-    if (isLocked) {
+    if (!access.allowed) {
+      let msg = 'Access denied.';
+      if (access.reason === 'not_approved_by_admin') msg = 'This material is awaiting admin approval.';
+      else if (access.reason === 'locked_by_teacher') msg = 'This material is locked. Contact your teacher for access.';
+      else if (access.reason === 'grade_mismatch') msg = 'This material is not available for your class.';
       return res.status(403).json({
         success: false,
-        message: 'This material is locked. Contact your teacher for access.',
+        message: msg,
       });
     }
 
@@ -607,9 +679,10 @@ const getChatMessages = async (req, res) => {
 module.exports = {
   getStudentDashboard,
   getStudentMaterials,
+  getStudentFolder,
   getMaterialPreviewUrl,
   getMaterialDownloadUrl,
-    downloadMaterialDirect,
+  downloadMaterialDirect,
   getStudentScores,
   getStudentAttendance,
   getStudentSchedule,

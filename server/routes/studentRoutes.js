@@ -17,6 +17,7 @@ const {
   getNotifications,
   submitAdmissionForm,
   getChatMessages,
+  getStudentFolder,
 } = require('../controllers/studentController');
 
 // ─── Material routes — accessible to ALL authenticated users ───────────────────
@@ -26,6 +27,7 @@ router.get('/materials/:id/preview', verifyToken, getMaterialPreviewUrl);
 router.get('/materials/:id/download', verifyToken, getMaterialDownloadUrl);
 router.get('/materials/:id/direct-download', verifyToken, downloadMaterialDirect);
 router.get('/materials/:id/view', verifyToken, getMaterialPreviewUrl);
+router.get('/folder', verifyToken, getStudentFolder);
 
 // ─── Student-only routes ───────────────────────────────────────────────────────
 router.use(verifyToken, studentOnly);

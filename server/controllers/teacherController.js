@@ -10,6 +10,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const s3Client = require('../config/s3');
 const LeaveApplication = require('../models/LeaveApplication');
 const TeacherGrading = require('../models/TeacherGrading');
+const MaterialFolder = require('../models/MaterialFolder');
 const storageService = require('../services/storageService');
 const notificationService = require('../services/notificationService');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
@@ -247,7 +248,27 @@ const uploadMaterial = async (req, res) => {
       
       // Access control (locked by default)
       lockedForAll: lockedForAll !== 'false',
+      
+      // Admin workflow
+      approvalStatus: req.user.role === 'admin' ? 'approved' : 'pending_new',
+      uploadedByRole: req.user.role === 'admin' ? 'admin' : 'teacher',
+      requestedBy: req.user._id,
+      requestedAt: new Date(),
     };
+
+    // Auto-resolve folder based on grade (skip 'all' or empty)
+    if (grade && grade.toLowerCase() !== 'all') {
+      const parsedGrade = grade.trim();
+      let folder = await MaterialFolder.findOne({ grade: parsedGrade });
+      if (!folder) {
+        folder = await MaterialFolder.create({
+          name: `Class ${parsedGrade}`,
+          grade: parsedGrade,
+          createdBy: req.user._id,
+        });
+      }
+      materialPayload.folder = folder._id;
+    }
 
     // S3-specific fields (if applicable)
     if (uploadResult.storageType === 's3') {
@@ -272,6 +293,37 @@ const uploadMaterial = async (req, res) => {
         warnDev('[Teacher Upload] Thumbnail generation failed:', thumbErr.message);
         // Non-critical, don't fail the upload
       }
+    }
+
+    // Notify admins of new pending upload
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const teacherName = req.user.name || req.user.displayName || 'A teacher';
+      if (admins.length > 0) {
+        const payload = {
+          senderId: req.user._id,
+          type: 'study_material',
+          title: 'New Material Pending Review',
+          message: `${teacherName} uploaded "${material.title}" which needs your approval.`,
+          link: '/admin/materials/pending',
+          referenceId: material._id,
+          referenceType: 'StudyMaterial',
+          io: req.app.get('io'),
+        };
+        if (admins.length > 1) {
+          await notificationService.sendBulkNotifications({
+            ...payload,
+            recipientIds: admins.map((a) => a._id),
+          });
+        } else {
+          await notificationService.sendNotification({
+            ...payload,
+            recipientId: admins[0]._id,
+          });
+        }
+      }
+    } catch (notifErr) {
+      errorCrit('[Teacher Upload] Admin notification failed:', notifErr.message);
     }
 
     logDev('[Teacher Upload] Complete');
@@ -306,15 +358,48 @@ const uploadMaterial = async (req, res) => {
 // @access  Teacher
 const editMaterial = async (req, res) => {
   try {
-    const material = await StudyMaterial.findOneAndUpdate(
-      { _id: req.params.id, teacher: req.user._id },
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const material = await StudyMaterial.findOne({ _id: req.params.id, teacher: req.user._id });
     if (!material) {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
-    res.status(200).json({ success: true, material });
+
+    if (material.approvalStatus && material.approvalStatus.startsWith('pending_')) {
+      return res.status(400).json({ success: false, message: 'This material already has a pending action awaiting admin approval.' });
+    }
+
+    // Stage changes instead of applying them directly
+    material.pendingChanges = req.body;
+    material.approvalStatus = 'pending_edit';
+    material.requestedBy = req.user._id;
+    material.requestedAt = new Date();
+    await material.save();
+
+    // Notify admins
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const teacherName = req.user.name || req.user.displayName || 'A teacher';
+      if (admins.length > 0) {
+        const payload = {
+          senderId: req.user._id,
+          type: 'study_material',
+          title: 'Material Edit Pending Review',
+          message: `${teacherName} requested an edit for "${material.title}".`,
+          link: '/admin/materials/pending',
+          referenceId: material._id,
+          referenceType: 'StudyMaterial',
+          io: req.app.get('io'),
+        };
+        if (admins.length > 1) {
+          await notificationService.sendBulkNotifications({ ...payload, recipientIds: admins.map((a) => a._id) });
+        } else {
+          await notificationService.sendNotification({ ...payload, recipientId: admins[0]._id });
+        }
+      }
+    } catch (notifErr) {
+      errorCrit('[Teacher Edit] Admin notification failed:', notifErr.message);
+    }
+
+    res.status(200).json({ success: true, material, message: 'Edit request submitted for admin approval.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -325,11 +410,47 @@ const editMaterial = async (req, res) => {
 // @access  Teacher
 const deleteMaterial = async (req, res) => {
   try {
-    const material = await StudyMaterial.findOneAndDelete({ _id: req.params.id, teacher: req.user._id });
+    const material = await StudyMaterial.findOne({ _id: req.params.id, teacher: req.user._id });
     if (!material) {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
-    res.status(200).json({ success: true, message: 'Material deleted successfully.' });
+
+    if (material.approvalStatus && material.approvalStatus.startsWith('pending_')) {
+      return res.status(400).json({ success: false, message: 'This material already has a pending action awaiting admin approval.' });
+    }
+
+    // Stage deletion instead of hard delete
+    material.approvalStatus = 'pending_delete';
+    material.requestedBy = req.user._id;
+    material.requestedAt = new Date();
+    await material.save();
+
+    // Notify admins
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const teacherName = req.user.name || req.user.displayName || 'A teacher';
+      if (admins.length > 0) {
+        const payload = {
+          senderId: req.user._id,
+          type: 'study_material',
+          title: 'Material Deletion Pending Review',
+          message: `${teacherName} requested to delete "${material.title}".`,
+          link: '/admin/materials/pending',
+          referenceId: material._id,
+          referenceType: 'StudyMaterial',
+          io: req.app.get('io'),
+        };
+        if (admins.length > 1) {
+          await notificationService.sendBulkNotifications({ ...payload, recipientIds: admins.map((a) => a._id) });
+        } else {
+          await notificationService.sendNotification({ ...payload, recipientId: admins[0]._id });
+        }
+      }
+    } catch (notifErr) {
+      errorCrit('[Teacher Delete] Admin notification failed:', notifErr.message);
+    }
+
+    res.status(200).json({ success: true, message: 'Deletion request submitted for admin approval.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -375,6 +496,8 @@ const toggleMaterialLock = async (req, res) => {
       material.unlockedFor = material.unlockedFor.filter((id) => id.toString() !== studentId);
     }
 
+    // Log action
+    material.reviewNotes = (material.reviewNotes ? material.reviewNotes + '\n' : '') + `[${new Date().toISOString()}] Lock toggled by teacher (unlock: ${unlock})`;
     await material.save();
 
     if (unlock) {
@@ -583,6 +706,49 @@ const getTeacherLeaves = async (req, res) => {
   }
 };
 
+// ─── TEACHER: STUDY MATERIAL FOLDERS ────────────────────────────────────────
+
+const getTeacherFolders = async (req, res) => {
+  try {
+    const folders = await MaterialFolder.aggregate([
+      {
+        $lookup: {
+          from: 'studymaterials',
+          localField: '_id',
+          foreignField: 'folder',
+          as: 'materials'
+        }
+      },
+      {
+        $addFields: {
+          materialCount: { $size: '$materials' }
+        }
+      },
+      {
+        $project: {
+          materials: 0
+        }
+      },
+      { $sort: { order: 1, grade: 1 } }
+    ]);
+    res.status(200).json({ success: true, folders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getTeacherFolderMaterials = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const materials = await StudyMaterial.find({ folder: id, teacher: req.user._id })
+      .populate('course', 'title')
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, materials });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getTeacherDashboard,
   getMyStudents,
@@ -599,4 +765,6 @@ module.exports = {
   getMonthlyGrading,
   applyLeave,
   getTeacherLeaves,
+  getTeacherFolders,
+  getTeacherFolderMaterials,
 };
