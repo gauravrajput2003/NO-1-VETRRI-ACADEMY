@@ -72,7 +72,7 @@ const getStudentDashboard = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [todayClass, recentScores, attendanceSummary, unreadNotifications] = await Promise.all([
+    const [todayClass, recentScores, attendanceSummary, unreadNotifications, studentData] = await Promise.all([
       // Today's live class
       LiveClass.findOne({
         enrolledStudents: studentId,
@@ -100,6 +100,9 @@ const getStudentDashboard = async (req, res) => {
 
       // Unread notifications count
       Notification.countDocuments({ recipient: studentId, isRead: false }),
+
+      // Assigned Teacher profile
+      User.findById(studentId).select('assignedTeacher').populate('assignedTeacher', 'name displayName qualification subjects'),
     ]);
 
     // Weekly leaderboard (top 3 by total score this week)
@@ -137,6 +140,7 @@ const getStudentDashboard = async (req, res) => {
         attendanceSummary,
         unreadNotifications,
         leaderboard,
+        assignedTeacher: studentData?.assignedTeacher || null,
       },
     });
   } catch (error) {

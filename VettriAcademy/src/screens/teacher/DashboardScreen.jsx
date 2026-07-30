@@ -31,6 +31,7 @@ import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useCompensationNotifications } from '../../hooks/useCompensationNotifications';
 
 
+
 const T = {
   pink: '#FF4D8D',
   teal: '#14C8C4',
@@ -157,7 +158,11 @@ function QuickActionCard({ item, onPress }) {
           <View style={st.quickCircle1} />
           <View style={st.quickCircle2} />
           <FloatingView style={st.quickImageWrap} amplitude={5}>
-            <Image source={item.image} style={st.quickImage} contentFit="contain" transition={300} cachePolicy="memory-disk" />
+            {item.image ? (
+              <Image source={item.image} style={st.quickImage} contentFit="contain" transition={300} cachePolicy="memory-disk" />
+            ) : (
+              <Ionicons name={item.icon || 'star-outline'} size={40} color="#FFF" />
+            )}
           </FloatingView>
           <Text style={st.quickTitle}>{item.title}</Text>
           <Text style={st.quickSub}>{item.subtitle}</Text>
@@ -271,6 +276,7 @@ export default function TeacherDashboard({ navigation }) {
     { id: 'doubts', title: 'Doubts', subtitle: 'View & Reply', screen: 'DoubtCenter', gradient: [T.orange, '#FFB347'], image: ASSETS.question },
     { id: 'materials', title: 'Materials', subtitle: 'Upload & Manage', screen: 'TeacherMaterials', gradient: [T.teal, T.tealLight], image: ASSETS.book },
     { id: 'students', title: 'Students', subtitle: 'View All', screen: 'Students', gradient: [T.pink, '#FF7EB3'], image: ASSETS.studentGroup },
+    { id: 'salary', title: 'Salary', subtitle: 'View & Download', screen: 'Salary', gradient: ['#F59E0B', T.gold], icon: 'cash-outline' },
   ]), []);
 
   const openMenu = () => navigation.getParent()?.navigate('Profile');

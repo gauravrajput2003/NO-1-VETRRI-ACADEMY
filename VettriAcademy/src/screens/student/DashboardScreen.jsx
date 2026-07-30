@@ -501,6 +501,7 @@ export default function DashboardScreen({ navigation }) {
           </ScaleButton>
         </Animated.View>
 
+
         {/* EXPLORE — rebuilt as an icon-tile grid */}
         <Animated.View style={slide(anims[4])}>
           <SectionHeader label="Explore" />
@@ -539,6 +540,28 @@ export default function DashboardScreen({ navigation }) {
                 </ScaleButton>
               );
             })}
+          </View>
+
+          {/* YOUR TEACHER CARD (Inside Explore) */}
+          <View style={{ paddingHorizontal: 16, paddingBottom: 20 }}>
+             <LinearGradient colors={[D.tealLight, '#B2EBF2']} style={{ borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', shadowColor: D.teal, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
+                <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: D.teal, justifyContent: 'center', alignItems: 'center' }}>
+                   {dashboard?.assignedTeacher ? (
+                      <Text style={{ fontSize: 26, color: '#FFF', fontWeight: '800' }}>{dashboard.assignedTeacher.name?.charAt(0)}</Text>
+                   ) : (
+                      <Ionicons name="person-outline" size={28} color="#FFF" />
+                   )}
+                </View>
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                   <Text style={{ fontSize: 13, color: D.tealDark, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Your Teacher</Text>
+                   <Text style={{ fontSize: 19, fontWeight: '900', color: D.ink, marginBottom: 2 }} numberOfLines={1}>
+                      {dashboard?.assignedTeacher ? (dashboard.assignedTeacher.displayName || dashboard.assignedTeacher.name) : 'Unassigned'}
+                   </Text>
+                   <Text style={{ fontSize: 14, fontWeight: '700', color: D.muted }}>
+                      {dashboard?.assignedTeacher ? (dashboard.assignedTeacher.qualification || 'Instructor') : 'Ask admin to assign one'}
+                   </Text>
+                </View>
+             </LinearGradient>
           </View>
         </Animated.View>
 

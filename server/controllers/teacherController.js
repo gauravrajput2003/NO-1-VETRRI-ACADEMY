@@ -92,7 +92,7 @@ const getMyStudents = async (req, res) => {
       role: 'student',
       isActive: true,
     })
-      .select('-password -refreshToken')
+      .select('name displayName grade board course assignedTeacher createdAt isActive')
       .populate('course', 'title category');
 
     res.status(200).json({ success: true, students });

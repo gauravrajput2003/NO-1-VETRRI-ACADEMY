@@ -518,7 +518,7 @@ export default function ManageStudentsScreen({ navigation }) {
               )}
             </View>
 
-            <Text style={[styles.label, { color: textColor }]}>Assigned Teacher</Text>
+            <Text style={[styles.label, { color: textColor }]}>Your Teacher</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               <TouchableOpacity
                 style={[styles.teacherChip, !editData.assignedTeacher && styles.teacherChipActive]}
@@ -639,7 +639,7 @@ export default function ManageStudentsScreen({ navigation }) {
                 </ScrollView>
               )}
             </View>
-            <Text style={[styles.label, { color: textColor }]}>Assigned Teacher</Text>
+            <Text style={[styles.label, { color: textColor }]}>Your Teacher</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               <TouchableOpacity
                 style={[styles.teacherChip, !createData.assignedTeacher && styles.teacherChipActive]}
