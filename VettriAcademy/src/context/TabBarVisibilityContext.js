@@ -1,141 +1,66 @@
-import React, { createContext, useContext, useRef, useCallback,useEffect } from 'react';
-import { Animated ,Keyboard,Platform} from 'react-native';
+import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
+import { Animated } from 'react-native';
 
+const TabBarVisibilityContext = createContext();
 
+export const useTabBarVisibility = () => useContext(TabBarVisibilityContext);
 
-const SCROLL_THRESHOLD = 12;
-const ANIMATION_DURATION = 250;
+export const TabBarVisibilityProvider = ({ children }) => {
+  const [isPermanentlyHidden, setIsPermanentlyHidden] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
 
-const TabBarVisibilityContext = createContext(null);
+  const hidePermanently = useCallback(() => {
+    setIsPermanentlyHidden(true);
+  }, []);
 
-export function TabBarVisibilityProvider({ children, tabBarHeight = 100 }) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
-  const isHidden = useRef(false);
-  const lastOffsetY = useRef(0);
-  const accumulatedDelta = useRef(0);
+  const showPermanently = useCallback(() => {
+    setIsPermanentlyHidden(false);
+  }, []);
 
-  const show = useCallback(() => {
-    if (!isHidden.current) return;
-    isHidden.current = false;
-    accumulatedDelta.current = 0;
-
-    Animated.parallel([
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 12,
-      }),
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: ANIMATION_DURATION,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [translateY, opacity]);
-
-  const hide = useCallback(() => {
-    if (isHidden.current) return;
-    isHidden.current = true;
-    accumulatedDelta.current = 0;
-
-    Animated.parallel([
-      Animated.spring(translateY, {
-        toValue: tabBarHeight + 40,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 12,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: ANIMATION_DURATION,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [translateY, opacity, tabBarHeight]);
-
-  const onScroll = useCallback(
-    (event) => {
-      const currentY = event.nativeEvent.contentOffset.y;
-      const delta = currentY - lastOffsetY.current;
-
-      if (currentY <= 0) {
-        lastOffsetY.current = currentY;
-        accumulatedDelta.current = 0;
-        show();
-        return;
-      }
-
-      if ((delta > 0 && accumulatedDelta.current >= 0) || (delta < 0 && accumulatedDelta.current <= 0)) {
-        accumulatedDelta.current += delta;
-      } else {
-        accumulatedDelta.current = delta;
-      }
-
-      lastOffsetY.current = currentY;
-
-      if (accumulatedDelta.current > SCROLL_THRESHOLD) {
-        hide();
-      } else if (accumulatedDelta.current < -SCROLL_THRESHOLD) {
-        show();
-      }
-    },
-    [show, hide]
+  const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: false,
+      listener: (event) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        lastScrollY.current = currentScrollY;
+      },
+    }
   );
 
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const subShow = Keyboard.addListener(showEvent, () => {
-      hide();
-    });
-    const subHide = Keyboard.addListener(hideEvent, () => {
-      show();
-    });
-
-    return () => {
-      subShow.remove();
-      subHide.remove();
-    };
-  }, [hide, show]);
+  const value = {
+    scrollY,
+    onScroll,
+    isPermanentlyHidden,
+    hidePermanently,
+    showPermanently,
+  };
 
   return (
-    <TabBarVisibilityContext.Provider value={{ translateY, opacity, onScroll, show, hide }}>
+    <TabBarVisibilityContext.Provider value={value}>
       {children}
     </TabBarVisibilityContext.Provider>
   );
-}
+};
 
-/**
- * useTabBarScroll — returns onScroll handler for FlatList/ScrollView
- *
- * Usage in any screen:
- *   const { onScroll } = useTabBarScroll();
- *   <FlatList onScroll={onScroll} scrollEventThrottle={16} />
- */
-export function useTabBarScroll() {
-  const ctx = useContext(TabBarVisibilityContext);
-  if (!ctx) {
-    // Fallback if not wrapped in provider (e.g. screens outside tab navigator)
-    return { onScroll: undefined, show: () => {}, hide: () => {} };
-  }
-  return { onScroll: ctx.onScroll, show: ctx.show, hide: ctx.hide };
-}
+export const useTabBarAnimation = () => {
+  const { scrollY } = useTabBarVisibility();
+  const diffClamp = Animated.diffClamp(scrollY, 0, 78);
+  const translateY = diffClamp.interpolate({
+    inputRange: [0, 78],
+    outputRange: [0, 100],
+    extrapolate: 'clamp',
+  });
+  const opacity = translateY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  return { translateY, opacity };
+};
 
-/**
- * useTabBarAnimation — returns animated values for CustomTabBar
- */
-export function useTabBarAnimation() {
-  const ctx = useContext(TabBarVisibilityContext);
-  if (!ctx) {
-    return {
-      translateY: new Animated.Value(0),
-      opacity: new Animated.Value(1),
-    };
-  }
-  return { translateY: ctx.translateY, opacity: ctx.opacity };
-}
-
-export default TabBarVisibilityContext;
+export const useTabBarScroll = () => {
+  const { onScroll } = useTabBarVisibility();
+  return { onScroll };
+};

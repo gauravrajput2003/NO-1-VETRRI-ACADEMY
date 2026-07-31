@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDate, formatFileSize } from '../../utils/formatters';
 import { MaterialPalette } from '../../utils/theme';
 import { detectFileType, normalizeMaterialFileUrl } from '../../utils/fileUtils';
+import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 
 const ScaleBtn = ({ onPress, children, activeScale = 0.96, style, disabled }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -63,17 +65,19 @@ export default function AdminMaterialsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { materials, folders, loading, previewLoading } = useSelector((s) => s.admin);
   const insets = useSafeAreaInsets();
+  const bottomPadding = useBottomTabBarPadding();
+  const { onScroll: onTabBarScroll } = useTabBarScroll();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('All');
-  
+
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [availableGrades, setAvailableGrades] = useState([]);
 
   // Modal State
   const [isUploadModalVisible, setUploadModalVisible] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState(null);
-  
+
   // Form State
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -88,7 +92,7 @@ export default function AdminMaterialsScreen({ navigation }) {
     if (navigation) navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  useEffect(() => { 
+  useEffect(() => {
     dispatch(fetchAdminMaterials());
     dispatch(fetchFolders());
     loadMeta();
@@ -115,11 +119,11 @@ export default function AdminMaterialsScreen({ navigation }) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const pickedFile = result.assets[0];
-        
+
         const isVideo = pickedFile.mimeType?.startsWith('video/');
         const isDoc = pickedFile.mimeType === 'application/pdf' || pickedFile.mimeType?.includes('presentation');
         const maxSize = isVideo ? 500 * 1024 * 1024 : isDoc ? 50 * 1024 * 1024 : 20 * 1024 * 1024;
-        
+
         if (pickedFile.size > maxSize) {
           Toast.show({ type: 'error', text1: 'File too large', text2: `Max size is ${formatFileSize(maxSize)}` });
           return;
@@ -141,7 +145,7 @@ export default function AdminMaterialsScreen({ navigation }) {
     const isReplacingFile = !!editingMaterial && !!file;
 
     setUploading(true);
-    
+
     if (editingMaterial) {
       try {
         let updateData = { title, subject, grade, description, lockedForAll: isLocked };
@@ -178,7 +182,7 @@ export default function AdminMaterialsScreen({ navigation }) {
       formData.append('grade', grade);
       formData.append('description', description);
       formData.append('lockedForAll', isLocked);
-      
+
       appendPickedFile(formData, file);
 
       try {
@@ -238,7 +242,7 @@ export default function AdminMaterialsScreen({ navigation }) {
   const handleDelete = (material) => {
     Alert.alert('Delete Material?', `Are you sure you want to delete "${material.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { 
+      {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           const result = await dispatch(deleteAdminMaterial(material._id));
@@ -276,9 +280,9 @@ export default function AdminMaterialsScreen({ navigation }) {
         url,
         title: material.title,
         fileType,
-        mimeType: preview.mimeType || material.mimeType,
-        extension: preview.extension || material.extension,
-        filename: preview.filename || material.originalFilename,
+        mimeType: preview.mimeType || material.mimeType, // Pass full mimeType
+        extension: preview.extension || material.extension, // Pass extension
+        filename: preview.filename || material.originalFilename, // Pass filename
       });
     } finally {
       setPreviewingId(null);
@@ -286,9 +290,9 @@ export default function AdminMaterialsScreen({ navigation }) {
   };
 
   const filteredMaterials = (materials || []).filter(m => {
-    const matchesSearch = (m.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (m.teacher?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const matchesSearch = (m.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (m.teacher?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+
     let matchesFilter = true;
     if (filterMode === 'All') matchesFilter = true;
     else if (filterMode === 'Pending Review') matchesFilter = m.approvalStatus?.startsWith('pending');
@@ -298,16 +302,44 @@ export default function AdminMaterialsScreen({ navigation }) {
       // Must be a folder/class filter
       matchesFilter = (m.folder && m.folder.name === filterMode) || (m.grade === filterMode);
     }
-    
+
     return matchesSearch && matchesFilter;
   });
 
   const filterTabs = ['All', 'Pending Review', 'Approved', 'Rejected', ...(folders || []).map(f => f.name || f.title)];
 
+  // ─── Status pills: only the two applicable ones render, always pinned left ──
+  const renderStatusPills = (item) => (
+    <View style={styles.pillRow}>
+      {item.approvalStatus?.startsWith('pending') ? (
+        <View style={[styles.statusPill, { backgroundColor: MaterialPalette.goldSoft }]}>
+          <Text style={[styles.statusPillText, { color: MaterialPalette.gold }]}>⏳ Pending</Text>
+        </View>
+      ) : item.approvalStatus === 'rejected' ? (
+        <View style={[styles.statusPill, { backgroundColor: '#FEE2E2' }]}>
+          <Text style={[styles.statusPillText, { color: '#DC2626' }]}>❌ Rejected</Text>
+        </View>
+      ) : (
+        <View style={[styles.statusPill, { backgroundColor: MaterialPalette.tealLight }]}>
+          <Text style={[styles.statusPillText, { color: MaterialPalette.tealDark }]}>✅ Approved</Text>
+        </View>
+      )}
+      {item.lockedForAll ? (
+        <View style={[styles.statusPill, { backgroundColor: MaterialPalette.goldSoft }]}>
+          <Text style={[styles.statusPillText, { color: MaterialPalette.gold }]}>🔒 Locked</Text>
+        </View>
+      ) : (
+        <View style={[styles.statusPill, { backgroundColor: MaterialPalette.tealLight }]}>
+          <Text style={[styles.statusPillText, { color: MaterialPalette.tealDark }]}>🔓 Unlocked</Text>
+        </View>
+      )}
+    </View>
+  );
+
   const renderMaterial = ({ item, index }) => {
     const tConf = getTypeConfig(item.type);
     return (
-      <FadeSlideView index={Math.min(index, 10)}>
+      <FadeSlideView index={Math.min(index, 10)} style={styles.cardOuter}>
         <View style={styles.card}>
           <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFillObject} />
           <View style={styles.cardInner}>
@@ -321,29 +353,14 @@ export default function AdminMaterialsScreen({ navigation }) {
 
             <View style={styles.cardContent}>
               <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-              
+
               <View style={styles.chipRow}>
                 <View style={[styles.infoChip, { backgroundColor: '#E0F2FE' }]}><Text style={[styles.infoChipText, { color: '#0284C7' }]}>{item.subject}</Text></View>
                 <View style={[styles.infoChip, { backgroundColor: '#CCFBF1' }]}><Text style={[styles.infoChipText, { color: '#0F766E' }]}>{item.grade}</Text></View>
                 <Text style={styles.teacherName}>By: {item.teacher?.name || 'Admin'}</Text>
               </View>
 
-              <View style={styles.metaRow}>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {item.approvalStatus?.startsWith('pending') ? (
-                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.goldSoft }]}><Text style={[styles.statusPillText, { color: MaterialPalette.gold }]}>⏳ Pending</Text></View>
-                  ) : item.approvalStatus === 'rejected' ? (
-                    <View style={[styles.statusPill, { backgroundColor: '#FEE2E2' }]}><Text style={[styles.statusPillText, { color: '#DC2626' }]}>❌ Rejected</Text></View>
-                  ) : (
-                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.tealLight }]}><Text style={[styles.statusPillText, { color: MaterialPalette.tealDark }]}>✅ Approved</Text></View>
-                  )}
-                  {item.lockedForAll ? (
-                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.goldSoft }]}><Text style={[styles.statusPillText, { color: MaterialPalette.gold }]}>🔒 Locked</Text></View>
-                  ) : (
-                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.tealLight }]}><Text style={[styles.statusPillText, { color: MaterialPalette.tealDark }]}>🔓 Unlocked</Text></View>
-                  )}
-                </View>
-              </View>
+              {renderStatusPills(item)}
             </View>
 
             <View style={styles.actionCol}>
@@ -363,11 +380,12 @@ export default function AdminMaterialsScreen({ navigation }) {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      <LinearGradient 
+  // ─── Everything above the list (header, upload button, search, chips) now ──
+  // ─── lives inside ListHeaderComponent so the ENTIRE screen scrolls as one ──
+  // ─── unit — this is what makes the page fully scrollable.                ──
+  const renderListHeader = () => (
+    <>
+      <LinearGradient
         colors={[MaterialPalette.primaryPink, MaterialPalette.primaryPinkLight]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[styles.premiumHeader, { paddingTop: insets.top + 20 }]}
@@ -377,7 +395,7 @@ export default function AdminMaterialsScreen({ navigation }) {
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </ScaleBtn>
         </View>
-        
+
         <View style={styles.headerTitlesModern}>
           <Text style={styles.headerTitleModern}>Material Library</Text>
           <Text style={styles.headerSubtitleModern}>Manage all educational resources globally</Text>
@@ -404,7 +422,7 @@ export default function AdminMaterialsScreen({ navigation }) {
             onChangeText={setSearchQuery}
           />
         </View>
-        
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScrollModern} contentContainerStyle={{ paddingHorizontal: 24 }}>
           {Array.from(new Set(filterTabs)).map((sub) => {
             if (!sub) return null;
@@ -423,32 +441,42 @@ export default function AdminMaterialsScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      <View style={styles.contentContainer}>
-        {loading && !uploading ? (
-          <ActivityIndicator size="large" color={MaterialPalette.primaryPink} style={{ marginTop: 40 }} />
-        ) : (
-          <FlatList
-            data={filteredMaterials}
-            keyExtractor={(item) => item._id}
-            renderItem={renderMaterial}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Ionicons name="folder-open" size={64} color="#9CA3AF" />
-                <Text style={styles.emptyText}>No materials found</Text>
-              </View>
-            }
-          />
-        )}
-      </View>
+      {loading && !uploading && (
+        <ActivityIndicator size="large" color={MaterialPalette.primaryPink} style={{ marginTop: 20, marginBottom: 20 }} />
+      )}
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      <FlatList
+        data={loading && !uploading ? [] : filteredMaterials}
+        keyExtractor={(item) => item._id}
+        renderItem={renderMaterial}
+        ListHeaderComponent={renderListHeader}
+        contentContainerStyle={{ paddingBottom: bottomPadding + 24 }}
+        showsVerticalScrollIndicator={false}
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
+        refreshControl={undefined}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={[styles.empty, { paddingHorizontal: 24 }]}>
+              <Ionicons name="folder-open" size={64} color="#9CA3AF" />
+              <Text style={styles.emptyText}>No materials found</Text>
+            </View>
+          ) : null
+        }
+      />
 
       {/* FULL SCREEN UPLOAD MODAL */}
       <Modal visible={isUploadModalVisible} animationType="slide" transparent={false} onRequestClose={closeUploadModal}>
         <View style={styles.fullScreenModal}>
           <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-          
-          <LinearGradient 
+
+          <LinearGradient
             colors={[MaterialPalette.primaryPink, MaterialPalette.primaryPinkLight]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[styles.fullScreenHeader, { paddingTop: insets.top + 20 }]}
@@ -464,7 +492,7 @@ export default function AdminMaterialsScreen({ navigation }) {
 
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.fsScrollContent} showsVerticalScrollIndicator={false}>
-              
+
               <ScaleBtn activeScale={0.98} onPress={handlePickFile}>
                 <View style={styles.uploadCard}>
                   {file ? (
@@ -523,7 +551,7 @@ export default function AdminMaterialsScreen({ navigation }) {
                   )}
                 </LinearGradient>
               </ScaleBtn>
-              
+
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -548,33 +576,33 @@ const styles = StyleSheet.create({
   filterSectionModern: { paddingVertical: 10 },
   searchBoxModern: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 12, backgroundColor: '#FFF', marginHorizontal: 24, marginBottom: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB' },
   searchInputModern: { flex: 1, fontSize: 15, color: '#1F2937' },
-  
+
   chipScrollModern: { paddingBottom: 10 },
   chipModernHeader: { height: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
   chipModernHeaderActive: { backgroundColor: MaterialPalette.gold, borderColor: MaterialPalette.gold },
   chipTextModernHeader: { fontSize: 13, fontWeight: '600' },
 
-  contentContainer: { flex: 1 },
-  listContent: { padding: 24, paddingBottom: 100 },
-  
+  cardOuter: { paddingHorizontal: 24 },
+
   card: { borderRadius: 20, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
   cardInner: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  
+
   thumbnail: { width: 56, height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   cardContent: { flex: 1 },
   title: { fontSize: 17, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center', justifyContent: 'flex-start' },
   infoChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   infoChipText: { fontSize: 11, fontWeight: '700' },
   teacherName: { fontSize: 12, color: '#6B7280', fontWeight: '500', marginLeft: 4 },
-  
-  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
+  // Status pills — always flex-start, wraps if needed, never centers/spreads
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-start', gap: 6, alignSelf: 'flex-start' },
   statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   statusPillText: { fontSize: 11, fontWeight: '700' },
-  
+
   actionCol: { marginLeft: 16, gap: 10 },
   actionCircleBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  
+
   empty: { alignItems: 'center', marginTop: 60 },
   emptyText: { fontSize: 18, fontWeight: '700', color: '#9CA3AF', marginTop: 16 },
 

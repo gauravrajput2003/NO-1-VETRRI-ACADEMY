@@ -172,7 +172,14 @@ export default function DocumentViewerScreen({ route, navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Detect file type and preview strategy
-  const detectedType = detectFileType({ type: explicitType, mimeType, extension, url, filename });
+  let detectedType = detectFileType({ type: explicitType, mimeType, extension, url, filename });
+
+  // Fallback for PDF: If detection fails but URL ends with .pdf, force it.
+  // This is a safeguard against incorrect props being passed from navigation.
+  if (detectedType === 'unknown' && url?.toLowerCase().endsWith('.pdf')) {
+    detectedType = 'pdf';
+  }
+
   const strategy = getPreviewStrategy(detectedType, url);
 
   // Handle blocked sites on mount

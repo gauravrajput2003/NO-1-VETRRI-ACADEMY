@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
+import { useFocusEffect } from '@react-navigation/native';
 import { formatRelativeTime } from '../../utils/formatters';
 import {
   fetchNotifications,
@@ -27,6 +28,7 @@ import {
 import { toggleAI } from '../../redux/slices/uiSlice';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { resolveNotificationTarget } from '../../utils/notificationNavigation';
+import { useTabBarVisibility } from '../../context/TabBarVisibilityContext';
 
 // ---------------------------------------------------------------------------
 // Responsive scaling helpers
@@ -103,6 +105,7 @@ export default function NotificationsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const r = useResponsive();
   const styles = React.useMemo(() => createStyles(r), [r.width, r.height]);
+  const { hidePermanently, showPermanently } = useTabBarVisibility();
 
   const { list = [], loading = false, page = 1, hasMore = false } = useSelector((s) => s.notifications);
 
@@ -121,11 +124,26 @@ export default function NotificationsScreen({ navigation }) {
     navigation.setOptions?.({ headerShown: false });
   }, [navigation]);
 
+  // This screen is a full-page utility screen and should not show the bottom
+  // tab bar. We use the TabBarVisibilityContext to imperatively hide it on
+  // focus and show it again on blur.
+  useFocusEffect(
+    useCallback(() => {
+      hidePermanently();
+      // The cleanup function is called when the screen loses focus
+      return () => {
+        showPermanently();
+      };
+    }, [navigation])
+  );
+
   const unreadCount = list.filter((n) => !n.isRead).length;
+  const userRole = useSelector((s) => s.auth.user?.role);
 
   const handlePress = (item) => {
     if (!item.isRead) dispatch(markNotificationRead(item._id));
-    const { screen, params } = resolveNotificationTarget(item);
+    if (!userRole) return; // Should not happen if user is logged in
+    const { screen, params } = resolveNotificationTarget(item, userRole);
     navigation.navigate(screen, params);
   };
 
@@ -193,20 +211,12 @@ export default function NotificationsScreen({ navigation }) {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FF4F8B" />
-      <LinearGradient
-        colors={['#FFF8FB', '#F8F7FC', '#F5FCFF', '#F2FFFC']}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Decorative blobs — sized as a fraction of screen width so they never
-          overwhelm small phones or look tiny on large ones */}
-      <View style={[styles.blob, styles.blobOne]} />
-      <View style={[styles.blob, styles.blobTwo]} />
-
-      {/* Single colorful hero header (replaces the default stack header) */}
+  // ─── Header + action bar now live inside ListHeaderComponent so the ENTIRE
+  // ─── page (hero + unread bar + list) scrolls together as one unit. Before,
+  // ─── these sat above the FlatList as fixed elements and only the list body
+  // ─── beneath them could scroll.
+  const renderListHeader = () => (
+    <>
       <LinearGradient
         colors={['#FF4F8B', '#FF6EA8']}
         start={{ x: 0, y: 0 }}
@@ -251,11 +261,28 @@ export default function NotificationsScreen({ navigation }) {
           </ParticleWrapper>
         )}
       </View>
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#FF4F8B" />
+      <LinearGradient
+        colors={['#FFF8FB', '#F8F7FC', '#F5FCFF', '#F2FFFC']}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Decorative blobs — sized as a fraction of screen width so they never
+          overwhelm small phones or look tiny on large ones. Kept outside the
+          FlatList since they're purely decorative background, not content. */}
+      <View style={[styles.blob, styles.blobOne]} />
+      <View style={[styles.blob, styles.blobTwo]} />
 
       <FlatList
         data={list}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
+        ListHeaderComponent={renderListHeader}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshing={loading}
@@ -303,7 +330,9 @@ function createStyles(r) {
       backgroundColor: '#14B8A6',
     },
 
-    // Single hero header
+    // Single hero header — full-bleed, so it must NOT sit inside a padded
+    // contentContainerStyle. It gets its OWN horizontalPadding, and the
+    // FlatList's contentContainerStyle only pads the action bar + cards.
     heroGradient: {
       paddingHorizontal: horizontalPadding,
       paddingBottom: 20,
@@ -337,6 +366,9 @@ function createStyles(r) {
       shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2,
     },
 
+    // NOTE: horizontalPadding here is applied directly (not inherited from
+    // the FlatList contentContainerStyle) since the hero header above is
+    // full-bleed and must NOT be padded by the shared container style.
     actionBar: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       paddingHorizontal: horizontalPadding, marginTop: 16, marginBottom: 12,
@@ -350,11 +382,11 @@ function createStyles(r) {
     },
     markAllText: { fontSize: scaleFont(12.5), fontWeight: '700', color: '#FF4F8B' },
 
-    listContent: {
-      paddingHorizontal: horizontalPadding, paddingBottom: 40,
-      maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%',
-    },
-    cardWrap: { marginBottom: 16 },
+    // contentContainerStyle no longer carries horizontal padding — the hero
+    // header (rendered via ListHeaderComponent) needs to stay full-bleed.
+    // Cards get their own horizontal padding below via cardOuter.
+    listContent: { paddingBottom: 40 },
+    cardWrap: { marginBottom: 16, marginHorizontal: horizontalPadding, maxWidth: contentMaxWidth, alignSelf: contentMaxWidth ? 'center' : undefined, width: contentMaxWidth ? '100%' : undefined },
     deleteAction: {
       backgroundColor: '#EF4444',
       justifyContent: 'center',

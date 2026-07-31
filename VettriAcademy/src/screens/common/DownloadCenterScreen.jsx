@@ -290,9 +290,11 @@ export default function DownloadCenterScreen({ navigation }) {
           url: normalizeMaterialFileUrl(item.fileUrl, {
             resourceType: item?.resourceType,
             publicId: item?.publicId,
-          }),
+          }), 
           title: item.title,
           fileType: item.type,
+          mimeType: item.mimeType,
+          extension: item.extension,
         });
       }
     };

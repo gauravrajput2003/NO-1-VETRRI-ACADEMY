@@ -4,7 +4,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTabBarAnimation } from '../context/TabBarVisibilityContext';
+import { useTabBarAnimation, useTabBarVisibility } from '../context/TabBarVisibilityContext';
 import ParticleWrapper from './effects/ParticleWrapper';
 
 const PINK = '#FF4F8B';
@@ -86,6 +86,12 @@ const TabButton = ({ isFocused, onPress, onLongPress, iconName, label, options, 
 export default function CustomTabBar({ state, descriptors, navigation, iconConfig, badges = {} }) {
   const insets = useSafeAreaInsets();
   const { translateY, opacity } = useTabBarAnimation();
+  const { isPermanentlyHidden } = useTabBarVisibility();
+
+  // If the context dictates the bar should be permanently hidden, render nothing.
+  if (isPermanentlyHidden) {
+    return null;
+  }
 
   return (
     <Animated.View
@@ -263,4 +269,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
