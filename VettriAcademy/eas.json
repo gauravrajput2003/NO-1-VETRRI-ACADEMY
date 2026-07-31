@@ -6,22 +6,17 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-          "projectDir": "VettriAcademy"
-
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-         "projectDir": "VettriAcademy"
+      "distribution": "internal"
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       }
-
-    },
-       "projectDir": "VettriAcademy"
+    }
   },
   "submit": {
     "production": {}
