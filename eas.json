@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 7.6.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "projectDir": "VettriAcademy"
+    },
+    "preview": {
+      "distribution": "internal",
+      "projectDir": "VettriAcademy"
+    },
+    "production": {
+      "projectDir": "VettriAcademy"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
