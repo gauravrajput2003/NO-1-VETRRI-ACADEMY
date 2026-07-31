@@ -34,6 +34,7 @@ const MaterialFolder = require('../models/MaterialFolder');
 const notificationService = require('../services/notificationService');
 const storageService = require('../services/storageService');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
+const { proxyDownload } = require('../middleware/fileDownloadHandler');
 
 const getMaterialTypeFromMime = (mimeType = '') => {
   if (mimeType.startsWith('video/')) return 'video';
@@ -669,12 +670,60 @@ const getAdminMaterialPreviewUrl = async (req, res) => {
       mimeType: previewResource.mimeType || material.mimeType,
       storageType: previewResource.storageType || material.storageType,
       resourceType: previewResource.resourceType || material.resourceType,
+      publicId: previewResource.publicId || material.publicId,
       extension: previewResource.extension || material.extension,
       filename: previewResource.originalFilename || material.originalFilename,
+      fileSize: previewResource.fileSize || material.fileSize,
       isPendingReplacement: !!(usePendingReplacement && replacement),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const downloadAdminMaterialDirect = async (req, res) => {
+  try {
+    const material = await StudyMaterial.findById(req.params.id);
+    if (!material) return res.status(404).json({ success: false, message: 'Material not found.' });
+
+    const usePendingReplacement = req.query.pendingReplacement === 'true';
+    const replacement = material.pendingChanges?.fileReplacement;
+    const downloadResource = usePendingReplacement && replacement
+      ? { ...replacement }
+      : material;
+
+    const filename = downloadResource.originalFilename || `file.${downloadResource.extension || 'pdf'}`;
+    const mimeType = downloadResource.mimeType || 'application/octet-stream';
+    const resourceType = downloadResource.resourceType || 'raw';
+    let downloadUrl;
+
+    if (downloadResource.publicId) {
+      const cloudinary = require('../config/cloudinary');
+      downloadUrl = cloudinary.utils.private_download_url(
+        downloadResource.publicId,
+        downloadResource.extension || 'pdf',
+        {
+          resource_type: resourceType,
+          type: 'upload',
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          attachment: true,
+        }
+      );
+    } else if (downloadResource.fileUrl) {
+      downloadUrl = downloadResource.fileUrl.startsWith('https://')
+        ? downloadResource.fileUrl
+        : downloadResource.fileUrl.replace('http://', 'https://');
+    }
+
+    if (!downloadUrl) {
+      return res.status(404).json({ success: false, message: 'Material file URL not found.' });
+    }
+
+    await proxyDownload(downloadUrl, filename, mimeType, res);
+  } catch (error) {
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: error.message || 'Failed to download material.' });
+    }
   }
 };
 
@@ -1092,6 +1141,7 @@ module.exports = {
   getAdminMaterials,
   getPendingMaterials,
   getAdminMaterialPreviewUrl,
+  downloadAdminMaterialDirect,
   approveMaterial,
   rejectMaterial,
   directEditMaterial,

@@ -21,6 +21,7 @@ const {
   getAdminMaterials,
   getPendingMaterials,
   getAdminMaterialPreviewUrl,
+  downloadAdminMaterialDirect,
   approveMaterial,
   rejectMaterial,
   directEditMaterial,
@@ -107,6 +108,7 @@ router.put('/admissions/:id', updateAdmission);
 router.get('/materials', getAdminMaterials);
 router.get('/materials/pending', getPendingMaterials);
 router.get('/materials/:id/preview', getAdminMaterialPreviewUrl);
+router.get('/materials/:id/direct-download', downloadAdminMaterialDirect);
 router.post('/materials/:id/approve', approveMaterial);
 router.post('/materials/:id/reject', rejectMaterial);
 router.put('/materials/:id', uploadStudyMaterial.single('file'), directEditMaterial);

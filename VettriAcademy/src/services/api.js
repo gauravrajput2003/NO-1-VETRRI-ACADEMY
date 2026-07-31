@@ -556,6 +556,11 @@ export const getAdminMaterialPreviewAPI = (id, pendingReplacement = false) =>
     params: pendingReplacement ? { pendingReplacement: true } : undefined,
   });
 
+export const getAdminMaterialDownloadAPI = (id, pendingReplacement = false) =>
+  api.get(`/admin/materials/${id}/preview`, {
+    params: pendingReplacement ? { pendingReplacement: true } : undefined,
+  });
+
 export const approveMaterialAPI = (id) =>
   api.post(`/admin/materials/${id}/approve`);
 

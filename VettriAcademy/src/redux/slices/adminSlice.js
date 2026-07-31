@@ -12,7 +12,7 @@ import {
   createAnnouncementAPI, deleteAnnouncementAPI,
   getLiveMonitorAPI,
   getAdminMaterialsAPI, deleteAdminMaterialAPI, toggleAdminMaterialLockAPI,
-  getPendingMaterialsAPI, getAdminMaterialPreviewAPI, approveMaterialAPI, rejectMaterialAPI,
+  getPendingMaterialsAPI, getAdminMaterialPreviewAPI, getAdminMaterialDownloadAPI, approveMaterialAPI, rejectMaterialAPI,
   directEditMaterialAPI, uploadAdminMaterialAPI,
   getLibraryAccessListAPI, approveLibraryAccessAPI, revokeLibraryAccessAPI,
   getAdminFoldersAPI,
@@ -204,12 +204,35 @@ export const fetchAdminMaterialPreview = createAsyncThunk('admin/fetchMaterialPr
       mimeType: data.mimeType,
       storageType: data.storageType,
       resourceType: data.resourceType,
+      publicId: data.publicId,
       extension: data.extension,
       filename: data.filename,
+      fileSize: data.fileSize,
       isPendingReplacement: data.isPendingReplacement,
     };
   } catch (e) {
     return rejectWithValue(e.response?.data?.message || 'Failed to load preview');
+  }
+});
+
+export const fetchAdminMaterialDownload = createAsyncThunk('admin/fetchMaterialDownload', async ({ id, pendingReplacement = false }, { rejectWithValue }) => {
+  try {
+    const { data } = await getAdminMaterialDownloadAPI(id, pendingReplacement);
+    return {
+      id,
+      url: data.url,
+      type: data.type,
+      mimeType: data.mimeType,
+      storageType: data.storageType,
+      resourceType: data.resourceType,
+      publicId: data.publicId,
+      extension: data.extension,
+      filename: data.filename,
+      fileSize: data.fileSize,
+      isPendingReplacement: data.isPendingReplacement,
+    };
+  } catch (e) {
+    return rejectWithValue(e.response?.data?.message || 'Failed to load download');
   }
 });
 
@@ -276,10 +299,12 @@ const adminSlice = createSlice({
     materials: [],
     pendingMaterials: [],
     currentPreviewUrl: null,
+    currentDownloadUrl: null,
     libraryAccessList: [],
     folders: [],
     loading: false,
     previewLoading: false,
+    downloadLoading: false,
     error: null,
   },
   reducers: {
@@ -349,6 +374,9 @@ const adminSlice = createSlice({
       .addCase(fetchAdminMaterialPreview.pending, (state) => { state.previewLoading = true; })
       .addCase(fetchAdminMaterialPreview.fulfilled, (state, a) => { state.currentPreviewUrl = a.payload; state.previewLoading = false; })
       .addCase(fetchAdminMaterialPreview.rejected, (state, a) => { state.error = a.payload; state.previewLoading = false; })
+      .addCase(fetchAdminMaterialDownload.pending, (state) => { state.downloadLoading = true; })
+      .addCase(fetchAdminMaterialDownload.fulfilled, (state, a) => { state.currentDownloadUrl = a.payload; state.downloadLoading = false; })
+      .addCase(fetchAdminMaterialDownload.rejected, (state, a) => { state.error = a.payload; state.downloadLoading = false; })
       .addCase(approvePendingMaterial.fulfilled, (state, a) => { state.pendingMaterials = state.pendingMaterials.filter(m => m._id !== a.payload); })
       .addCase(rejectPendingMaterial.fulfilled, (state, a) => { state.pendingMaterials = state.pendingMaterials.filter(m => m._id !== a.payload); })
       .addCase(editAdminMaterial.fulfilled, (state, a) => { state.materials = state.materials.map((m) => m._id === a.payload?._id ? a.payload : m); })
