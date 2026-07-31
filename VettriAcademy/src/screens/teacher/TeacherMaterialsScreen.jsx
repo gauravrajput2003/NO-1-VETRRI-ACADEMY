@@ -56,6 +56,18 @@ const FILTER_ICONS = {
   'Unlocked': '🔓'
 };
 
+const appendPickedFile = (formData, pickedFile) => {
+  if (Platform.OS === 'web' && pickedFile.file) {
+    formData.append('file', pickedFile.file);
+  } else {
+    formData.append('file', {
+      uri: pickedFile.uri,
+      name: pickedFile.name,
+      type: pickedFile.mimeType || 'application/octet-stream',
+    });
+  }
+};
+
 export default function TeacherMaterialsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { materials, loading } = useSelector((s) => s.teacher);
@@ -148,16 +160,30 @@ export default function TeacherMaterialsScreen({ navigation }) {
     if (!subject) return Toast.show({ type: 'error', text1: 'Please select a subject' });
     if (!grade) return Toast.show({ type: 'error', text1: 'Please select a grade' });
 
+    const isReplacingFile = !!editingMaterial && !!file;
+
     setUploading(true);
     
     if (editingMaterial) {
       try {
+        let updateData = { title, subject, grade, description, lockedForAll: isLocked };
+
+        if (file) {
+          updateData = new FormData();
+          updateData.append('title', title);
+          updateData.append('subject', subject);
+          updateData.append('grade', grade);
+          updateData.append('description', description);
+          updateData.append('lockedForAll', isLocked);
+          appendPickedFile(updateData, file);
+        }
+
         const resultAction = await dispatch(editMaterial({
           materialId: editingMaterial._id,
-          data: { title, subject, grade, description, lockedForAll: isLocked }
+          data: updateData
         }));
         if (editMaterial.fulfilled.match(resultAction)) {
-          Toast.show({ type: 'success', text1: 'Updated successfully!' });
+          Toast.show({ type: 'success', text1: isReplacingFile ? 'Replacement sent for approval!' : 'Updated successfully!' });
           closeUploadModal();
         } else {
           Toast.show({ type: 'error', text1: 'Update failed', text2: resultAction.payload });
@@ -176,15 +202,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
       formData.append('lockedForAll', isLocked);
       
       // Append file
-      if (Platform.OS === 'web' && file.file) {
-        formData.append('file', file.file);
-      } else {
-        formData.append('file', {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream',
-        });
-      }
+      appendPickedFile(formData, file);
 
       try {
         const resultAction = await dispatch(uploadMaterial(formData));
@@ -220,7 +238,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
     setGrade(material.grade);
     setDescription(material.description || '');
     setIsLocked(material.lockedForAll);
-    setFile(null); // Backend API currently doesn't support changing file after upload
+    setFile(null);
     setUploadModalVisible(true);
   };
 
@@ -459,7 +477,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
                 <Ionicons name="arrow-back" size={24} color="#1E293B" />
               </ScaleBtn>
             </View>
-            <Text style={styles.fsHeaderTitle}>Upload Material</Text>
+            <Text style={styles.fsHeaderTitle}>{editingMaterial ? 'Edit Material' : 'Upload Material'}</Text>
             <Text style={styles.fsHeaderSubtitle}>Upload PDFs, videos, images and study materials.</Text>
           </LinearGradient>
 
@@ -467,7 +485,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
             <ScrollView contentContainerStyle={styles.fsScrollContent} showsVerticalScrollIndicator={false}>
               
               {/* UPLOAD CARD */}
-              <ScaleBtn activeScale={0.98} onPress={handlePickFile} disabled={!!editingMaterial}>
+              <ScaleBtn activeScale={0.98} onPress={handlePickFile}>
                 <View style={styles.uploadCard}>
                   {file ? (
                     <View style={styles.fileSelectedState}>
@@ -482,15 +500,13 @@ export default function TeacherMaterialsScreen({ navigation }) {
                       <View style={styles.uploadIconBigWrap}>
                         <Ionicons name="cloud-upload" size={40} color="#14B8A6" />
                       </View>
-                      <Text style={styles.uploadCardTitle}>Select File</Text>
+                      <Text style={styles.uploadCardTitle}>{editingMaterial ? 'Select Replacement File' : 'Select File'}</Text>
                       <Text style={styles.uploadCardSupported}>Supported: PDF • PPT • Video • Image</Text>
                       <Text style={styles.uploadCardLimits}>Max: 500MB Video / 50MB Document</Text>
                       
-                      {!editingMaterial && (
-                        <View style={styles.chooseFileBtnBig}>
-                          <Text style={styles.chooseFileBtnText}>Choose File</Text>
-                        </View>
-                      )}
+                      <View style={styles.chooseFileBtnBig}>
+                        <Text style={styles.chooseFileBtnText}>{editingMaterial ? 'Choose Replacement' : 'Choose File'}</Text>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -560,7 +576,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
                   {uploading ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={styles.fsSubmitBtnText}>{editingMaterial ? 'Update Material' : 'Upload Material'}</Text>
+                    <Text style={styles.fsSubmitBtnText}>{editingMaterial && file ? 'Replacing File...' : editingMaterial ? 'Update Material' : 'Upload Material'}</Text>
                   )}
                 </LinearGradient>
               </ScaleBtn>

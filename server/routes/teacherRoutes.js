@@ -47,7 +47,7 @@ router.get('/folders', getTeacherFolders);
 router.get('/folders/:id/materials', getTeacherFolderMaterials);
 
 router.put('/materials/:id/lock', requireLibraryAccess, toggleMaterialLock);
-router.put('/materials/:id', requireLibraryAccess, editMaterial);
+router.put('/materials/:id', requireLibraryAccess, uploadStudyMaterial.single('file'), editMaterial);
 router.delete('/materials/:id', requireLibraryAccess, deleteMaterial);
 
 // Exam scores

@@ -32,6 +32,93 @@ const WeeklyTopPerformer = require('../models/WeeklyTopPerformer');
 const LibraryAccess = require('../models/LibraryAccess');
 const MaterialFolder = require('../models/MaterialFolder');
 const notificationService = require('../services/notificationService');
+const storageService = require('../services/storageService');
+const { resolveFileAccessUrl } = require('../utils/downloadHelper');
+
+const getMaterialTypeFromMime = (mimeType = '') => {
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (
+    mimeType.includes('presentation') ||
+    mimeType.includes('word') ||
+    mimeType.includes('excel') ||
+    mimeType === 'text/plain'
+  ) {
+    return 'ppt';
+  }
+  return 'image';
+};
+
+const parseBooleanField = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+};
+
+const buildMaterialTextUpdates = (body = {}) => {
+  const updates = {};
+  ['title', 'subject', 'grade', 'description'].forEach((field) => {
+    if (body[field] !== undefined) {
+      updates[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
+    }
+  });
+  if (body.lockedForAll !== undefined) {
+    updates.lockedForAll = parseBooleanField(body.lockedForAll);
+  }
+  return updates;
+};
+
+const uploadMaterialReplacement = async (file) => {
+  const uploadOptions = {
+    public_id: `${Date.now()}-${file.originalname}`,
+  };
+
+  if (file.path) {
+    return storageService.uploadFileFromDisk(
+      file.path,
+      file.mimetype,
+      file.originalname,
+      'materials/study-materials',
+      uploadOptions
+    );
+  }
+  if (file.buffer) {
+    return storageService.uploadFileFromBuffer(
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+      'materials/study-materials',
+      uploadOptions
+    );
+  }
+  throw new Error('No file buffer or path available');
+};
+
+const buildReplacementFields = (uploadResult, mimeType) => ({
+  fileUrl: uploadResult.fileUrl,
+  publicId: uploadResult.publicId,
+  storageType: uploadResult.storageType,
+  originalFilename: uploadResult.originalFilename,
+  extension: uploadResult.extension,
+  resourceType: uploadResult.resourceType,
+  fileSize: uploadResult.fileSize,
+  mimeType: uploadResult.mimeType,
+  type: getMaterialTypeFromMime(mimeType),
+  thumbnailUrl: mimeType === 'application/pdf' && uploadResult.publicId
+    ? storageService.getPdfThumbnailUrl(uploadResult.publicId)
+    : '',
+});
+
+const cleanupTempUpload = (file) => {
+  if (!file?.path) return;
+  const fs = require('fs');
+  if (fs.existsSync(file.path)) {
+    fs.unlink(file.path, (err) => {
+      if (err) console.warn('[Material Edit] Failed to delete temp file:', err.message);
+    });
+  }
+};
 
 // @desc    Get all students (admin)
 // @route   GET /api/admin/students
@@ -555,7 +642,45 @@ const getPendingMaterials = async (req, res) => {
   }
 };
 
+const getAdminMaterialPreviewUrl = async (req, res) => {
+  try {
+    const material = await StudyMaterial.findById(req.params.id);
+    if (!material) return res.status(404).json({ success: false, message: 'Material not found.' });
+
+    const usePendingReplacement = req.query.pendingReplacement === 'true';
+    const replacement = material.pendingChanges?.fileReplacement;
+    const previewResource = usePendingReplacement && replacement
+      ? { ...replacement }
+      : material;
+
+    const previewUrl = await resolveFileAccessUrl(previewResource, false);
+
+    if (!previewUrl) {
+      return res.status(404).json({
+        success: false,
+        message: 'Material file is missing or inaccessible.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      url: previewUrl,
+      type: previewResource.type || material.type,
+      mimeType: previewResource.mimeType || material.mimeType,
+      storageType: previewResource.storageType || material.storageType,
+      resourceType: previewResource.resourceType || material.resourceType,
+      extension: previewResource.extension || material.extension,
+      filename: previewResource.originalFilename || material.originalFilename,
+      isPendingReplacement: !!(usePendingReplacement && replacement),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const approveMaterial = async (req, res) => {
+  let oldFileToDelete = null;
+  let approvedReplacement = null;
   try {
     const material = await StudyMaterial.findById(req.params.id);
     if (!material) return res.status(404).json({ success: false, message: 'Material not found.' });
@@ -566,7 +691,18 @@ const approveMaterial = async (req, res) => {
       await StudyMaterial.findByIdAndDelete(material._id);
     } else {
       if (material.approvalStatus === 'pending_edit' && material.pendingChanges) {
-        Object.assign(material, material.pendingChanges);
+        const { fileReplacement, ...textChanges } = material.pendingChanges;
+        oldFileToDelete = fileReplacement ? {
+          publicId: material.publicId,
+          resourceType: material.resourceType,
+          storageType: material.storageType,
+        } : null;
+        approvedReplacement = fileReplacement || null;
+
+        Object.assign(material, textChanges);
+        if (fileReplacement) {
+          Object.assign(material, fileReplacement);
+        }
         material.pendingChanges = null;
       }
       
@@ -577,6 +713,18 @@ const approveMaterial = async (req, res) => {
       material.reviewedAt = new Date();
       if (reviewNotes) material.reviewNotes = (material.reviewNotes ? material.reviewNotes + '\\n' : '') + `[Admin] ${reviewNotes}`;
       await material.save();
+
+      if (
+        oldFileToDelete?.publicId &&
+        approvedReplacement?.publicId &&
+        (
+          oldFileToDelete.publicId !== approvedReplacement.publicId ||
+          oldFileToDelete.resourceType !== approvedReplacement.resourceType
+        )
+      ) {
+        storageService.deleteFile(oldFileToDelete.publicId, oldFileToDelete.storageType, oldFileToDelete.resourceType)
+          .catch((deleteErr) => console.warn('[Approve Material] Old file delete failed:', deleteErr.message));
+      }
 
       // Notify students if it was a new upload going live (same logic as teacher controller) or approved edit
       if (wasPendingNew) {
@@ -611,6 +759,7 @@ const rejectMaterial = async (req, res) => {
     if (!material) return res.status(404).json({ success: false, message: 'Material not found.' });
 
     const reviewNotes = req.body.reviewNotes || 'Rejected by admin without notes.';
+    const stagedReplacement = material.pendingChanges?.fileReplacement;
 
     material.approvalStatus = 'rejected';
     material.pendingChanges = null; // discard pending edit payload if any
@@ -618,6 +767,14 @@ const rejectMaterial = async (req, res) => {
     material.reviewedAt = new Date();
     material.reviewNotes = (material.reviewNotes ? material.reviewNotes + '\\n' : '') + `[Admin] ${reviewNotes}`;
     await material.save();
+
+    if (stagedReplacement?.publicId) {
+      storageService.deleteFile(
+        stagedReplacement.publicId,
+        stagedReplacement.storageType,
+        stagedReplacement.resourceType
+      ).catch((deleteErr) => console.warn('[Reject Material] Staged file delete failed:', deleteErr.message));
+    }
 
     if (material.requestedBy) {
       await notificationService.sendNotification({
@@ -638,15 +795,49 @@ const rejectMaterial = async (req, res) => {
 };
 
 const directEditMaterial = async (req, res) => {
+  let newUploadResult = null;
   try {
-    const material = await StudyMaterial.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, approvalStatus: 'approved', pendingChanges: null },
-      { new: true }
-    );
-    if (!material) return res.status(404).json({ success: false, message: 'Material not found.' });
+    const material = await StudyMaterial.findById(req.params.id);
+    if (!material) {
+      cleanupTempUpload(req.file);
+      return res.status(404).json({ success: false, message: 'Material not found.' });
+    }
+
+    const updates = buildMaterialTextUpdates(req.body);
+    const oldFile = {
+      publicId: material.publicId,
+      resourceType: material.resourceType,
+      storageType: material.storageType,
+    };
+
+    if (req.file) {
+      newUploadResult = await uploadMaterialReplacement(req.file);
+      Object.assign(updates, buildReplacementFields(newUploadResult, req.file.mimetype));
+    }
+
+    Object.assign(material, updates, {
+      approvalStatus: 'approved',
+      pendingChanges: null,
+    });
+
+    await material.save();
+
+    if (
+      req.file &&
+      oldFile.publicId &&
+      (oldFile.publicId !== newUploadResult.publicId || oldFile.resourceType !== newUploadResult.resourceType)
+    ) {
+      storageService.deleteFile(oldFile.publicId, oldFile.storageType, oldFile.resourceType)
+        .catch((deleteErr) => console.warn('[Admin Edit] Old file delete failed:', deleteErr.message));
+    }
+
     res.status(200).json({ success: true, material });
   } catch (error) {
+    cleanupTempUpload(req.file);
+    if (newUploadResult?.publicId) {
+      storageService.deleteFile(newUploadResult.publicId, newUploadResult.storageType, newUploadResult.resourceType)
+        .catch((deleteErr) => console.warn('[Admin Edit] New file cleanup failed:', deleteErr.message));
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -900,6 +1091,7 @@ module.exports = {
   recordFeePayment,
   getAdminMaterials,
   getPendingMaterials,
+  getAdminMaterialPreviewUrl,
   approveMaterial,
   rejectMaterial,
   directEditMaterial,

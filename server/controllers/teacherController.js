@@ -29,6 +29,77 @@ const getMaterialTypeFromMime = (mimeType = '') => {
   return 'image';
 };
 
+const parseBooleanField = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+};
+
+const buildMaterialTextUpdates = (body = {}) => {
+  const updates = {};
+  ['title', 'subject', 'grade', 'description'].forEach((field) => {
+    if (body[field] !== undefined) {
+      updates[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
+    }
+  });
+  if (body.lockedForAll !== undefined) {
+    updates.lockedForAll = parseBooleanField(body.lockedForAll);
+  }
+  return updates;
+};
+
+const uploadMaterialReplacement = async (file) => {
+  const uploadOptions = {
+    public_id: `${Date.now()}-${file.originalname}`,
+  };
+
+  if (file.path) {
+    return storageService.uploadFileFromDisk(
+      file.path,
+      file.mimetype,
+      file.originalname,
+      'materials/study-materials',
+      uploadOptions
+    );
+  }
+  if (file.buffer) {
+    return storageService.uploadFileFromBuffer(
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+      'materials/study-materials',
+      uploadOptions
+    );
+  }
+  throw new Error('No file buffer or path available');
+};
+
+const buildReplacementFields = (uploadResult, mimeType) => ({
+  fileUrl: uploadResult.fileUrl,
+  publicId: uploadResult.publicId,
+  storageType: uploadResult.storageType,
+  originalFilename: uploadResult.originalFilename,
+  extension: uploadResult.extension,
+  resourceType: uploadResult.resourceType,
+  fileSize: uploadResult.fileSize,
+  mimeType: uploadResult.mimeType,
+  type: getMaterialTypeFromMime(mimeType),
+  thumbnailUrl: mimeType === 'application/pdf' && uploadResult.publicId
+    ? storageService.getPdfThumbnailUrl(uploadResult.publicId)
+    : '',
+});
+
+const cleanupTempUpload = (file) => {
+  if (!file?.path) return;
+  const fs = require('fs');
+  if (fs.existsSync(file.path)) {
+    fs.unlink(file.path, (err) => {
+      if (err) warnDev('[Cleanup] Failed to delete temp file:', err.message);
+    });
+  }
+};
+
 const getTeacherStudentFilter = async (teacherId) => {
   const students = await User.find({
     role: 'student',
@@ -357,18 +428,28 @@ const uploadMaterial = async (req, res) => {
 // @route   PUT /api/teacher/materials/:id
 // @access  Teacher
 const editMaterial = async (req, res) => {
+  let uploadResult = null;
   try {
     const material = await StudyMaterial.findOne({ _id: req.params.id, teacher: req.user._id });
     if (!material) {
+      cleanupTempUpload(req.file);
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
 
     if (material.approvalStatus && material.approvalStatus.startsWith('pending_')) {
+      cleanupTempUpload(req.file);
       return res.status(400).json({ success: false, message: 'This material already has a pending action awaiting admin approval.' });
     }
 
+    const pendingChanges = buildMaterialTextUpdates(req.body);
+
+    if (req.file) {
+      uploadResult = await uploadMaterialReplacement(req.file);
+      pendingChanges.fileReplacement = buildReplacementFields(uploadResult, req.file.mimetype);
+    }
+
     // Stage changes instead of applying them directly
-    material.pendingChanges = req.body;
+    material.pendingChanges = pendingChanges;
     material.approvalStatus = 'pending_edit';
     material.requestedBy = req.user._id;
     material.requestedAt = new Date();
@@ -401,6 +482,11 @@ const editMaterial = async (req, res) => {
 
     res.status(200).json({ success: true, material, message: 'Edit request submitted for admin approval.' });
   } catch (error) {
+    cleanupTempUpload(req.file);
+    if (uploadResult?.publicId) {
+      storageService.deleteFile(uploadResult.publicId, uploadResult.storageType, uploadResult.resourceType)
+        .catch((deleteErr) => warnDev('[Teacher Edit] Uploaded replacement cleanup failed:', deleteErr.message));
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

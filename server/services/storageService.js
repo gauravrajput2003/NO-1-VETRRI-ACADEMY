@@ -114,8 +114,17 @@ class StorageService {
    * @returns {Promise<boolean>} Success flag
    */
   async deleteFile(publicId, storageType, resourceType = 'raw') {
-    const service = this.getService(storageType || this.storageType);
-    return await service.deleteFile(publicId, resourceType);
+    const resourceTypes = ['image', 'video', 'raw'];
+    let resolvedStorageType = storageType;
+    let resolvedResourceType = resourceType;
+
+    if (resourceTypes.includes(storageType) && resourceType === 'raw') {
+      resolvedStorageType = this.storageType;
+      resolvedResourceType = storageType;
+    }
+
+    const service = this.getService(resolvedStorageType || this.storageType);
+    return await service.deleteFile(publicId, resolvedResourceType);
   }
 
   /**

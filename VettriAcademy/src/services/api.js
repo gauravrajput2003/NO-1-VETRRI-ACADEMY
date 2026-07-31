@@ -296,7 +296,10 @@ export const deleteTeacherMaterialAPI = (id) =>
   api.delete(`/teacher/materials/${id}`);
 
 export const editTeacherMaterialAPI = (id, data) =>
-  api.put(`/teacher/materials/${id}`, data);
+  api.put(`/teacher/materials/${id}`, data, data instanceof FormData ? {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  } : undefined);
 
 export const toggleMaterialLockAPI = (id, studentId, unlock, lockedForAll) =>
   api.put(`/teacher/materials/${id}/lock`, { studentId, unlock, lockedForAll });
@@ -548,6 +551,11 @@ export const getAdminMaterialsAPI = () =>
 export const getPendingMaterialsAPI = () =>
   api.get('/admin/materials/pending');
 
+export const getAdminMaterialPreviewAPI = (id, pendingReplacement = false) =>
+  api.get(`/admin/materials/${id}/preview`, {
+    params: pendingReplacement ? { pendingReplacement: true } : undefined,
+  });
+
 export const approveMaterialAPI = (id) =>
   api.post(`/admin/materials/${id}/approve`);
 
@@ -555,7 +563,10 @@ export const rejectMaterialAPI = (id, reviewNotes) =>
   api.post(`/admin/materials/${id}/reject`, { reviewNotes });
 
 export const directEditMaterialAPI = (id, data) =>
-  api.put(`/admin/materials/${id}`, data);
+  api.put(`/admin/materials/${id}`, data, data instanceof FormData ? {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  } : undefined);
 
 export const uploadAdminMaterialAPI = (formData) =>
   api.post('/admin/materials', formData, {

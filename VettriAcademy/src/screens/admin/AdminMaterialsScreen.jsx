@@ -5,10 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as DocumentPicker from 'expo-document-picker';
-import { fetchAdminMaterials, toggleAdminMaterialLock, uploadAdminMaterial, deleteAdminMaterial, editAdminMaterial, fetchFolders } from '../../redux/slices/adminSlice';
+import { fetchAdminMaterials, toggleAdminMaterialLock, uploadAdminMaterial, deleteAdminMaterial, editAdminMaterial, fetchFolders, fetchAdminMaterialPreview } from '../../redux/slices/adminSlice';
 import { getCoursesMetaAPI } from '../../services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDate, formatFileSize } from '../../utils/formatters';
+import { MaterialPalette } from '../../utils/theme';
+import { detectFileType, normalizeMaterialFileUrl } from '../../utils/fileUtils';
 
 const ScaleBtn = ({ onPress, children, activeScale = 0.96, style, disabled }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -45,9 +47,21 @@ const FILTER_ICONS = {
   'Rejected': '❌',
 };
 
+const appendPickedFile = (formData, pickedFile) => {
+  if (Platform.OS === 'web' && pickedFile.file) {
+    formData.append('file', pickedFile.file);
+  } else {
+    formData.append('file', {
+      uri: pickedFile.uri,
+      name: pickedFile.name,
+      type: pickedFile.mimeType || 'application/octet-stream',
+    });
+  }
+};
+
 export default function AdminMaterialsScreen({ navigation }) {
   const dispatch = useDispatch();
-  const { materials, folders, loading } = useSelector((s) => s.admin);
+  const { materials, folders, loading, previewLoading } = useSelector((s) => s.admin);
   const insets = useSafeAreaInsets();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +82,7 @@ export default function AdminMaterialsScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [isLocked, setIsLocked] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [previewingId, setPreviewingId] = useState(null);
 
   useEffect(() => {
     if (navigation) navigation.setOptions({ headerShown: false });
@@ -123,16 +138,30 @@ export default function AdminMaterialsScreen({ navigation }) {
     if (!subject) return Toast.show({ type: 'error', text1: 'Please select a subject' });
     if (!grade) return Toast.show({ type: 'error', text1: 'Please select a grade' });
 
+    const isReplacingFile = !!editingMaterial && !!file;
+
     setUploading(true);
     
     if (editingMaterial) {
       try {
+        let updateData = { title, subject, grade, description, lockedForAll: isLocked };
+
+        if (file) {
+          updateData = new FormData();
+          updateData.append('title', title);
+          updateData.append('subject', subject);
+          updateData.append('grade', grade);
+          updateData.append('description', description);
+          updateData.append('lockedForAll', isLocked);
+          appendPickedFile(updateData, file);
+        }
+
         const resultAction = await dispatch(editAdminMaterial({
           id: editingMaterial._id,
-          data: { title, subject, grade, description, lockedForAll: isLocked }
+          data: updateData
         }));
         if (editAdminMaterial.fulfilled.match(resultAction)) {
-          Toast.show({ type: 'success', text1: 'Updated successfully!' });
+          Toast.show({ type: 'success', text1: isReplacingFile ? 'File replaced successfully!' : 'Updated successfully!' });
           closeUploadModal();
         } else {
           Toast.show({ type: 'error', text1: 'Update failed' });
@@ -150,15 +179,7 @@ export default function AdminMaterialsScreen({ navigation }) {
       formData.append('description', description);
       formData.append('lockedForAll', isLocked);
       
-      if (Platform.OS === 'web' && file.file) {
-        formData.append('file', file.file);
-      } else {
-        formData.append('file', {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream',
-        });
-      }
+      appendPickedFile(formData, file);
 
       try {
         const resultAction = await dispatch(uploadAdminMaterial(formData));
@@ -229,6 +250,41 @@ export default function AdminMaterialsScreen({ navigation }) {
     ]);
   };
 
+  const handlePreview = async (material) => {
+    setPreviewingId(material._id);
+    try {
+      const result = await dispatch(fetchAdminMaterialPreview({ id: material._id }));
+      if (!fetchAdminMaterialPreview.fulfilled.match(result)) {
+        Toast.show({ type: 'error', text1: 'Preview failed', text2: result.payload });
+        return;
+      }
+
+      const preview = result.payload;
+      const url = normalizeMaterialFileUrl(preview.url, {
+        resourceType: preview.resourceType || material.resourceType,
+        publicId: material.publicId,
+      });
+      const fileType = detectFileType({
+        type: preview.type || material.type,
+        mimeType: preview.mimeType || material.mimeType,
+        extension: preview.extension || material.extension,
+        url,
+        filename: preview.filename || material.originalFilename,
+      });
+
+      navigation.navigate('DocumentViewer', {
+        url,
+        title: material.title,
+        fileType,
+        mimeType: preview.mimeType || material.mimeType,
+        extension: preview.extension || material.extension,
+        filename: preview.filename || material.originalFilename,
+      });
+    } finally {
+      setPreviewingId(null);
+    }
+  };
+
   const filteredMaterials = (materials || []).filter(m => {
     const matchesSearch = (m.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (m.teacher?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -255,9 +311,13 @@ export default function AdminMaterialsScreen({ navigation }) {
         <View style={styles.card}>
           <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFillObject} />
           <View style={styles.cardInner}>
-            <View style={[styles.thumbnail, { backgroundColor: tConf.bg }]}>
-              <Ionicons name={tConf.icon} size={32} color={tConf.color} />
-            </View>
+            <ScaleBtn onPress={() => handlePreview(item)} style={[styles.thumbnail, { backgroundColor: tConf.bg }]}>
+              {previewLoading && previewingId === item._id ? (
+                <ActivityIndicator size="small" color={MaterialPalette.teal} />
+              ) : (
+                <Ionicons name={tConf.icon} size={32} color={tConf.color} />
+              )}
+            </ScaleBtn>
 
             <View style={styles.cardContent}>
               <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
@@ -271,16 +331,16 @@ export default function AdminMaterialsScreen({ navigation }) {
               <View style={styles.metaRow}>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   {item.approvalStatus?.startsWith('pending') ? (
-                    <View style={[styles.statusPill, { backgroundColor: '#FEF3C7' }]}><Text style={[styles.statusPillText, { color: '#D97706' }]}>⏳ Pending</Text></View>
+                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.goldSoft }]}><Text style={[styles.statusPillText, { color: MaterialPalette.gold }]}>⏳ Pending</Text></View>
                   ) : item.approvalStatus === 'rejected' ? (
                     <View style={[styles.statusPill, { backgroundColor: '#FEE2E2' }]}><Text style={[styles.statusPillText, { color: '#DC2626' }]}>❌ Rejected</Text></View>
                   ) : (
-                    <View style={[styles.statusPill, { backgroundColor: '#DCFCE7' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>✅ Approved</Text></View>
+                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.tealLight }]}><Text style={[styles.statusPillText, { color: MaterialPalette.tealDark }]}>✅ Approved</Text></View>
                   )}
                   {item.lockedForAll ? (
-                    <View style={[styles.statusPill, { backgroundColor: '#FFF7ED' }]}><Text style={[styles.statusPillText, { color: '#EA580C' }]}>🔒 Locked</Text></View>
+                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.goldSoft }]}><Text style={[styles.statusPillText, { color: MaterialPalette.gold }]}>🔒 Locked</Text></View>
                   ) : (
-                    <View style={[styles.statusPill, { backgroundColor: '#F0FDF4' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>🔓 Unlocked</Text></View>
+                    <View style={[styles.statusPill, { backgroundColor: MaterialPalette.tealLight }]}><Text style={[styles.statusPillText, { color: MaterialPalette.tealDark }]}>🔓 Unlocked</Text></View>
                   )}
                 </View>
               </View>
@@ -288,7 +348,7 @@ export default function AdminMaterialsScreen({ navigation }) {
 
             <View style={styles.actionCol}>
               <ScaleBtn onPress={() => handleToggleLock(item)} style={styles.actionCircleBtn}>
-                <Ionicons name={item.lockedForAll ? 'lock-open' : 'lock-closed'} size={18} color="#16A34A" />
+                <Ionicons name={item.lockedForAll ? 'lock-open' : 'lock-closed'} size={18} color={MaterialPalette.tealDark} />
               </ScaleBtn>
               <ScaleBtn onPress={() => openEditModal(item)} style={styles.actionCircleBtn}>
                 <Ionicons name="pencil" size={18} color="#3B82F6" />
@@ -308,7 +368,7 @@ export default function AdminMaterialsScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       <LinearGradient 
-        colors={['#1F2937', '#111827']} 
+        colors={[MaterialPalette.primaryPink, MaterialPalette.primaryPinkLight]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[styles.premiumHeader, { paddingTop: insets.top + 20 }]}
       >
@@ -325,7 +385,7 @@ export default function AdminMaterialsScreen({ navigation }) {
       </LinearGradient>
 
       <ScaleBtn activeScale={0.96} onPress={() => setUploadModalVisible(true)} style={styles.uploadBtnWrapModern}>
-        <LinearGradient colors={['#10B981', '#059669']} style={styles.uploadBtnModern} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <LinearGradient colors={[MaterialPalette.teal, MaterialPalette.tealDark]} style={styles.uploadBtnModern} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={styles.uploadIconCircleModern}>
             <Ionicons name="cloud-upload" size={24} color="#FFF" />
           </View>
@@ -365,7 +425,7 @@ export default function AdminMaterialsScreen({ navigation }) {
 
       <View style={styles.contentContainer}>
         {loading && !uploading ? (
-          <ActivityIndicator size="large" color="#1F2937" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color={MaterialPalette.primaryPink} style={{ marginTop: 40 }} />
         ) : (
           <FlatList
             data={filteredMaterials}
@@ -389,7 +449,7 @@ export default function AdminMaterialsScreen({ navigation }) {
           <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
           
           <LinearGradient 
-            colors={['#1F2937', '#111827']} 
+            colors={[MaterialPalette.primaryPink, MaterialPalette.primaryPinkLight]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[styles.fullScreenHeader, { paddingTop: insets.top + 20 }]}
           >
@@ -405,17 +465,19 @@ export default function AdminMaterialsScreen({ navigation }) {
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.fsScrollContent} showsVerticalScrollIndicator={false}>
               
-              <ScaleBtn activeScale={0.98} onPress={handlePickFile} disabled={!!editingMaterial}>
-                <View style={[styles.uploadCard, !!editingMaterial && { opacity: 0.5 }]}>
+              <ScaleBtn activeScale={0.98} onPress={handlePickFile}>
+                <View style={styles.uploadCard}>
                   {file ? (
                     <View style={{ alignItems: 'center' }}>
-                      <Ionicons name="document-text" size={40} color="#10B981" />
-                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#047857', marginTop: 10 }}>{file.name}</Text>
+                      <Ionicons name="document-text" size={40} color={MaterialPalette.teal} />
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: MaterialPalette.tealDark, marginTop: 10 }}>{file.name}</Text>
                     </View>
                   ) : (
                     <View style={{ alignItems: 'center' }}>
-                      <Ionicons name="cloud-upload" size={40} color="#10B981" />
-                      <Text style={{ fontSize: 18, fontWeight: '700', color: '#047857', marginTop: 10 }}>Select File</Text>
+                      <Ionicons name="cloud-upload" size={40} color={MaterialPalette.teal} />
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: MaterialPalette.tealDark, marginTop: 10 }}>
+                        {editingMaterial ? 'Select Replacement File' : 'Select File'}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -453,11 +515,11 @@ export default function AdminMaterialsScreen({ navigation }) {
               </View>
 
               <ScaleBtn activeScale={0.96} onPress={handleUploadOrUpdate} disabled={uploading}>
-                <LinearGradient colors={['#10B981', '#059669']} style={styles.fsSubmitBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <LinearGradient colors={[MaterialPalette.teal, MaterialPalette.tealDark]} style={styles.fsSubmitBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   {uploading ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={styles.fsSubmitBtnText}>{editingMaterial ? 'Update Direct' : 'Upload Direct'}</Text>
+                    <Text style={styles.fsSubmitBtnText}>{editingMaterial && file ? 'Replacing File...' : editingMaterial ? 'Update Direct' : 'Upload Direct'}</Text>
                   )}
                 </LinearGradient>
               </ScaleBtn>
@@ -479,7 +541,7 @@ const styles = StyleSheet.create({
   headerSubtitleModern: { fontSize: 14, fontWeight: '500', color: '#9CA3AF' },
 
   uploadBtnWrapModern: { marginHorizontal: 24, marginTop: -20, marginBottom: 20, zIndex: 11 },
-  uploadBtnModern: { height: 56, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  uploadBtnModern: { height: 56, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: MaterialPalette.teal, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
   uploadIconCircleModern: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   uploadBtnTextModern: { color: '#FFF', fontSize: 16, fontWeight: '700' },
 
@@ -489,7 +551,7 @@ const styles = StyleSheet.create({
   
   chipScrollModern: { paddingBottom: 10 },
   chipModernHeader: { height: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
-  chipModernHeaderActive: { backgroundColor: '#1F2937', borderColor: '#1F2937' },
+  chipModernHeaderActive: { backgroundColor: MaterialPalette.gold, borderColor: MaterialPalette.gold },
   chipTextModernHeader: { fontSize: 13, fontWeight: '600' },
 
   contentContainer: { flex: 1 },
@@ -523,7 +585,7 @@ const styles = StyleSheet.create({
   fsHeaderTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
   fsHeaderSubtitle: { fontSize: 14, color: '#9CA3AF' },
   fsScrollContent: { padding: 24, paddingBottom: 80 },
-  uploadCard: { backgroundColor: '#F0FDF4', borderRadius: 16, borderWidth: 2, borderColor: '#34D399', borderStyle: 'dashed', padding: 24, alignItems: 'center', marginBottom: 24 },
+  uploadCard: { backgroundColor: '#F0FDF4', borderRadius: 16, borderWidth: 2, borderColor: MaterialPalette.teal, borderStyle: 'dashed', padding: 24, alignItems: 'center', marginBottom: 24 },
   formSection: { marginBottom: 24 },
   fsLabel: { fontSize: 14, fontWeight: '600', color: '#4B5563', marginBottom: 8, marginLeft: 4 },
   fsInputWrap: { height: 50, borderRadius: 12, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 16, paddingHorizontal: 16, justifyContent: 'center' },
@@ -532,7 +594,7 @@ const styles = StyleSheet.create({
   segmentBtn: { flex: 1, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   segmentBtnActive: { backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   segmentText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
-  segmentTextActive: { color: '#059669' },
+  segmentTextActive: { color: MaterialPalette.tealDark },
   fsSubmitBtn: { height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   fsSubmitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
 });

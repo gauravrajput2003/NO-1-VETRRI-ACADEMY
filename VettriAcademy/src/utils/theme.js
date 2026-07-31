@@ -55,6 +55,19 @@ export const Shadows = {
   heavy: makeShadow({ y: 6, blur: 16, opacity: 0.2, elevation: 8 }),
 };
 
+export const MaterialPalette = {
+  primaryPink: '#EC4899',
+  primaryPinkLight: '#F472B6',
+  teal: '#14B8A6',
+  tealDark: '#0D9488',
+  gold: '#F59E0B',
+  goldLight: '#FBBF24',
+  red: '#EF4444',
+  redLight: '#FEE2E2',
+  tealLight: '#CCFBF1',
+  goldSoft: '#FEF3C7',
+};
+
 // ─── Theme Objects ─────────────────────────────────────────────────────────────
 export const lightTheme = {
   dark: false,

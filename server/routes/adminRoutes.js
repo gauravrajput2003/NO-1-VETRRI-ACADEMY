@@ -20,6 +20,7 @@ const {
   recordFeePayment,
   getAdminMaterials,
   getPendingMaterials,
+  getAdminMaterialPreviewUrl,
   approveMaterial,
   rejectMaterial,
   directEditMaterial,
@@ -105,9 +106,10 @@ router.put('/admissions/:id', updateAdmission);
 // Materials & Library Access
 router.get('/materials', getAdminMaterials);
 router.get('/materials/pending', getPendingMaterials);
+router.get('/materials/:id/preview', getAdminMaterialPreviewUrl);
 router.post('/materials/:id/approve', approveMaterial);
 router.post('/materials/:id/reject', rejectMaterial);
-router.put('/materials/:id', directEditMaterial);
+router.put('/materials/:id', uploadStudyMaterial.single('file'), directEditMaterial);
 router.delete('/materials/:id', directDeleteMaterial);
 router.put('/materials/:id/lock', adminToggleMaterialLock);
 router.post('/materials', uploadStudyMaterial.single('file'), uploadMaterial); // use the unified uploadHandler

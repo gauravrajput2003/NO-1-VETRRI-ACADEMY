@@ -12,7 +12,7 @@ import {
   createAnnouncementAPI, deleteAnnouncementAPI,
   getLiveMonitorAPI,
   getAdminMaterialsAPI, deleteAdminMaterialAPI, toggleAdminMaterialLockAPI,
-  getPendingMaterialsAPI, approveMaterialAPI, rejectMaterialAPI,
+  getPendingMaterialsAPI, getAdminMaterialPreviewAPI, approveMaterialAPI, rejectMaterialAPI,
   directEditMaterialAPI, uploadAdminMaterialAPI,
   getLibraryAccessListAPI, approveLibraryAccessAPI, revokeLibraryAccessAPI,
   getAdminFoldersAPI,
@@ -194,6 +194,25 @@ export const fetchPendingMaterials = createAsyncThunk('admin/fetchPendingMateria
   catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
 });
 
+export const fetchAdminMaterialPreview = createAsyncThunk('admin/fetchMaterialPreview', async ({ id, pendingReplacement = false }, { rejectWithValue }) => {
+  try {
+    const { data } = await getAdminMaterialPreviewAPI(id, pendingReplacement);
+    return {
+      id,
+      url: data.url,
+      type: data.type,
+      mimeType: data.mimeType,
+      storageType: data.storageType,
+      resourceType: data.resourceType,
+      extension: data.extension,
+      filename: data.filename,
+      isPendingReplacement: data.isPendingReplacement,
+    };
+  } catch (e) {
+    return rejectWithValue(e.response?.data?.message || 'Failed to load preview');
+  }
+});
+
 export const approvePendingMaterial = createAsyncThunk('admin/approvePendingMaterial', async (id, { rejectWithValue }) => {
   try { await approveMaterialAPI(id); return id; }
   catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
@@ -256,9 +275,11 @@ const adminSlice = createSlice({
     liveMonitor: null,
     materials: [],
     pendingMaterials: [],
+    currentPreviewUrl: null,
     libraryAccessList: [],
     folders: [],
     loading: false,
+    previewLoading: false,
     error: null,
   },
   reducers: {
@@ -325,6 +346,9 @@ const adminSlice = createSlice({
         state.materials = state.materials.map(m => m._id === a.payload._id ? a.payload : m); 
       })
       .addCase(fetchPendingMaterials.fulfilled, (state, a) => { state.pendingMaterials = a.payload; })
+      .addCase(fetchAdminMaterialPreview.pending, (state) => { state.previewLoading = true; })
+      .addCase(fetchAdminMaterialPreview.fulfilled, (state, a) => { state.currentPreviewUrl = a.payload; state.previewLoading = false; })
+      .addCase(fetchAdminMaterialPreview.rejected, (state, a) => { state.error = a.payload; state.previewLoading = false; })
       .addCase(approvePendingMaterial.fulfilled, (state, a) => { state.pendingMaterials = state.pendingMaterials.filter(m => m._id !== a.payload); })
       .addCase(rejectPendingMaterial.fulfilled, (state, a) => { state.pendingMaterials = state.pendingMaterials.filter(m => m._id !== a.payload); })
       .addCase(editAdminMaterial.fulfilled, (state, a) => { state.materials = state.materials.map((m) => m._id === a.payload?._id ? a.payload : m); })

@@ -14,6 +14,9 @@ const ASSETS = {
   newNotice: require('../../../assets/new_notice.png'),
   newSchedular: require('../../../assets/new_schedular.png'),
   newTraining: require('../../../assets/new_training.png'),
+   materialUpload: require('../../../assets/materialupload_new.png'),
+  pendingApproval: require('../../../assets/pendingapproval_new.png'),
+  libraryAccess: require('../../../assets/libraryaccess_new.png'),
 };
 
 // Prefetch assets for faster rendering
@@ -218,9 +221,9 @@ export default function AdminDashboard({ navigation }) {
     { id: '5', icon: ASSETS.newSalary, label: 'Salary', subtitle: 'Employee Payroll', screen: 'SalaryManagement', gradient: ['#F59E0B', '#FB923C'] },
     { id: '6', icon: ASSETS.newSchedular, label: 'Scheduler', subtitle: 'Manage Classes', screen: 'ClassScheduler', gradient: ['#0F766E', '#06B6D4'] },
     { id: '7', icon: ASSETS.newTraining, label: 'Training', subtitle: 'Video Library', screen: 'AdminTrainingVideos', gradient: ['#7C3AED', '#EC4899'] },
-    { id: '8', iconName: 'folder-open', label: 'Materials', subtitle: 'Manage Study Materials', screen: 'AdminMaterials', gradient: ['#3B82F6', '#60A5FA'] },
-    { id: '9', iconName: 'checkmark-done-circle', label: 'Approvals', subtitle: 'Review Pending Requests', screen: 'AdminPendingApprovals', gradient: ['#F59E0B', '#FBBF24'], badge: s.pendingMaterialsCount || 0 },
-    { id: '10', iconName: 'key', label: 'Library Access', subtitle: 'Approve Teacher Access', screen: 'LibraryAccess', gradient: ['#8B5CF6', '#A78BFA'] },
+    { id: '8', icon: ASSETS.materialUpload, label: 'Materials', subtitle: 'Manage Study Materials', screen: 'AdminMaterials', gradient: ['#3B82F6', '#60A5FA'] },
+    { id: '9', icon: ASSETS.pendingApproval, label: 'Approvals', subtitle: 'Review Pending Requests', screen: 'AdminPendingApprovals', gradient: ['#F59E0B', '#FBBF24'], badge: s.pendingMaterialsCount || 0 },
+    { id: '10', icon: ASSETS.libraryAccess, label: 'Library Access', subtitle: 'Approve Teacher Access', screen: 'LibraryAccess', gradient: ['#8B5CF6', '#A78BFA'] },
   ];
 
   const greetingTime = () => {
