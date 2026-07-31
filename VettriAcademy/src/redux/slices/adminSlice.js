@@ -12,6 +12,10 @@ import {
   createAnnouncementAPI, deleteAnnouncementAPI,
   getLiveMonitorAPI,
   getAdminMaterialsAPI, deleteAdminMaterialAPI, toggleAdminMaterialLockAPI,
+  getPendingMaterialsAPI, approveMaterialAPI, rejectMaterialAPI,
+  directEditMaterialAPI, uploadAdminMaterialAPI,
+  getLibraryAccessListAPI, approveLibraryAccessAPI, revokeLibraryAccessAPI,
+  getAdminFoldersAPI,
   approveAdminLeaveCompensationAPI,
 } from '../../services/api';
 
@@ -185,6 +189,51 @@ export const toggleAdminMaterialLock = createAsyncThunk('admin/toggleMaterialLoc
   catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
 });
 
+export const fetchPendingMaterials = createAsyncThunk('admin/fetchPendingMaterials', async (_, { rejectWithValue }) => {
+  try { const { data } = await getPendingMaterialsAPI(); return data.materials; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const approvePendingMaterial = createAsyncThunk('admin/approvePendingMaterial', async (id, { rejectWithValue }) => {
+  try { await approveMaterialAPI(id); return id; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const rejectPendingMaterial = createAsyncThunk('admin/rejectPendingMaterial', async ({ id, reviewNotes }, { rejectWithValue }) => {
+  try { await rejectMaterialAPI(id, reviewNotes); return id; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const editAdminMaterial = createAsyncThunk('admin/editAdminMaterial', async ({ id, data }, { rejectWithValue }) => {
+  try { const response = await directEditMaterialAPI(id, data); return response.data.material; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const uploadAdminMaterial = createAsyncThunk('admin/uploadAdminMaterial', async (formData, { rejectWithValue }) => {
+  try { const { data } = await uploadAdminMaterialAPI(formData); return data.material; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const fetchLibraryAccess = createAsyncThunk('admin/fetchLibraryAccess', async (_, { rejectWithValue }) => {
+  try { const { data } = await getLibraryAccessListAPI(); return data.libraryAccessList; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const approveAccess = createAsyncThunk('admin/approveAccess', async (teacherId, { rejectWithValue }) => {
+  try { const { data } = await approveLibraryAccessAPI(teacherId); return data.access; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const revokeAccess = createAsyncThunk('admin/revokeAccess', async ({ teacherId, notes }, { rejectWithValue }) => {
+  try { const { data } = await revokeLibraryAccessAPI(teacherId, notes); return data.access; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
+export const fetchFolders = createAsyncThunk('admin/fetchFolders', async (_, { rejectWithValue }) => {
+  try { const { data } = await getAdminFoldersAPI(); return data.folders; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+});
+
 // ─── Slice ─────────────────────────────────────────────────────────────────────
 
 const adminSlice = createSlice({
@@ -206,6 +255,9 @@ const adminSlice = createSlice({
     bestTeacher: null,
     liveMonitor: null,
     materials: [],
+    pendingMaterials: [],
+    libraryAccessList: [],
+    folders: [],
     loading: false,
     error: null,
   },
@@ -271,7 +323,22 @@ const adminSlice = createSlice({
       .addCase(deleteAdminMaterial.fulfilled, (state, a) => { state.materials = state.materials.filter(m => m._id !== a.payload); })
       .addCase(toggleAdminMaterialLock.fulfilled, (state, a) => { 
         state.materials = state.materials.map(m => m._id === a.payload._id ? a.payload : m); 
-      });
+      })
+      .addCase(fetchPendingMaterials.fulfilled, (state, a) => { state.pendingMaterials = a.payload; })
+      .addCase(approvePendingMaterial.fulfilled, (state, a) => { state.pendingMaterials = state.pendingMaterials.filter(m => m._id !== a.payload); })
+      .addCase(rejectPendingMaterial.fulfilled, (state, a) => { state.pendingMaterials = state.pendingMaterials.filter(m => m._id !== a.payload); })
+      .addCase(editAdminMaterial.fulfilled, (state, a) => { state.materials = state.materials.map((m) => m._id === a.payload?._id ? a.payload : m); })
+      .addCase(uploadAdminMaterial.fulfilled, (state, a) => { if(a.payload) state.materials.unshift(a.payload); })
+      .addCase(fetchLibraryAccess.fulfilled, (state, a) => { state.libraryAccessList = a.payload; })
+      .addCase(approveAccess.fulfilled, (state, a) => { 
+         const idx = state.libraryAccessList.findIndex(t => t._id === a.payload.teacher);
+         if(idx !== -1) state.libraryAccessList[idx].libraryAccess = a.payload;
+      })
+      .addCase(revokeAccess.fulfilled, (state, a) => { 
+         const idx = state.libraryAccessList.findIndex(t => t._id === a.payload.teacher);
+         if(idx !== -1) state.libraryAccessList[idx].libraryAccess = a.payload;
+      })
+      .addCase(fetchFolders.fulfilled, (state, a) => { state.folders = a.payload; });
   },
 });
 

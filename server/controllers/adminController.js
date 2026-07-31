@@ -311,11 +311,12 @@ const deleteStudent = async (req, res) => {
 // @access  Admin
 const getAdminStats = async (req, res) => {
   try {
-    const [totalStudents, totalTeachers, pendingEnquiries, pendingLeaves] = await Promise.all([
+    const [totalStudents, totalTeachers, pendingEnquiries, pendingLeaves, pendingMaterialsCount] = await Promise.all([
       User.countDocuments({ role: 'student', isActive: true }),
       User.countDocuments({ role: 'teacher', isActive: true }),
       require('../models/Enquiry').countDocuments({ status: 'new' }),
       require('../models/LeaveApplication').countDocuments({ status: 'pending' }),
+      require('../models/StudyMaterial').countDocuments({ approvalStatus: { $in: ['pending_new', 'pending_edit', 'pending_delete'] } }),
     ]);
 
     // Revenue this month
@@ -333,6 +334,7 @@ const getAdminStats = async (req, res) => {
         totalTeachers,
         pendingEnquiries,
         pendingLeaves,
+        pendingMaterialsCount,
         monthRevenue: monthRevenue[0]?.total || 0,
       },
     });

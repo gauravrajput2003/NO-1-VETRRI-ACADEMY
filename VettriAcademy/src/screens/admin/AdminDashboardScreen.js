@@ -13,7 +13,9 @@ import {
   StatusBar
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { fetchPendingMaterials } from '../../redux/slices/adminSlice';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
@@ -137,6 +139,8 @@ const TouchableOpacity = (props) => {
 export function AdminDashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const dispatch = useDispatch();
+  const { pendingMaterials } = useSelector(s => s.admin);
   
   const heroHeight = width < 380 ? 250 : width < 420 ? 240 : 230;
   const adminName = 'Super Admin';
@@ -170,11 +174,15 @@ export function AdminDashboardScreen({ navigation }) {
     { title: 'Notices', icon: ASSETS.newNotice, gradient: ['#EF4444', '#FCA5A5'] },
     { title: 'Class Scheduler', icon: ASSETS.newSchedular, gradient: ['#14C8C4', '#6EE7E5'] },
     { title: 'Training Videos', icon: ASSETS.newTraining, gradient: ['#8B5CF6', '#C4B5FD'] },
+    { title: 'Materials', icon: ASSETS.newHomework, gradient: ['#EC4899', '#F9A8D4'], route: 'AdminMaterials' },
+    { title: 'Pending Approvals', icon: ASSETS.newTimeTable, gradient: ['#F97316', '#FDBA74'], route: 'AdminPendingApprovals' },
+    { title: 'Library Access', icon: ASSETS.newStudent, gradient: ['#10B981', '#6EE7B7'], route: 'LibraryAccess' },
   ]);
 
   const fetchDashboardData = async () => {
     try {
       console.log('Fetching admin dashboard data...');
+      dispatch(fetchPendingMaterials());
     } catch (error) {
       console.log('Error fetching dashboard:', error);
     }
@@ -297,10 +305,17 @@ export function AdminDashboardScreen({ navigation }) {
           <View style={st.mgmtGrid}>
             {managementCards.map((m, idx) => (
               <View key={idx} style={st.mgmtCardWrap2}>
-                <ScalePressable activeScale={0.95} onPress={() => navigation.navigate('Users', { tab: m.title })}>
+                <ScalePressable activeScale={0.95} onPress={() => m.route ? navigation.navigate(m.route) : navigation.navigate('Users', { tab: m.title })}>
                   <LinearGradient colors={m.gradient} style={st.mgmtCard2}>
                     <View style={st.statGlass} />
                     <Image source={m.icon} style={st.mgmtImage2} resizeMode="contain" />
+                    
+                    {m.title === 'Pending Approvals' && pendingMaterials?.length > 0 && (
+                      <View style={{ position: 'absolute', top: 12, right: 12, backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>{pendingMaterials.length}</Text>
+                      </View>
+                    )}
+
                     <View style={st.mgmtTitleRow}>
                       <Text style={st.mgmtTitle2}>{m.title}</Text>
                       <View style={st.mgmtArrowWrap}>

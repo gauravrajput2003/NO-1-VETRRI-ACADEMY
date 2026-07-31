@@ -303,11 +303,20 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
                   <View style={styles.metaRow}>
                     <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
-                    {item.lockedForAll ? (
-                      <View style={[styles.statusPill, { backgroundColor: '#FFF7ED' }]}><Text style={[styles.statusPillText, { color: '#EA580C' }]}>🔒 Locked</Text></View>
-                    ) : (
-                      <View style={[styles.statusPill, { backgroundColor: '#F0FDF4' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>🔓 Unlocked</Text></View>
-                    )}
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {item.approvalStatus === 'pending_new' || item.approvalStatus === 'pending_edit' || item.approvalStatus === 'pending_delete' ? (
+                        <View style={[styles.statusPill, { backgroundColor: '#FEF3C7' }]}><Text style={[styles.statusPillText, { color: '#D97706' }]}>⏳ Pending</Text></View>
+                      ) : item.approvalStatus === 'rejected' ? (
+                        <View style={[styles.statusPill, { backgroundColor: '#FEE2E2' }]}><Text style={[styles.statusPillText, { color: '#DC2626' }]}>❌ Rejected</Text></View>
+                      ) : (
+                        <View style={[styles.statusPill, { backgroundColor: '#DCFCE7' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>✅ Approved</Text></View>
+                      )}
+                      {item.lockedForAll ? (
+                        <View style={[styles.statusPill, { backgroundColor: '#FFF7ED' }]}><Text style={[styles.statusPillText, { color: '#EA580C' }]}>🔒 Locked</Text></View>
+                      ) : (
+                        <View style={[styles.statusPill, { backgroundColor: '#F0FDF4' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>🔓 Unlocked</Text></View>
+                      )}
+                    </View>
                   </View>
                 </View>
 

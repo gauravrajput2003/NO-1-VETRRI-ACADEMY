@@ -545,11 +545,37 @@ export const approveAdminLeaveCompensationAPI = (id) =>
 export const getAdminMaterialsAPI = () =>
   api.get('/admin/materials');
 
+export const getPendingMaterialsAPI = () =>
+  api.get('/admin/materials/pending');
+
+export const approveMaterialAPI = (id) =>
+  api.post(`/admin/materials/${id}/approve`);
+
+export const rejectMaterialAPI = (id, reviewNotes) =>
+  api.post(`/admin/materials/${id}/reject`, { reviewNotes });
+
+export const directEditMaterialAPI = (id, data) =>
+  api.put(`/admin/materials/${id}`, data);
+
+export const uploadAdminMaterialAPI = (formData) =>
+  api.post('/admin/materials', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  });
+
 export const deleteAdminMaterialAPI = (id) =>
   api.delete(`/admin/materials/${id}`);
 
 export const toggleAdminMaterialLockAPI = (id, lockedForAll) =>
   api.put(`/admin/materials/${id}/lock`, { lockedForAll });
+
+export const getAdminFoldersAPI = () =>
+  api.get('/admin/folders');
+
+// Library Access (Admin)
+export const getLibraryAccessListAPI = () => api.get('/admin/library-access');
+export const approveLibraryAccessAPI = (teacherId) => api.post(`/admin/library-access/${teacherId}/approve`);
+export const revokeLibraryAccessAPI = (teacherId) => api.post(`/admin/library-access/${teacherId}/revoke`);
 
 // Best teacher / grading
 export const getBestTeacherAPI = () =>

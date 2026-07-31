@@ -18,6 +18,8 @@ import LiveMonitorScreen from '../screens/admin/LiveMonitorScreen';
 import ClassSchedulerScreen from '../screens/admin/ClassSchedulerScreen';
 import EnquiriesScreen from '../screens/admin/EnquiriesScreen';
 import AdminMaterialsScreen from '../screens/admin/AdminMaterialsScreen';
+import AdminPendingApprovalsScreen from '../screens/admin/AdminPendingApprovalsScreen';
+import LibraryAccessScreen from '../screens/admin/LibraryAccessScreen';
 import AdminTrainingVideosScreen from '../screens/admin/AdminTrainingVideosScreen';
 import StudentMarksScreen from '../screens/admin/StudentMarksScreen';
 import MonthlyTopRankersScreen from '../screens/admin/MonthlyTopRankersScreen';
@@ -57,7 +59,9 @@ function HomeStack() {
       <Stack.Screen name="LiveMonitor" component={LiveMonitorScreen} options={{ headerShown: true, title: 'Live Monitor' }} />
       <Stack.Screen name="ClassScheduler" component={ClassSchedulerScreen} options={{ headerShown: true, title: 'Scheduler' }} />
       <Stack.Screen name="Enquiries" component={EnquiriesScreen} options={{ headerShown: true, title: 'Enquiries' }} />
-      <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} options={{ headerShown: true, title: 'Manage Materials' }} />
+      <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminPendingApprovals" component={AdminPendingApprovalsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LibraryAccess" component={LibraryAccessScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AdminTrainingVideos" component={AdminTrainingVideosScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StudentMarks" component={StudentMarksScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MonthlyTopRankers" component={MonthlyTopRankersScreen} options={{ headerShown: false }} />

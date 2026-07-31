@@ -96,7 +96,7 @@ function ActionButton({ icon, badge, onPress, isGold = false, delay = 0 }) {
   );
 }
 
-function PremiumCard({ title, subtitle, value, icon, gradient, onPress, width, height = 160, footerText = "Explore Module", delay = 0 }) {
+function PremiumCard({ title, subtitle, value, icon, iconName, gradient, onPress, width, height = 160, footerText = "Explore Module", delay = 0, badge }) {
   const scale = useRef(new Animated.Value(1)).current;
   const rotation = useRef(new Animated.Value(0)).current;
 
@@ -140,7 +140,16 @@ function PremiumCard({ title, subtitle, value, icon, gradient, onPress, width, h
               {value !== undefined && <Text style={styles.cardValue}>{value}</Text>}
             </View>
             
-            {icon && <Image source={icon} style={[styles.cardImage, (!title && !subtitle && value === undefined) && styles.cardImageFull]} contentFit="contain" transition={200} cachePolicy="memory-disk" />}
+            {icon 
+              ? <Image source={icon} style={[styles.cardImage, (!title && !subtitle && value === undefined) && styles.cardImageFull]} contentFit="contain" transition={200} cachePolicy="memory-disk" />
+              : iconName && <Ionicons name={iconName} size={48} color="rgba(255,255,255,0.9)" style={styles.cardIconFallback} />
+            }
+
+            {badge > 0 && (
+              <View style={styles.cardBadge}>
+                <Text style={styles.cardBadgeText}>{badge}</Text>
+              </View>
+            )}
             
             <View style={styles.cardFooter}>
               <Text style={styles.cardFooterText}>{footerText}</Text>
@@ -209,6 +218,9 @@ export default function AdminDashboard({ navigation }) {
     { id: '5', icon: ASSETS.newSalary, label: 'Salary', subtitle: 'Employee Payroll', screen: 'SalaryManagement', gradient: ['#F59E0B', '#FB923C'] },
     { id: '6', icon: ASSETS.newSchedular, label: 'Scheduler', subtitle: 'Manage Classes', screen: 'ClassScheduler', gradient: ['#0F766E', '#06B6D4'] },
     { id: '7', icon: ASSETS.newTraining, label: 'Training', subtitle: 'Video Library', screen: 'AdminTrainingVideos', gradient: ['#7C3AED', '#EC4899'] },
+    { id: '8', iconName: 'folder-open', label: 'Materials', subtitle: 'Manage Study Materials', screen: 'AdminMaterials', gradient: ['#3B82F6', '#60A5FA'] },
+    { id: '9', iconName: 'checkmark-done-circle', label: 'Approvals', subtitle: 'Review Pending Requests', screen: 'AdminPendingApprovals', gradient: ['#F59E0B', '#FBBF24'], badge: s.pendingMaterialsCount || 0 },
+    { id: '10', iconName: 'key', label: 'Library Access', subtitle: 'Approve Teacher Access', screen: 'LibraryAccess', gradient: ['#8B5CF6', '#A78BFA'] },
   ];
 
   const greetingTime = () => {
@@ -293,6 +305,8 @@ export default function AdminDashboard({ navigation }) {
                 width={175}
                 height={160}
                 icon={item.icon}
+                iconName={item.iconName}
+                badge={item.badge}
                 gradient={item.gradient}
                 onPress={() => navigation.navigate(item.screen)}
                 delay={700 + (index * 100)}
@@ -387,6 +401,18 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 24, color: '#FFF', fontWeight: '900', marginTop: 4, fontFamily: 'Inter' },
   cardImage: { position: 'absolute', width: '65%', height: '65%', bottom: '20%', right: -10, zIndex: 1, opacity: 0.95 },
   cardImageFull: { width: '85%', height: '80%', bottom: '20%', right: '7.5%', left: '7.5%' },
+  cardIconFallback: { position: 'absolute', bottom: '25%', right: 10, zIndex: 1, opacity: 0.6 },
+  
+  cardBadge: {
+    position: 'absolute', top: 12, right: 12,
+    backgroundColor: '#FF4F8B', borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#11C5C6',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
+    zIndex: 5,
+  },
+  cardBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
   
   cardFooter: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: '22%',
