@@ -189,19 +189,30 @@ const isWeb = Platform.OS === 'web';
 export const normalizeMaterialFileUrl = (url, options = {}) => {
   if (!url) return '';
 
-  const { resourceType, publicId } = options;
+  const {
+    resourceType,
+    publicId,
+  } = options;
+
   let normalized = String(url).trim();
 
+  // Remove accidental markdown wrapping
   const markdownLink = normalized.match(/\((https?:\/\/[^)\s]+)\)/);
   if (markdownLink?.[1]) {
     normalized = markdownLink[1];
   }
 
-  const allCloudinaryUrls = normalized.match(/https?:\/\/res\.cloudinary\.com\/[^\s)]+/g);
+  // If multiple Cloudinary URLs accidentally exist,
+  // use the last complete URL.
+  const allCloudinaryUrls = normalized.match(
+    /https?:\/\/res\.cloudinary\.com\/[^\s)]+/g
+  );
+
   if (allCloudinaryUrls?.length) {
     normalized = allCloudinaryUrls[allCloudinaryUrls.length - 1];
   }
 
+  // Always use HTTPS
   if (normalized.startsWith('http://')) {
     normalized = `https://${normalized.slice(7)}`;
   }
@@ -210,31 +221,45 @@ export const normalizeMaterialFileUrl = (url, options = {}) => {
     return normalized;
   }
 
-  const cloudNameMatch = normalized.match(/https:\/\/res\.cloudinary\.com\/([^/]+)/);
+  const cloudNameMatch = normalized.match(
+    /https:\/\/res\.cloudinary\.com\/([^/]+)/
+  );
+
   const cloudName = cloudNameMatch?.[1];
+
+  // For PDFs/documents Cloudinary should normally be raw.
   const materialResourceType = resourceType || 'raw';
 
+  /*
+   * If publicId is available, reconstruct the URL.
+   *
+   * This is especially important for announcement PDFs because
+   * those uploads can arrive with /auto/upload/ or another
+   * resource type.
+   */
   if (cloudName && publicId) {
-    const currentTypeMatch = normalized.match(/res\.cloudinary\.com\/[^/]+\/([^/]+)\/upload\//);
-    const currentType = currentTypeMatch?.[1];
-    const looksBroken = !currentType || currentType !== materialResourceType || normalized.includes('](');
+    const safePublicId = String(publicId)
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/');
 
-    if (looksBroken) {
-      const safePublicId = String(publicId).split('/').map(encodeURIComponent).join('/');
-      return `https://res.cloudinary.com/${cloudName}/${materialResourceType}/upload/${safePublicId}`;
-    }
+    return `https://res.cloudinary.com/${cloudName}/${materialResourceType}/upload/${safePublicId}`;
   }
 
+  /*
+   * No publicId available.
+   * Correct an incorrect Cloudinary resource path.
+   */
   if (resourceType) {
     normalized = normalized
       .replace('/image/upload/', `/${resourceType}/upload/`)
       .replace('/video/upload/', `/${resourceType}/upload/`)
-      .replace('/raw/upload/', `/${resourceType}/upload/`);
+      .replace('/raw/upload/', `/${resourceType}/upload/`)
+      .replace('/auto/upload/', `/${resourceType}/upload/`);
   }
 
   return normalized;
 };
-
 /**
  * WEB: Trigger a browser download using Linking.openURL.
  * This preserves Cloudinary's Content-Disposition headers (fl_attachment)
@@ -522,12 +547,12 @@ export const getPreviewStrategy = (fileType, url) => {
   switch (fileType) {
     case 'image':
       return { strategy: 'image', canPreviewInApp: true };
-    case 'pdf':
-      return {
-        strategy: 'pdf-webview',
-        viewerUrl: buildGoogleDocsViewerUrl(url),
-        canPreviewInApp: true,
-      };
+   case 'pdf':
+  return {
+    strategy: 'pdf-native',
+    viewerUrl: url,
+    canPreviewInApp: true,
+  };
     case 'video':
       return { strategy: 'video-webview', canPreviewInApp: true };
     case 'text':

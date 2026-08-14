@@ -41,6 +41,8 @@ const TeacherPermissions = require('./models/TeacherPermissions');
 
 // ─── Express App Setup ─────────────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1);
+
 const server = http.createServer(app);
 
 // ─── CORS Configuration ────────────────────────────────────────────────────────

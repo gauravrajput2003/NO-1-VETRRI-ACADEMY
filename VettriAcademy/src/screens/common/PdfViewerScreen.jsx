@@ -100,8 +100,12 @@ const getPdfHtml = (pdfUrl, isDarkReading) => `
     // Load PDF
     async function loadPdf() {
       try {
-        pdfDoc = await pdfjsLib.getDocument('${pdfUrl}').promise;
-        totalPages = pdfDoc.numPages;
+const PDF_URL = ${JSON.stringify(pdfUrl)};
+
+pdfDoc = await pdfjsLib.getDocument({
+  url: PDF_URL,
+  withCredentials: false,
+}).promise;        totalPages = pdfDoc.numPages;
         loading.style.display = 'none';
         sendToRN('loaded', { totalPages });
 
@@ -506,6 +510,8 @@ export default function PdfViewerScreen({ navigation, route }) {
           mixedContentMode="compatibility"
           allowFileAccess
           originWhitelist={['*']}
+          allowFileAccessFromFileURLs
+allowUniversalAccessFromFileURLs
           onError={() => setHasError(true)}
           startInLoadingState={false}
           showsVerticalScrollIndicator={false}

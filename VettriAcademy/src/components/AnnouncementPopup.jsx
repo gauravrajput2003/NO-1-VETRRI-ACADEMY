@@ -235,11 +235,12 @@ function DocumentAnnouncement({ document }) {
   };
 
   return (
-    <TouchableOpacity
-      style={styles.documentBox}
-      onPress={openDocument}
-      activeOpacity={0.8}
-    >
+ <TouchableOpacity
+  key={`doc-${idx}`}
+  style={st.documentRow}
+  onPress={() => openDocument(d)}
+  activeOpacity={0.8}
+>
 
       <View style={styles.documentIcon}>
         <Text style={styles.documentIconText}>
