@@ -224,6 +224,8 @@ export default function AdminDashboard({ navigation }) {
     { id: '8', icon: ASSETS.materialUpload, label: 'Materials', subtitle: 'Manage Study Materials', screen: 'AdminMaterials', gradient: ['#3B82F6', '#60A5FA'] },
     { id: '9', icon: ASSETS.pendingApproval, label: 'Approvals', subtitle: 'Review Pending Requests', screen: 'AdminPendingApprovals', gradient: ['#F59E0B', '#FBBF24'], badge: s.pendingMaterialsCount || 0 },
     { id: '10', icon: ASSETS.libraryAccess, label: 'Library Access', subtitle: 'Approve Teacher Access', screen: 'LibraryAccess', gradient: ['#8B5CF6', '#A78BFA'] },
+      { id: '11', iconName: 'cloud-download-outline', label: 'Downloads', subtitle: 'NCERT Books & Materials', screen: 'Downloads', gradient: ['#16D6D1', '#0A8C89'] },
+
   ];
 
   const greetingTime = () => {

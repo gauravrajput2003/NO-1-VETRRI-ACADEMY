@@ -29,6 +29,7 @@ import { formatScheduledTime } from '../../utils/formatters';
 import { Sparkle, PaperPlane, DottedPath } from '../student/BadgeIcons';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useCompensationNotifications } from '../../hooks/useCompensationNotifications';
+import AnnouncementCard from '../../components/announcements/AnnouncementCard';
 
 
 
@@ -644,15 +645,7 @@ export default function TeacherDashboard({ navigation }) {
         <View style={st.sectionCard}>
           <Text style={st.sectionTitle}>Announcements</Text>
           {announcements.map((a) => (
-            <View key={a._id} style={st.announceCard}>
-              <View style={st.announceIcon}>
-                <Ionicons name="megaphone" size={18} color={T.sky} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={st.announceTitle} numberOfLines={1}>{a.title}</Text>
-                <Text style={st.announceBody} numberOfLines={2}>{a.content}</Text>
-              </View>
-            </View>
+            <AnnouncementCard key={a._id} ann={a} />
           ))}
         </View>
       )}

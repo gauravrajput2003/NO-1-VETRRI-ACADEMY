@@ -1,19 +1,3 @@
-/**
- * ─── Notification Navigation Resolver ────────────────────────────────────────
- *
- * This utility is the single source of truth for mapping a notification object
- * to a React Navigation screen and parameters.
- *
- * It is ROLE-AWARE. The same notification `type` (e.g., 'study_material') can
- * resolve to different screens depending on whether a 'student', 'teacher', or
- * 'admin' is viewing it.
- *
- * - Student: 'study_material' -> MaterialDetailScreen
- * - Admin:   'study_material' -> AdminPendingApprovalsScreen
- *
- * This prevents silent navigation failures where a screen name exists in one
- * navigator stack but not another.
- */
 
 const STUDENT_ROUTES = {
   // Core Learning

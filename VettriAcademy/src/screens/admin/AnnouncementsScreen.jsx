@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -20,6 +21,7 @@ import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import VoiceMessageSheet from '../../components/announcements/VoiceMessageSheet';
 import VideoMessageSheet from '../../components/announcements/VideoMessageSheet';
 import { formatDate } from '../../utils/formatters';
+import AnnouncementCard from '../../components/announcements/AnnouncementCard';
 
 const TouchableOpacity = (props) => {
   const { particleCount = 20, size = 'small', colors, children, ...rest } = props;
@@ -32,10 +34,7 @@ const TouchableOpacity = (props) => {
 
 // ─── Determine Cloudinary resource_type from mime ───────────────────────────
 const getResourceType = (mimeType = '') => {
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'video'; // Cloudinary uses "video" for audio
-  return 'raw';
+  return 'auto'; // Cloudinary handles resource_type automatically for video/image/raw when set to 'auto'
 };
 
 // ─── Determine our media type enum from mime ─────────────────────────────────
@@ -43,37 +42,60 @@ const getMediaType = (mimeType = '') => {
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('audio/')) return 'audio';
-  return 'image';
+  return 'document';
 };
 
+// ─── Upload a single file to Cloudinary via signed params ────────────────────
 // ─── Upload a single file to Cloudinary via signed params ────────────────────
 const uploadToCloudinary = async (file, onProgress) => {
   const { data } = await getCloudinaryUploadParamsAPI({
     folder: 'announcements',
     filename: file.name,
+    mimetype: file.mimeType,
   });
+
   if (!data.success) throw new Error(data.message || 'Failed to get upload params');
 
   const { signature, timestamp, apiKey, cloudName, publicId } = data;
   const resourceType = getResourceType(file.mimeType);
 
   const formData = new FormData();
-  formData.append('file', { uri: file.uri, name: file.name, type: file.mimeType });
+
+  formData.append('file', {
+    uri: file.uri,
+    name: file.name,
+    type: file.mimeType
+  });
+
   formData.append('api_key', apiKey);
   formData.append('timestamp', String(timestamp));
   formData.append('signature', signature);
   formData.append('folder', 'announcements');
-  if (publicId) formData.append('public_id', publicId);
+
+  if (publicId) {
+    formData.append('public_id', publicId);
+  }
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+
+    xhr.open(
+      'POST',
+      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`
+    );
+
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      if (e.lengthComputable && onProgress) {
+        onProgress(
+          Math.round((e.loaded / e.total) * 100)
+        );
+      }
     };
+
     xhr.onload = () => {
       try {
         const result = JSON.parse(xhr.responseText);
+
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve({
             url: result.secure_url,
@@ -82,27 +104,53 @@ const uploadToCloudinary = async (file, onProgress) => {
             originalFilename: file.name,
             mimeType: file.mimeType,
             fileSize: result.bytes,
-            ...(file.duration != null ? { duration: file.duration } : {}),
+
+            ...(file.duration != null
+              ? { duration: file.duration }
+              : {}),
+
             ...(file.thumbnail
               ? { thumbnail: file.thumbnail }
-              : getMediaType(file.mimeType) === 'video' && result.secure_url
+              : getMediaType(file.mimeType) === 'video' &&
+                result.secure_url
                 ? {
-                    // Cloudinary video poster frame
-                    thumbnail: result.secure_url.replace('/upload/', '/upload/so_0,w_640,h_360,c_fill/').replace(/\.(mp4|mov|webm)$/i, '.jpg'),
+                    thumbnail: result.secure_url
+                      .replace(
+                        '/upload/',
+                        '/upload/so_0,w_640,h_360,c_fill/'
+                      )
+                      .replace(
+                        /\.(mp4|mov|webm)$/i,
+                        '.jpg'
+                      ),
                   }
                 : {}),
-            ...(result.duration != null && file.duration == null
-              ? { duration: Math.round(result.duration) }
+
+            ...(result.duration != null &&
+            file.duration == null
+              ? {
+                  duration: Math.round(result.duration),
+                }
               : {}),
           });
         } else {
-          reject(new Error(result.error?.message || 'Upload failed'));
+          reject(
+            new Error(
+              result.error?.message || 'Upload failed'
+            )
+          );
         }
+        console.log('CLOUDINARY RESPONSE:', xhr.status, xhr.responseText);
       } catch (e) {
         reject(e);
       }
     };
-    xhr.onerror = () => reject(new Error('Network error during upload'));
+
+    xhr.onerror = () =>
+      reject(
+        new Error('Network error during upload')
+      );
+
     xhr.send(formData);
   });
 };
@@ -254,6 +302,26 @@ export default function AnnouncementsScreen() {
     }
   };
 
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+      if (!result.canceled && result.assets) {
+        const newFiles = result.assets.map((a) => ({
+          uri: a.uri,
+          name: a.name || `file_${Date.now()}`,
+          mimeType: a.mimeType || 'application/octet-stream',
+        }));
+        setMediaFiles((prev) => [...prev, ...newFiles]);
+      }
+    } catch (e) {
+      console.log('Document pick error', e);
+    }
+  };
+
   // ── Video Message (camera or gallery via sheet) ─────────────────────────────
   const onVideoMessageReady = (file) => {
     setMediaFiles((prev) => [...prev, file]);
@@ -344,55 +412,12 @@ export default function AnnouncementsScreen() {
         keyExtractor={(i) => i._id}
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: cardBg }]}>
-            <View style={styles.cardHeader}>
-              <View style={{ flex: 1 }}>
-                {item.isPinned && <Text style={styles.pinBadge}>📌 Pinned</Text>}
-                <Text style={[styles.cardTitle, { color: textColor }]}>{item.title}</Text>
-              </View>
-              <TouchableOpacity onPress={() => handleDelete(item._id)}>
-                <Ionicons name="trash-outline" size={20} color={Colors.error} />
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.cardContent, { color: textSec }]} numberOfLines={3}>{item.content}</Text>
-
-            {/* Media preview thumbnail (first image if any) */}
-            {item.media?.length > 0 && item.media[0].type === 'image' && (
-              <Image
-                source={{ uri: item.media[0].url }}
-                style={styles.cardMediaThumb}
-                contentFit="cover"
-              />
-            )}
-            {item.media?.some((m) => m.type !== 'image') && (
-              <View style={styles.cardMediaRow}>
-                {item.media.filter((m) => m.type === 'video').length > 0 && (
-                  <View style={styles.cardMediaPill}>
-                    <Ionicons name="videocam" size={12} color="#8B5CF6" />
-                    <Text style={[styles.cardMediaPillText, { color: '#8B5CF6' }]}>
-                      {item.media.filter((m) => m.type === 'video').length} video
-                    </Text>
-                  </View>
-                )}
-                {item.media.filter((m) => m.type === 'audio').length > 0 && (
-                  <View style={styles.cardMediaPill}>
-                    <Ionicons name="mic" size={12} color={Colors.success} />
-                    <Text style={[styles.cardMediaPillText, { color: Colors.success }]}>
-                      {item.media.filter((m) => m.type === 'audio').length} voice
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <View style={styles.cardMeta}>
-              <Text style={[styles.metaText, { color: textSec }]}>{formatDate(item.createdAt)}</Text>
-              <View style={[styles.targetBadge, { backgroundColor: Colors.info + '18' }]}>
-                <Text style={[styles.targetText, { color: Colors.info }]}>@{item.targetRole}</Text>
-              </View>
-            </View>
-            <MediaBadge media={item.media} />
-          </View>
+          <AnnouncementCard 
+            ann={item} 
+            onDelete={() => handleDelete(item._id)} 
+            showTargetBadge={true} 
+            showPinBadge={true} 
+          />
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -501,7 +526,19 @@ export default function AnnouncementsScreen() {
                   </RNTouchableOpacity>
                   <Text style={[styles.attachLabel, { color: Colors.success }]}>Voice</Text>
                 </View>
+                
+                <View style={styles.attachItem}>
+                  <RNTouchableOpacity
+                    style={[styles.attachIconBtn, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B' }]}
+                    onPress={pickDocument}
+                    disabled={isUploading}
+                  >
+                    <Ionicons name="document-text" size={22} color="#F59E0B" />
+                  </RNTouchableOpacity>
+                  <Text style={[styles.attachLabel, { color: '#F59E0B' }]}>File</Text>
+                </View>
               </View>
+
 
               {/* Selected file chips */}
               {mediaFiles.map((file, index) => (

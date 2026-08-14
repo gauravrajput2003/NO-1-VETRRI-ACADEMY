@@ -22,6 +22,7 @@ import { toggleAI } from '../../redux/slices/uiSlice';
 import { getStudentDashboardAPI, getActiveAnnouncementsAPI } from '../../services/api';
 import { Colors } from '../../utils/colors';
 import { Sparkle, SunCharacter, DottedPath, PaperPlane } from './BadgeIcons';
+import AnnouncementCard from '../../components/announcements/AnnouncementCard';
 
 const { width } = Dimensions.get('window');
 
@@ -129,134 +130,7 @@ function formatRelativeTime(value) {
   return `${days}d ago`;
 }
 
-// ─── Announcement Card with inline media ─────────────────────────────────────
-function formatMediaTime(sec) {
-  const s = Math.max(0, Math.floor(sec || 0));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, '0')}`;
-}
-
-function AnnouncementCard({ ann }) {
-  const images = (ann.media || []).filter((m) => m.type === 'image');
-  const videos = (ann.media || []).filter((m) => m.type === 'video');
-  const audios = (ann.media || []).filter((m) => m.type === 'audio');
-  const [activeVideo, setActiveVideo] = useState(null);
-
-  return (
-    <LinearGradient colors={['#FFFFFF', '#FFFBFC']} style={st.annCard}>
-      {/* Header row */}
-      <View style={st.annCardTop}>
-        <View style={st.annIconWrap}>
-          <Ionicons name="megaphone" size={22} color={D.pink} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={st.annTitle} numberOfLines={1}>{ann.title}</Text>
-          <Text style={st.annBody} numberOfLines={images.length > 0 || videos.length > 0 ? 2 : 4}>{ann.content}</Text>
-        </View>
-      </View>
-
-      {/* Images / Poster */}
-      {images.length > 0 && (
-        <>
-          <Image source={{ uri: images[0].url }} style={st.annMediaImg} contentFit="cover" />
-          {images.length > 1 && (
-            <Text style={st.annMoreImages}>+{images.length - 1} more image{images.length > 2 ? 's' : ''}</Text>
-          )}
-        </>
-      )}
-
-      {/* Video messages — thumbnail + tap to play (lazy WebView) */}
-      {videos.map((v, idx) => {
-        const playing = activeVideo === idx;
-        const thumb = v.thumbnail || v.url;
-        return (
-          <View key={`vid-${idx}`} style={st.annVideoWrap}>
-            {playing ? (
-              <WebView
-                source={{ uri: v.url }}
-                style={{ flex: 1 }}
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-                javaScriptEnabled
-                allowsFullscreenVideo
-              />
-            ) : (
-              <TouchableOpacity style={st.annVideoPoster} onPress={() => setActiveVideo(idx)} activeOpacity={0.9}>
-                <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                <View style={st.annVideoPlay}>
-                  <Ionicons name="play" size={28} color="#FFFFFF" />
-                </View>
-                {v.duration > 0 && (
-                  <View style={st.annVideoDur}>
-                    <Text style={st.annVideoDurText}>{formatMediaTime(v.duration)}</Text>
-                  </View>
-                )}
-                <Text style={st.annVideoLabel}>Video Message</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      })}
-
-      {/* Voice messages */}
-      {audios.map((a, idx) => (
-        <AudioRow key={`aud-${idx}`} audio={a} />
-      ))}
-    </LinearGradient>
-  );
-}
-
-// ─── Voice Message player (expo-audio) ───────────────────────────────────────
-function AudioRow({ audio }) {
-  const player = useAudioPlayer({ uri: audio.url });
-  const status = useAudioPlayerStatus(player);
-  const playing = Boolean(status?.playing);
-  const current = status?.currentTime || 0;
-  const duration = status?.duration || audio.duration || 0;
-  const progress = duration > 0 ? Math.min(1, current / duration) : 0;
-
-  const togglePlay = () => {
-    try {
-      if (playing) player.pause();
-      else player.play();
-    } catch {}
-  };
-
-  const seekTo = async (ratio) => {
-    try {
-      if (!duration) return;
-      await player.seekTo(ratio * duration);
-    } catch {}
-  };
-
-  return (
-    <View style={st.annAudioRow}>
-      <TouchableOpacity style={st.annAudioBtn} onPress={togglePlay} activeOpacity={0.8}>
-        <Ionicons name={playing ? 'pause' : 'play'} size={18} color="#FFFFFF" />
-      </TouchableOpacity>
-      <View style={{ flex: 1 }}>
-        <Text style={st.annAudioName} numberOfLines={1}>Voice Message</Text>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={(e) => {
-            const x = e.nativeEvent.locationX;
-            // approximate seek from tap on bar (bar ~ full width of parent)
-            seekTo(Math.min(1, Math.max(0, x / 200)));
-          }}
-          style={st.annSeekTrack}
-        >
-          <View style={[st.annSeekFill, { width: `${progress * 100}%` }]} />
-        </TouchableOpacity>
-        <View style={st.annTimeRow}>
-          <Text style={st.annTimeText}>{formatMediaTime(current)}</Text>
-          <Text style={st.annTimeText}>{formatMediaTime(duration)}</Text>
-        </View>
-      </View>
-      <Ionicons name="mic" size={16} color={D.pink} />
-    </View>
-  );
-}
+// AnnouncementCard logic extracted to src/components/announcements/AnnouncementCard.jsx
 
 export default function DashboardScreen({ navigation }) {
   const dispatch = useDispatch();

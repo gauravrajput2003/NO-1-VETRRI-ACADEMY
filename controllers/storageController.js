@@ -7,9 +7,6 @@ const storageService = require('../services/storageService');
 const crypto = require('crypto');
 const path = require('path');
 
-/**
- * Generates an S3 PutObject pre-signed URL for direct browser-to-S3 upload.
- */
 const getS3UploadUrl = async (req, res) => {
   try {
     const bucket = process.env.AWS_S3_BUCKET;
@@ -48,53 +45,90 @@ const getS3UploadUrl = async (req, res) => {
   }
 };
 
-/**
- * Generates Cloudinary signed upload parameters for direct browser-to-Cloudinary upload.
- */
+
 const getCloudinaryUploadParams = async (req, res) => {
   try {
-    const { folder = 'materials/study-materials', filename } = req.body;
-    const timestamp = Math.round(new Date().getTime() / 1000);
+    const {
+      folder = 'announcements',
+      filename,
+      mimetype,
+    } = req.body;
 
-    let publicId = undefined;
-    if (filename) {
-      const ext = path.extname(filename);
-      const cleanBaseName = path.basename(filename, ext).replace(/[^a-zA-Z0-9]/g, '_');
-      publicId = `${cleanBaseName}_${Date.now()}`;
+    if (!filename || !mimetype) {
+      return res.status(400).json({
+        success: false,
+        message: 'Filename and mimetype are required',
+      });
     }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    // Cloudinary resource type
+    let resourceType = 'raw';
+
+    if (mimetype.startsWith('image/')) {
+      resourceType = 'image';
+    } else if (
+      mimetype.startsWith('video/') ||
+      mimetype.startsWith('audio/')
+    ) {
+      resourceType = 'video';
+    }
+
+    const extension = path.extname(filename);
+    const baseName = path.basename(filename, extension);
+
+    const cleanBaseName = baseName
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .substring(0, 80);
+
+    const publicId = `${cleanBaseName}_${Date.now()}_${crypto
+      .randomBytes(4)
+      .toString('hex')}`;
 
     const paramsToSign = {
       timestamp,
       folder,
+      public_id: publicId,
     };
-
-    if (publicId) {
-      paramsToSign.public_id = publicId;
-    }
 
     const signature = cloudinary.utils.api_sign_request(
       paramsToSign,
       process.env.CLOUDINARY_API_SECRET
     );
 
-    res.json({
+    return res.json({
       success: true,
-      signature,
-      timestamp,
-      apiKey: process.env.CLOUDINARY_API_KEY,
+
       cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+      apiKey: process.env.CLOUDINARY_API_KEY,
+
+      timestamp,
+      signature,
+
       folder,
       publicId,
+      resourceType,
+
+      originalFilename: filename,
+      extension: extension.replace('.', ''),
+      mimeType: mimetype,
     });
   } catch (error) {
-    console.error('[Cloudinary Presign Upload] Error:', error.message);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      '[Cloudinary Presign Upload] Error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate Cloudinary upload params',
+    });
   }
 };
 
-/**
- * Called by the client to save metadata into the database after a successful direct upload.
- */
+
 const confirmUpload = async (req, res) => {
   try {
     const {
@@ -190,9 +224,6 @@ const confirmUpload = async (req, res) => {
   }
 };
 
-/**
- * Returns a pre-signed or customized download URL for study materials.
- */
 const getDownloadUrl = async (req, res) => {
   try {
     const materialId = req.params.materialId;
