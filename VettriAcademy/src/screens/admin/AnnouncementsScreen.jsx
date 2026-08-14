@@ -33,20 +33,28 @@ const TouchableOpacity = (props) => {
 };
 
 // ─── Determine Cloudinary resource_type from mime ───────────────────────────
+// ─── Determine Cloudinary resource_type from mime ───────────────────────────
 const getResourceType = (mimeType = '') => {
-  return 'auto'; // Cloudinary handles resource_type automatically for video/image/raw when set to 'auto'
-};
+  const type = mimeType.toLowerCase();
 
+  if (type.startsWith('video/')) return 'video';
+  if (type.startsWith('image/')) return 'image';
+  if (type.startsWith('audio/')) return 'video';
+
+  return 'raw';
+};
 // ─── Determine our media type enum from mime ─────────────────────────────────
 const getMediaType = (mimeType = '') => {
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'audio';
+  const type = mimeType.toLowerCase();
+
+  if (type.startsWith('video/')) return 'video';
+  if (type.startsWith('image/')) return 'image';
+  if (type.startsWith('audio/')) return 'audio';
+
   return 'document';
 };
 
-// ─── Upload a single file to Cloudinary via signed params ────────────────────
-// ─── Upload a single file to Cloudinary via signed params ────────────────────
+
 const uploadToCloudinary = async (file, onProgress) => {
   const { data } = await getCloudinaryUploadParamsAPI({
     folder: 'announcements',
@@ -54,18 +62,58 @@ const uploadToCloudinary = async (file, onProgress) => {
     mimetype: file.mimeType,
   });
 
-  if (!data.success) throw new Error(data.message || 'Failed to get upload params');
+  if (!data.success) {
+    throw new Error(
+      data.message || 'Failed to get upload params'
+    );
+  }
 
-  const { signature, timestamp, apiKey, cloudName, publicId } = data;
-  const resourceType = getResourceType(file.mimeType);
+  const {
+    signature,
+    timestamp,
+    apiKey,
+    cloudName,
+    publicId,
+  } = data;
+
+  const mimeType = (file.mimeType || '').toLowerCase();
+
+  let resourceType = 'raw';
+
+  if (mimeType.startsWith('image/')) {
+    resourceType = 'image';
+  } else if (
+    mimeType.startsWith('video/') ||
+    mimeType.startsWith('audio/')
+  ) {
+    resourceType = 'video';
+  }
 
   const formData = new FormData();
 
-  formData.append('file', {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType
-  });
+  // IMPORTANT: React Native Web needs Blob/File,
+  // native React Native needs { uri, name, type }
+  if (Platform.OS === 'web') {
+    const response = await fetch(file.uri);
+
+    if (!response.ok) {
+      throw new Error('Unable to read selected file');
+    }
+
+    const blob = await response.blob();
+
+    formData.append(
+      'file',
+      blob,
+      file.name
+    );
+  } else {
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    });
+  }
 
   formData.append('api_key', apiKey);
   formData.append('timestamp', String(timestamp));
@@ -76,13 +124,20 @@ const uploadToCloudinary = async (file, onProgress) => {
     formData.append('public_id', publicId);
   }
 
+  const uploadUrl =
+    `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+
+  console.log('[Cloudinary] Upload URL:', uploadUrl);
+  console.log('[Cloudinary] File:', {
+    name: file.name,
+    mimeType: file.mimeType,
+    resourceType,
+  });
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    xhr.open(
-      'POST',
-      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`
-    );
+    xhr.open('POST', uploadUrl);
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
@@ -93,10 +148,23 @@ const uploadToCloudinary = async (file, onProgress) => {
     };
 
     xhr.onload = () => {
+      console.log(
+        'CLOUDINARY STATUS:',
+        xhr.status
+      );
+
+      console.log(
+        'CLOUDINARY RESPONSE:',
+        xhr.responseText
+      );
+
       try {
         const result = JSON.parse(xhr.responseText);
 
-        if (xhr.status >= 200 && xhr.status < 300) {
+        if (
+          xhr.status >= 200 &&
+          xhr.status < 300
+        ) {
           resolve({
             url: result.secure_url,
             publicId: result.public_id,
@@ -111,45 +179,37 @@ const uploadToCloudinary = async (file, onProgress) => {
 
             ...(file.thumbnail
               ? { thumbnail: file.thumbnail }
-              : getMediaType(file.mimeType) === 'video' &&
-                result.secure_url
-                ? {
-                    thumbnail: result.secure_url
-                      .replace(
-                        '/upload/',
-                        '/upload/so_0,w_640,h_360,c_fill/'
-                      )
-                      .replace(
-                        /\.(mp4|mov|webm)$/i,
-                        '.jpg'
-                      ),
-                  }
-                : {}),
+              : {}),
 
             ...(result.duration != null &&
             file.duration == null
               ? {
-                  duration: Math.round(result.duration),
+                  duration: Math.round(
+                    result.duration
+                  ),
                 }
               : {}),
           });
         } else {
           reject(
             new Error(
-              result.error?.message || 'Upload failed'
+              result.error?.message ||
+              `Cloudinary upload failed (${xhr.status})`
             )
           );
         }
-        console.log('CLOUDINARY RESPONSE:', xhr.status, xhr.responseText);
       } catch (e) {
         reject(e);
       }
     };
 
-    xhr.onerror = () =>
+    xhr.onerror = () => {
       reject(
-        new Error('Network error during upload')
+        new Error(
+          'Network error during upload'
+        )
       );
+    };
 
     xhr.send(formData);
   });

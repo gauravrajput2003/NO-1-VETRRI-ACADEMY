@@ -10,10 +10,13 @@ import {
  * Determine Cloudinary resource_type from MIME type
  */
 export const getResourceType = (mimeType = '') => {
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'video'; // Cloudinary stores audio under "video"
-  return 'raw'; // PDF, docs, zip, etc.
+  const type = mimeType.toLowerCase();
+
+  if (type.startsWith('video/')) return 'video';
+  if (type.startsWith('image/')) return 'image';
+  if (type.startsWith('audio/')) return 'video';
+
+  return 'raw';
 };
 
 /**
