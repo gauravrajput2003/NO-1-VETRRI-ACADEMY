@@ -314,7 +314,7 @@ const uploadToCloudinary = (buffer, options = {}) => {
 
 const getResourceType = (mimetype) => {
   if (mimetype.startsWith('video/')) return 'video';
-  if (mimetype.startsWith('image/')) return 'image';
+  if (mimetype.startsWith('image/') || mimetype === 'application/pdf') return 'image';
   return 'raw';
 };
 

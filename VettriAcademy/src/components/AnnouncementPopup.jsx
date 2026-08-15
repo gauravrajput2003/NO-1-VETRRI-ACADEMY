@@ -11,6 +11,7 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import { Image } from 'expo-image';
 
@@ -24,6 +25,7 @@ import {
 import { Colors } from '../utils/colors';
 import { Shadows } from '../utils/theme';
 import { formatDate } from '../utils/formatters';
+import { normalizeMaterialFileUrl } from '../utils/fileUtils';
 
 import {
   useAudioPlayer,
@@ -34,7 +36,6 @@ import {
 // ─────────────────────────────────────────────
 // Audio Player
 // ─────────────────────────────────────────────
-
 function AudioAnnouncement({ audio }) {
   const player = useAudioPlayer(audio.url);
   const status = useAudioPlayerStatus(player);
@@ -157,15 +158,17 @@ function VideoAnnouncement({ video }) {
           onPress={() => setPlaying(true)}
         >
 
-          <Image
-            source={{
-              uri:
-                video.thumbnail ||
-                video.url,
-            }}
-            style={styles.videoImage}
-            contentFit="cover"
-          />
+          {video.thumbnail ? (
+            <Image
+              source={{
+                uri: video.thumbnail,
+              }}
+              style={styles.videoImage}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.videoFallback} />
+          )}
 
           <View style={styles.videoOverlay}>
 
@@ -217,31 +220,52 @@ function VideoAnnouncement({ video }) {
 
 
 // ─────────────────────────────────────────────
-// Document
+// Document / PDF
 // ─────────────────────────────────────────────
 
-function DocumentAnnouncement({ document }) {
-
+function DocumentAnnouncement({ document, navigation }) {
   const openDocument = () => {
-    if (document?.url) {
-      Linking.openURL(document.url).catch(
-        (error) =>
-          console.log(
-            'Document open error:',
-            error
-          )
-      );
+    if (!document?.url) {
+      console.warn('[Announcement PDF] Missing URL:', document);
+      return;
     }
+
+    const normalizedUrl = normalizeMaterialFileUrl(
+      document.url,
+      {
+        resourceType:
+          document.resourceType ||
+          document.resource_type ||
+          'raw',
+        publicId:
+          document.publicId ||
+          document.public_id,
+      }
+    );
+
+    console.log('[Announcement PDF] Opening:', {
+      originalUrl: document.url,
+      normalizedUrl,
+      filename: document.originalFilename,
+      mimeType: document.mimeType,
+      resourceType: document.resourceType || document.resource_type,
+      publicId: document.publicId || document.public_id,
+    });
+
+    navigation.navigate('PdfViewer', {
+      title: document.originalFilename || 'PDF Document',
+      pdfUrl: normalizedUrl,
+      materialId: document._id || null,
+      totalPages: document.totalPages || 0,
+    });
   };
 
   return (
- <TouchableOpacity
-  key={`doc-${idx}`}
-  style={st.documentRow}
-  onPress={() => openDocument(d)}
-  activeOpacity={0.8}
->
-
+    <TouchableOpacity
+      style={styles.documentBox}
+      onPress={openDocument}
+      activeOpacity={0.8}
+    >
       <View style={styles.documentIcon}>
         <Text style={styles.documentIconText}>
           📄
@@ -249,25 +273,23 @@ function DocumentAnnouncement({ document }) {
       </View>
 
       <View style={styles.documentInfo}>
-
         <Text
           style={styles.documentName}
           numberOfLines={1}
         >
-          {document.originalFilename ||
-            'File Attachment'}
+          {document.originalFilename || 'File Attachment'}
         </Text>
 
         <Text style={styles.documentHint}>
-          Tap to open
+          {document.mimeType === 'application/pdf'
+            ? 'Tap to preview PDF'
+            : 'Tap to open attachment'}
         </Text>
-
       </View>
 
       <Text style={styles.documentArrow}>
         →
       </Text>
-
     </TouchableOpacity>
   );
 }
@@ -278,7 +300,7 @@ function DocumentAnnouncement({ document }) {
 // ─────────────────────────────────────────────
 
 export function AnnouncementPopup() {
-
+  const navigation = useNavigation();
   const { user } = useSelector(
     (s) => s.auth
   );
@@ -672,16 +694,13 @@ export function AnnouncementPopup() {
 
             {/* FILE / PDF */}
 
-            {documents.map(
-              (document, index) => (
-
-                <DocumentAnnouncement
-                  key={`document-${index}`}
-                  document={document}
-                />
-
-              )
-            )}
+            {documents.map((document, index) => (
+              <DocumentAnnouncement
+                key={`document-${index}`}
+                document={document}
+                navigation={navigation}
+              />
+            ))}
 
           </ScrollView>
 
@@ -819,6 +838,12 @@ const styles = StyleSheet.create({
   videoImage: {
     width: '100%',
     height: '100%',
+  },
+
+  videoFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#111827',
   },
 
   videoOverlay: {

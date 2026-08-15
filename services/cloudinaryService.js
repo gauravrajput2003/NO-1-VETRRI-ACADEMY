@@ -27,7 +27,7 @@ class CloudinaryService {
    */
   getResourceType(mimetype = '') {
     if (mimetype.startsWith('video/')) return 'video';
-    if (mimetype.startsWith('image/')) return 'image';
+    if (mimetype.startsWith('image/') || mimetype === 'application/pdf') return 'image';
     // Everything else (PDF, DOCX, PPTX, XLSX, TXT, ZIP, RAR, etc.)
     return 'raw';
   }

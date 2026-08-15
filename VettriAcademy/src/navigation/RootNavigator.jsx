@@ -23,9 +23,10 @@ import StudentNavigator from './StudentNavigator';
 import TeacherNavigator from './TeacherNavigator';
 import AdminNavigator from './AdminNavigator';
 import AIAssistantDrawer from '../components/AIAssistantDrawer';
+import { AnnouncementPopup } from '../components/AnnouncementPopup';
 
 // Navigation ref for imperative navigation from notification taps
-const navigationRef = React.createRef();
+export const navigationRef = React.createRef();
 
 export default function RootNavigator() {
   const dispatch = useDispatch();
@@ -204,6 +205,7 @@ export default function RootNavigator() {
         <AuthNavigator />
       )}
       {isAuthenticated && user && <AIAssistantDrawer />}
+      <AnnouncementPopup />
     </NavigationContainer>
   );
 }

@@ -201,7 +201,7 @@ const uploadDoubtAttachment = async (req, res) => {
 		}
 
 		const attachmentType = isImage ? 'image' : isPdf ? 'pdf' : 'audio';
-		const resourceType = isImage ? 'image' : 'raw';
+		const resourceType = (isImage || isPdf) ? 'image' : 'raw';
 
 		const uploaded = await uploadToCloudinary(buffer, {
 			folder: 'doubts/attachments',

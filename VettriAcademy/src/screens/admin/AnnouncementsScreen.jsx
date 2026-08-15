@@ -35,12 +35,21 @@ const TouchableOpacity = (props) => {
 // ─── Determine Cloudinary resource_type from mime ───────────────────────────
 // ─── Determine Cloudinary resource_type from mime ───────────────────────────
 const getResourceType = (mimeType = '') => {
-  const type = mimeType.toLowerCase();
+  const type = String(mimeType).toLowerCase();
 
-  if (type.startsWith('video/')) return 'video';
-  if (type.startsWith('image/')) return 'image';
-  if (type.startsWith('audio/')) return 'video';
+  if (type.startsWith('image/') || type === 'application/pdf') {
+    return 'image';
+  }
 
+  if (type.startsWith('video/')) {
+    return 'video';
+  }
+
+  if (type.startsWith('audio/')) {
+    return 'video';
+  }
+
+  // PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, etc.
   return 'raw';
 };
 // ─── Determine our media type enum from mime ─────────────────────────────────
@@ -54,6 +63,12 @@ const getMediaType = (mimeType = '') => {
   return 'document';
 };
 
+const getCloudinaryVideoThumbnail = (url) => {
+  if (!url || !url.includes('/video/upload/')) return undefined;
+  return url
+    .replace('/video/upload/', '/video/upload/so_0/')
+    .replace(/\.[^/.?]+(\?.*)?$/, '.jpg$1');
+};
 
 const uploadToCloudinary = async (file, onProgress) => {
   const { data } = await getCloudinaryUploadParamsAPI({
@@ -76,18 +91,8 @@ const uploadToCloudinary = async (file, onProgress) => {
     publicId,
   } = data;
 
-  const mimeType = (file.mimeType || '').toLowerCase();
-
-  let resourceType = 'raw';
-
-  if (mimeType.startsWith('image/')) {
-    resourceType = 'image';
-  } else if (
-    mimeType.startsWith('video/') ||
-    mimeType.startsWith('audio/')
-  ) {
-    resourceType = 'video';
-  }
+  const mimeType = (file.mimeType || 'application/octet-stream').toLowerCase();
+  const resourceType = getResourceType(mimeType);
 
   const formData = new FormData();
 
@@ -127,8 +132,7 @@ const uploadToCloudinary = async (file, onProgress) => {
   const uploadUrl =
     `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 
-  console.log('[Cloudinary] Upload URL:', uploadUrl);
-  console.log('[Cloudinary] File:', {
+  console.log('[Cloudinary Upload] File:', {
     name: file.name,
     mimeType: file.mimeType,
     resourceType,
@@ -148,16 +152,6 @@ const uploadToCloudinary = async (file, onProgress) => {
     };
 
     xhr.onload = () => {
-      console.log(
-        'CLOUDINARY STATUS:',
-        xhr.status
-      );
-
-      console.log(
-        'CLOUDINARY RESPONSE:',
-        xhr.responseText
-      );
-
       try {
         const result = JSON.parse(xhr.responseText);
 
@@ -165,29 +159,27 @@ const uploadToCloudinary = async (file, onProgress) => {
           xhr.status >= 200 &&
           xhr.status < 300
         ) {
+          const mediaType = getMediaType(mimeType);
+          const thumbnail =
+            mediaType === 'video'
+              ? result.thumbnail_url || getCloudinaryVideoThumbnail(result.secure_url)
+              : file.thumbnail;
+
           resolve({
             url: result.secure_url,
             publicId: result.public_id,
-            type: getMediaType(file.mimeType),
+            type: mediaType,
             originalFilename: file.name,
-            mimeType: file.mimeType,
-            fileSize: result.bytes,
-
+            mimeType,
+            resourceType,
+            fileSize: result.bytes || file.size,
             ...(file.duration != null
               ? { duration: file.duration }
               : {}),
-
-            ...(file.thumbnail
-              ? { thumbnail: file.thumbnail }
-              : {}),
-
+            ...(thumbnail ? { thumbnail } : {}),
             ...(result.duration != null &&
             file.duration == null
-              ? {
-                  duration: Math.round(
-                    result.duration
-                  ),
-                }
+              ? { duration: Math.round(result.duration) }
               : {}),
           });
         } else {
@@ -217,55 +209,194 @@ const uploadToCloudinary = async (file, onProgress) => {
 
 // ─── Media Chip Component ─────────────────────────────────────────────────────
 function MediaChip({ item, index, onRemove, uploadProgress }) {
-  const isUploading = uploadProgress[index] !== undefined && uploadProgress[index] < 100;
+  const isUploading =
+    uploadProgress[index] !== undefined &&
+    uploadProgress[index] < 100;
+
   const isDone = uploadProgress[index] === 100;
 
-  const iconName = item.mimeType?.startsWith('video/') ? 'videocam'
-    : item.mimeType?.startsWith('audio/') ? 'mic'
-    : 'image';
+  const mimeType = String(item?.mimeType || '').toLowerCase();
+
+  const isImage = mimeType.startsWith('image/');
+  const isVideo = mimeType.startsWith('video/');
+  const isAudio = mimeType.startsWith('audio/');
+  const isPdf = mimeType === 'application/pdf';
+  const isDocument =
+    !isImage &&
+    !isVideo &&
+    !isAudio;
+
+  let iconName = 'document-text';
+  let iconColor = '#F59E0B';
+  let iconBackground = '#F59E0B';
+
+  if (isImage) {
+    iconName = 'image';
+    iconColor = Colors.info;
+    iconBackground = Colors.info;
+  } else if (isVideo) {
+    iconName = 'videocam';
+    iconColor = '#8B5CF6';
+    iconBackground = '#8B5CF6';
+  } else if (isAudio) {
+    iconName = 'mic';
+    iconColor = Colors.success;
+    iconBackground = Colors.success;
+  } else if (isPdf) {
+    iconName = 'document-text';
+    iconColor = '#EF4444';
+    iconBackground = '#EF4444';
+  }
 
   return (
     <View style={chipStyles.chip}>
-      {item.mimeType?.startsWith('image/') && item.uri ? (
-        <Image source={{ uri: item.uri }} style={chipStyles.thumbnail} contentFit="cover" />
+
+      {/* Image thumbnail */}
+      {isImage && item.uri ? (
+        <Image
+          source={{ uri: item.uri }}
+          style={chipStyles.thumbnail}
+          contentFit="cover"
+        />
       ) : (
-        <View style={chipStyles.iconBox}>
-          <Ionicons name={iconName} size={16} color={Colors.white} />
+        <View
+          style={[
+            chipStyles.iconBox,
+            { backgroundColor: iconBackground },
+          ]}
+        >
+          <Ionicons
+            name={iconName}
+            size={18}
+            color={Colors.white}
+          />
         </View>
       )}
-      <View style={{ flex: 1 }}>
-        <Text style={chipStyles.name} numberOfLines={1}>{item.name}</Text>
+
+      <View style={chipStyles.fileInfo}>
+        <Text
+          style={chipStyles.name}
+          numberOfLines={1}
+        >
+          {item.name || 'Attachment'}
+        </Text>
+
+        <Text style={chipStyles.fileType}>
+          {isPdf
+            ? 'PDF Document'
+            : isVideo
+              ? 'Video'
+              : isAudio
+                ? 'Voice Message'
+                : isImage
+                  ? 'Image'
+                  : 'Document'}
+        </Text>
+
         {isUploading && (
           <View style={chipStyles.progressBar}>
-            <View style={[chipStyles.progressFill, { width: `${uploadProgress[index]}%` }]} />
+            <View
+              style={[
+                chipStyles.progressFill,
+                {
+                  width: `${uploadProgress[index]}%`,
+                },
+              ]}
+            />
           </View>
         )}
-        {isDone && <Text style={chipStyles.done}>✓ Uploaded</Text>}
+
+        {isDone && (
+          <Text style={chipStyles.done}>
+            ✓ Uploaded successfully
+          </Text>
+        )}
       </View>
-      <RNTouchableOpacity onPress={() => onRemove(index)} style={chipStyles.removeBtn}>
-        <Ionicons name="close-circle" size={18} color={Colors.error} />
+
+      <RNTouchableOpacity
+        onPress={() => onRemove(index)}
+        style={chipStyles.removeBtn}
+        disabled={isUploading}
+      >
+        <Ionicons
+          name="close-circle"
+          size={20}
+          color={Colors.error}
+        />
       </RNTouchableOpacity>
+
     </View>
   );
 }
-
 const chipStyles = StyleSheet.create({
   chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.primary + '15',
-    borderRadius: 10, padding: 8, marginBottom: 6,
-    borderWidth: 1, borderColor: Colors.primary + '30',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.primary + '10',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
   },
-  thumbnail: { width: 36, height: 36, borderRadius: 6 },
+
+  thumbnail: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+  },
+
   iconBox: {
-    width: 36, height: 36, borderRadius: 6,
-    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  name: { fontSize: 12, color: Colors.darkGray, flex: 1 },
-  progressBar: { height: 3, backgroundColor: Colors.lightGray, borderRadius: 2, marginTop: 3, width: '100%' },
-  progressFill: { height: 3, backgroundColor: Colors.primary, borderRadius: 2 },
-  done: { fontSize: 10, color: Colors.success, marginTop: 2 },
-  removeBtn: { padding: 2 },
+
+  fileInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  name: {
+    fontSize: 13,
+    color: Colors.darkGray,
+    fontWeight: '700',
+  },
+
+  fileType: {
+    fontSize: 10,
+    color: Colors.mediumGray,
+    marginTop: 2,
+  },
+
+  progressBar: {
+    height: 4,
+    backgroundColor: Colors.lightGray,
+    borderRadius: 3,
+    marginTop: 5,
+    width: '100%',
+    overflow: 'hidden',
+  },
+
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+  },
+
+  done: {
+    fontSize: 10,
+    color: Colors.success,
+    marginTop: 3,
+    fontWeight: '600',
+  },
+
+  removeBtn: {
+    padding: 3,
+  },
 });
 
 // ─── Media Badge for announcement cards ──────────────────────────────────────
@@ -362,26 +493,73 @@ export default function AnnouncementsScreen() {
     }
   };
 
-  const pickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-        multiple: true,
-      });
-      if (!result.canceled && result.assets) {
-        const newFiles = result.assets.map((a) => ({
-          uri: a.uri,
-          name: a.name || `file_${Date.now()}`,
-          mimeType: a.mimeType || 'application/octet-stream',
-        }));
-        setMediaFiles((prev) => [...prev, ...newFiles]);
-      }
-    } catch (e) {
-      console.log('Document pick error', e);
-    }
-  };
+const pickDocument = async () => {
+  try {
+    console.log('[Announcement File Picker] Opening...');
 
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+      multiple: true,
+    });
+
+    console.log('[Announcement File Picker] Result:', result);
+
+    if (result.canceled || result.type === 'cancel') {
+      console.log('[Announcement File Picker] Cancelled');
+      return;
+    }
+
+    const assets = Array.isArray(result.assets)
+      ? result.assets
+      : result.uri
+        ? [result]
+        : [];
+
+    if (assets.length === 0) {
+      console.log('[Announcement File Picker] No assets returned');
+      return;
+    }
+
+    const newFiles = assets.map((asset, index) => {
+      const name = asset.name || asset.fileName || `file_${Date.now()}_${index}`;
+      const mimeType = asset.mimeType || asset.type || 'application/octet-stream';
+
+      console.log('[Announcement File Picker] Asset:', {
+        name,
+        mimeType,
+        uri: asset.uri,
+        size: asset.size,
+      });
+
+      return {
+        uri: asset.uri,
+        name,
+        mimeType,
+        size: asset.size || 0,
+      };
+    });
+
+    console.log('[Announcement File Picker] Adding files:', newFiles.length);
+
+    setMediaFiles((prev) => [
+      ...prev,
+      ...newFiles,
+    ]);
+
+  } catch (error) {
+    console.error(
+      '[Announcement File Picker] ERROR:',
+      error
+    );
+
+    Toast.show({
+      type: 'error',
+      text1: 'Unable to select file',
+      text2: error?.message || 'Please try again',
+    });
+  }
+};
   // ── Video Message (camera or gallery via sheet) ─────────────────────────────
   const onVideoMessageReady = (file) => {
     setMediaFiles((prev) => [...prev, file]);
@@ -401,7 +579,7 @@ export default function AnnouncementsScreen() {
     });
   };
 
-  // ── Create announcement with media upload ───────────────────────────────────
+  
   const handleCreate = async () => {
     if (!form.title || !form.content) {
       Toast.show({ type: 'error', text1: 'Title and content required' });
@@ -416,6 +594,13 @@ export default function AnnouncementsScreen() {
       for (let i = 0; i < mediaFiles.length; i++) {
         const file = mediaFiles[i];
         setUploadProgress((prev) => ({ ...prev, [i]: 0 }));
+        console.log('[Announcement Upload] Uploading:', {
+          index: i,
+          name: file.name,
+          mimeType: file.mimeType,
+          resourceType: getResourceType(file.mimeType),
+          type: getMediaType(file.mimeType),
+        });
         const uploaded = await uploadToCloudinary(file, (pct) => {
           setUploadProgress((prev) => ({ ...prev, [i]: pct }));
         });
@@ -424,6 +609,7 @@ export default function AnnouncementsScreen() {
       }
 
       const payload = { ...form, media: uploadedMedia };
+      console.log('[Announcement Create] Payload media:', uploadedMedia);
       const r = await dispatch(createAnnouncement(payload));
 
       if (createAnnouncement.fulfilled.match(r)) {

@@ -15,11 +15,17 @@ const announcementSchema = new mongoose.Schema(
     media: [
       {
         url: { type: String, required: true },
-type: {
-  type: String,
-  enum: ['image', 'video', 'audio', 'document'],
-  required: true,
-},        publicId: { type: String },
+        type: {
+          type: String,
+          enum: ['image', 'video', 'audio', 'document'],
+          required: true,
+        },
+        resourceType: {
+          type: String,
+          enum: ['image', 'video', 'raw'],
+          default: 'raw',
+        },
+        publicId: { type: String },
         originalFilename: { type: String },
         mimeType: { type: String },
         fileSize: { type: Number },

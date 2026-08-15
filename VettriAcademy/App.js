@@ -9,7 +9,6 @@ import { store, persistor } from './src/redux/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import { Colors } from './src/utils/colors';
 import { cleanupTempFiles } from './src/utils/fileUtils';
-import { AnnouncementPopup } from './src/components/AnnouncementPopup';
  
 export default function App() {
   // Auto-cleanup cached downloads older than 7 days on app startup
@@ -31,7 +30,6 @@ export default function App() {
             persistor={persistor}
           >
             <RootNavigator />
-            <AnnouncementPopup />
             <Toast />
           </PersistGate>
         </Provider>

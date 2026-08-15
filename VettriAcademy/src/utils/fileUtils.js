@@ -230,6 +230,10 @@ export const normalizeMaterialFileUrl = (url, options = {}) => {
   // For PDFs/documents Cloudinary should normally be raw.
   const materialResourceType = resourceType || 'raw';
 
+  if (normalized.includes(`/${materialResourceType}/upload/`)) {
+    return normalized;
+  }
+
   /*
    * If publicId is available, reconstruct the URL.
    *

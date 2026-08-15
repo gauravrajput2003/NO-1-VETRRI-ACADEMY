@@ -9,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -348,6 +349,29 @@ export default function DoubtThreadScreen({ route, navigation }) {
     }
   };
 
+  const onDeleteThread = () => {
+    Alert.alert(
+      'Delete Discussion',
+      'Are you sure you want to delete this entire discussion? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDoubtContentAPI(doubtId, { type: 'doubt', reason: 'admin_review' });
+              Toast.show({ type: 'success', text1: 'Discussion deleted' });
+              navigation.goBack();
+            } catch (err) {
+              Toast.show({ type: 'error', text1: 'Delete failed', text2: String(err || '') });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onDeleteReply = async (replyId) => {
     try {
       await deleteDoubtContentAPI(doubtId, { type: 'reply', replyId, reason: 'abuse_content' });
@@ -450,6 +474,11 @@ export default function DoubtThreadScreen({ route, navigation }) {
             <Text style={styles.subtitle}>{STATUS_LABEL[currentDoubt.status] || currentDoubt.status}</Text>
           </View>
         </View>
+        {user?.role === 'admin' ? (
+          <TouchableOpacity style={styles.headerAction} onPress={onDeleteThread}>
+            <Ionicons name="trash" size={20} color={D.white} />
+          </TouchableOpacity>
+        ) : null}
         {canManageAssignments ? (
           <TouchableOpacity style={styles.headerAction} onPress={() => setAssignModalOpen(true)}>
             <Ionicons name="people" size={20} color={D.white} />

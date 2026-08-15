@@ -38,30 +38,75 @@ function buildAnnouncementNotifyCopy({ title, content, media = [], posterName })
   };
 }
 
+function getMediaTypeFromMime(mimeType = '') {
+  const normalized = String(mimeType).toLowerCase();
+  if (normalized.startsWith('image/')) return 'image';
+  if (normalized.startsWith('video/')) return 'video';
+  if (normalized.startsWith('audio/')) return 'audio';
+  return 'document';
+}
+
+function getResourceTypeFromMedia(media = {}) {
+  const explicit = media.resourceType || media.resource_type;
+  if (['image', 'video', 'raw'].includes(explicit)) return explicit;
+
+  const mimeType = String(media.mimeType || '').toLowerCase();
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) return 'video';
+  return 'raw';
+}
+
+function normalizeAnnouncementMedia(media = []) {
+  if (!Array.isArray(media)) return [];
+
+  return media
+    .filter((item) => item && item.url)
+    .map((item) => {
+      const inferredType = getMediaTypeFromMime(item.mimeType);
+      const rawType = item.type === 'raw' ? 'document' : item.type;
+      const type = ['image', 'video', 'audio', 'document'].includes(rawType)
+        ? rawType
+        : inferredType;
+
+      return {
+        url: item.url,
+        type,
+        resourceType: getResourceTypeFromMedia(item),
+        publicId: item.publicId || item.public_id,
+        originalFilename: item.originalFilename || item.name,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize || item.size,
+        duration: item.duration,
+        thumbnail: item.thumbnail,
+      };
+    });
+}
+
 const createAnnouncement = async (req, res) => {
   try {
     const { title, content, targetRole, targetCourse, targetGrade, isPinned, expiresAt, media } = req.body;
     const io = req.app.get('io');
-    const mediaList = Array.isArray(media) ? media : [];
+    const normalizedTargetRole = targetRole || 'all';
+    const mediaList = normalizeAnnouncementMedia(media);
 
     const announcement = await Announcement.create({
-      title, content, targetRole, targetCourse, targetGrade,
+      title, content, targetRole: normalizedTargetRole, targetCourse, targetGrade,
       isPinned, expiresAt, postedBy: req.user._id,
       media: mediaList,
     });
 
-    if (targetRole === 'all' || targetRole === 'student') {
+    if (normalizedTargetRole === 'all' || normalizedTargetRole === 'student') {
       io.emit('announcement:new', { announcement: { ...announcement.toObject(), content: announcement.content.substring(0, 200) } });
-    } else if (targetRole === 'teacher') {
+    } else if (normalizedTargetRole === 'teacher') {
       io.emit('announcement:new', { announcement: { ...announcement.toObject() } });
     }
 
     // In-app + push notifications (fire-and-forget)
     (async () => {
       try {
-        const roleFilter = targetRole === 'all'
+        const roleFilter = normalizedTargetRole === 'all'
           ? { role: { $in: ['student', 'teacher'] } }
-          : { role: targetRole };
+          : { role: normalizedTargetRole };
 
         const recipients = await User.find({
           ...roleFilter,
@@ -98,6 +143,7 @@ const createAnnouncement = async (req, res) => {
 
     res.status(201).json({ success: true, announcement });
   } catch (error) {
+    console.error('[Announcement Create] Error:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -188,7 +234,11 @@ const markAsRead = async (req, res) => {
 
 const updateAnnouncement = async (req, res) => {
   try {
-    const announcement = await Announcement.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const update = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(update, 'media')) {
+      update.media = normalizeAnnouncementMedia(update.media);
+    }
+    const announcement = await Announcement.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, announcement });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
