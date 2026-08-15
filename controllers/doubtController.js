@@ -217,7 +217,7 @@ const uploadDoubtAttachment = async (req, res) => {
 				url: uploaded.secure_url,
 				publicId: uploaded.public_id,
 				storageType: 'cloudinary',
-				resourceType: getResourceType(mimetype),
+				resourceType,
 				attachmentType,
 				mimeType: mimetype,
 				originalFilename: originalname,

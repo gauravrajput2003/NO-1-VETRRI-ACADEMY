@@ -17,6 +17,8 @@ const {
   getRetentionSettings,
   updateRetentionSettings,
   exportDoubts,
+  downloadAttachment,
+  downloadReplyAttachment,
 } = require('../controllers/doubtController');
 
 router.use(verifyToken);
@@ -31,6 +33,15 @@ router.get('/admin/export', exportDoubts);
 
 router.post('/', generalLimiter, createDoubt);
 router.get('/', listDoubts);
+router.get(
+  '/:id/attachments/:attachmentIndex/download',
+  downloadAttachment
+);
+
+router.get(
+  '/:doubtId/replies/:replyId/attachments/:attachmentIndex/download',
+  downloadReplyAttachment
+);
 router.get('/:id', getDoubtDetail);
 router.post('/:id/replies', generalLimiter, addReply);
 router.patch('/:id/status', updateDoubtStatus);

@@ -3,6 +3,7 @@ const Doubt = require('../models/Doubt');
 const DoubtReply = require('../models/DoubtReply');
 const DoubtAuditLog = require('../models/DoubtAuditLog');
 const DoubtSetting = require('../models/DoubtSetting');
+const cloudinaryService = require('../services/cloudinaryService');
 const User = require('../models/User');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
 const { sendBulkNotifications } = require('../services/notificationService');
@@ -760,19 +761,226 @@ const exportDoubts = async (req, res) => {
 		res.status(500).json({ success: false, message: error.message });
 	}
 };
+const downloadAttachment = async (req, res) => {
+  try {
+    const { id, attachmentIndex } = req.params;
+
+    const doubt = await Doubt.findById(id);
+
+    if (!doubt || doubt.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doubt not found.',
+      });
+    }
+
+    if (!canAccessDoubt(doubt, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied.',
+      });
+    }
+
+    const index = Number(attachmentIndex);
+
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= (doubt.attachments || []).length
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attachment not found.',
+      });
+    }
+
+    const attachment = doubt.attachments[index];
+
+    if (!attachment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attachment not found.',
+      });
+    }
+
+    const isPdf =
+      attachment.attachmentType === 'pdf' ||
+      attachment.mimeType === 'application/pdf';
+
+    if (!isPdf) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only PDF attachments can be downloaded through this endpoint.',
+      });
+    }
+
+    if (!attachment.publicId) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attachment storage reference is missing.',
+      });
+    }
+
+    const resourceType = attachment.resourceType || 'raw';
+
+    const url = cloudinaryService.getSignedUrl(
+      attachment.publicId,
+      resourceType,
+      900
+    );
+
+    if (!url) {
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to generate secure download URL.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      url,
+      filename:
+        attachment.originalFilename ||
+        `doubt-attachment-${index + 1}.pdf`,
+      mimeType: attachment.mimeType || 'application/pdf',
+      fileSize: attachment.fileSize || 0,
+    });
+  } catch (error) {
+    console.error('[Doubt PDF Download]', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate download URL.',
+    });
+  }
+};
+
+
+const downloadReplyAttachment = async (req, res) => {
+  try {
+    const {
+      doubtId,
+      replyId,
+      attachmentIndex,
+    } = req.params;
+
+    const doubt = await Doubt.findById(doubtId);
+
+    if (!doubt || doubt.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doubt not found.',
+      });
+    }
+
+    if (!canAccessDoubt(doubt, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied.',
+      });
+    }
+
+    const reply = await DoubtReply.findOne({
+      _id: replyId,
+      doubtId: doubt._id,
+      isDeleted: false,
+    });
+
+    if (!reply) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reply not found.',
+      });
+    }
+
+    const index = Number(attachmentIndex);
+
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= (reply.attachments || []).length
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reply attachment not found.',
+      });
+    }
+
+    const attachment = reply.attachments[index];
+
+    if (!attachment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reply attachment not found.',
+      });
+    }
+
+    const isPdf =
+      attachment.attachmentType === 'pdf' ||
+      attachment.mimeType === 'application/pdf';
+
+    if (!isPdf) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only PDF attachments can be downloaded through this endpoint.',
+      });
+    }
+
+    if (!attachment.publicId) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attachment storage reference is missing.',
+      });
+    }
+
+    const resourceType = attachment.resourceType || 'raw';
+
+    const url = cloudinaryService.getSignedUrl(
+      attachment.publicId,
+      resourceType,
+      900
+    );
+
+    if (!url) {
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to generate secure download URL.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      url,
+      filename:
+        attachment.originalFilename ||
+        `reply-attachment-${index + 1}.pdf`,
+      mimeType: attachment.mimeType || 'application/pdf',
+      fileSize: attachment.fileSize || 0,
+    });
+  } catch (error) {
+    console.error('[Doubt Reply PDF Download]', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate download URL.',
+    });
+  }
+};
 
 module.exports = {
-	getTeacherSearch,
-	uploadDoubtAttachment,
-	createDoubt,
-	listDoubts,
-	getDoubtDetail,
-	addReply,
-	updateDoubtStatus,
-	reassignTeachers,
-	deleteAbusiveContent,
-	getDashboardMetrics,
-	getRetentionSettings,
-	updateRetentionSettings,
-	exportDoubts,
+  getTeacherSearch,
+  uploadDoubtAttachment,
+  createDoubt,
+  listDoubts,
+  getDoubtDetail,
+  addReply,
+  updateDoubtStatus,
+  reassignTeachers,
+  deleteAbusiveContent,
+  getDashboardMetrics,
+  getRetentionSettings,
+  updateRetentionSettings,
+  exportDoubts,
+  downloadAttachment,
+  downloadReplyAttachment,
 };

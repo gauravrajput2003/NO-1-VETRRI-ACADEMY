@@ -798,6 +798,22 @@ export const uploadDoubtAttachmentAPI = async ({ uri, name, type }) => {
 
   return { data };
 };
+export const getDoubtAttachmentDownloadUrlAPI = (
+  doubtId,
+  attachmentIndex
+) =>
+  api.get(
+    `/doubts/${doubtId}/attachments/${attachmentIndex}/download`
+  );
+
+export const getDoubtReplyAttachmentDownloadUrlAPI = (
+  doubtId,
+  replyId,
+  attachmentIndex
+) =>
+  api.get(
+    `/doubts/${doubtId}/replies/${replyId}/attachments/${attachmentIndex}/download`
+  );
 // Training Videos — Student (reuses same shared endpoints as teacher)
 export const getStudentTrainingVideosAPI = (params) =>
   api.get('/training-videos', { params });
