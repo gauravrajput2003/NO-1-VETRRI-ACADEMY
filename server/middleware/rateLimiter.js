@@ -1,5 +1,5 @@
 const rateLimit = require('express-rate-limit');
-const { ipKeyGenerator } = require('express-rate-limit');
+
 
 
 // ─────────────────────────────────────────────
@@ -27,7 +27,7 @@ const authLimiter = rateLimit({
       .trim()
       .toLowerCase();
 
-    const ip = ipKeyGenerator(req.ip);
+    const ip = req.ip || req.socket.remoteAddress;
 
     return `${ip}:${email}`;
   },
@@ -74,7 +74,7 @@ const generalLimiter = rateLimit({
       return authHeader;
     }
 
-    return ipKeyGenerator(req.ip);
+    return req.ip || req.socket.remoteAddress;
   },
 
   skip: (req) => {
