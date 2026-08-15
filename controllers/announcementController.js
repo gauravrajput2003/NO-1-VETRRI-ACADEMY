@@ -294,13 +294,12 @@ const downloadMedia = async (req, res) => {
 
     const StorageService = require('../services/StorageService');
     const filename = mediaItem.originalFilename || `document_${index}.pdf`;
-    const extension = filename.split('.').pop() || 'pdf';
 
-    const downloadUrl = await StorageService.getDownloadUrl(
-      mediaItem.url,
-      'cloudinary',
-      { originalFilename: filename, extension },
-      true
+    // Cloudinary strict delivery requires signed URLs for raw files
+    const downloadUrl = StorageService.getSignedUrl(
+      mediaItem.publicId,
+      mediaItem.resourceType || 'raw',
+      900
     );
 
     res.json({

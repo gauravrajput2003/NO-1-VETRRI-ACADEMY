@@ -240,11 +240,17 @@ function DocumentAnnouncement({ document, announcementId, index }) {
         const { downloadAndOpenFile } = require('../utils/fileUtils');
         
         const { data } = await getAnnouncementDownloadUrlAPI(announcementId, index);
+        console.log('[PDF DOWNLOAD] starting for URL:', data.url);
         if (data.success && data.url) {
-          await downloadAndOpenFile(data.url, data.filename, (p) => setProgress(p));
+          const fileInfo = await downloadAndOpenFile(data.url, data.filename, (p) => setProgress(p));
+          console.log('[PDF DOWNLOAD] local URI:', fileInfo.uri);
         }
       } catch (e) {
-        console.log('PDF download failed:', e);
+        console.log('[PDF DOWNLOAD] Error:', e.message);
+        console.log('[PDF DOWNLOAD] Stack:', e.stack);
+        import('react-native').then(({ Alert }) => {
+          Alert.alert('Download Error', e.message || 'Failed to download PDF.');
+        });
       } finally {
         setDownloading(false);
         setProgress(0);

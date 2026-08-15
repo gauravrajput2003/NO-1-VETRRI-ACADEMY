@@ -751,8 +751,280 @@ const exportDoubts = async (req, res) => {
 			res.setHeader('Content-Disposition', `attachment; filename="doubts-export-${Date.now()}.csv"`);
 			return res.send(csv);
 		}
+		});
+
+		await emitNotificationAndSocket({
+			req,
+			recipients: teacherIds,
+			type: 'doubt_assigned',
+			title: 'Doubt Reassigned',
+			message: `Admin assigned you: ${doubt.title}`,
+			data: { doubtId: doubt._id, route: 'DoubtDetail' },
+		});
+
+		res.json({ success: true, assignedTeachers: teacherIds });
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const deleteAbusiveContent = async (req, res) => {
+	try {
+		if (req.user.role !== 'admin') {
+			return res.status(403).json({ success: false, message: 'Only admin can delete abuse content.' });
+		}
+
+		const { type } = req.body;
+		const reason = trimSafe(req.body.reason) || 'abuse';
+
+		if (type === 'doubt') {
+			await Doubt.findByIdAndUpdate(req.params.id, {
+				isDeleted: true,
+				deletedBy: req.user._id,
+				deletedReason: reason,
+			});
+			await createAuditLog({ doubtId: req.params.id, actor: req.user, action: 'content_deleted', metadata: { type: 'doubt', reason } });
+			return res.json({ success: true });
+		}
+
+		if (type === 'reply') {
+			const replyId = req.body.replyId || req.params.replyId;
+			await DoubtReply.findByIdAndUpdate(replyId, {
+				isDeleted: true,
+				deletedBy: req.user._id,
+				deletedReason: reason,
+			});
+			await createAuditLog({ doubtId: req.params.id, actor: req.user, action: 'content_deleted', metadata: { type: 'reply', replyId, reason } });
+			return res.json({ success: true });
+		}
+
+		return res.status(400).json({ success: false, message: 'type should be doubt or reply.' });
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const getDashboardMetrics = async (req, res) => {
+	try {
+		const now = new Date();
+		const base = { isDeleted: false };
+
+		if (req.user.role === 'student') {
+			const [total, resolved, pending] = await Promise.all([
+				Doubt.countDocuments({ ...base, studentId: req.user._id }),
+				Doubt.countDocuments({ ...base, studentId: req.user._id, status: STATUS.RESOLVED }),
+				Doubt.countDocuments({ ...base, studentId: req.user._id, status: { $in: [STATUS.OPEN, STATUS.TEACHER_RESPONDED, STATUS.WAITING_FOR_STUDENT] } }),
+			]);
+			return res.json({ success: true, metrics: { totalDoubts: total, resolvedDoubts: resolved, pendingDoubts: pending } });
+		}
+
+		if (req.user.role === 'teacher') {
+			const assignedQuery = { ...base, assignedTeachers: req.user._id };
+			const [assigned, pending, responded, aggregates] = await Promise.all([
+				Doubt.countDocuments(assignedQuery),
+				Doubt.countDocuments({ ...assignedQuery, status: { $in: [STATUS.OPEN, STATUS.WAITING_FOR_STUDENT] } }),
+				Doubt.countDocuments({ ...assignedQuery, status: { $in: [STATUS.TEACHER_RESPONDED, STATUS.RESOLVED, STATUS.CLOSED] } }),
+				Doubt.aggregate([
+					{ $match: { ...assignedQuery, firstResponseAt: { $exists: true } } },
+					{
+						$project: {
+							responseMinutes: {
+								$divide: [{ $subtract: ['$firstResponseAt', '$createdAt'] }, 1000 * 60],
+							},
+							resolutionMinutes: {
+								$cond: [
+									{ $ifNull: ['$resolvedAt', false] },
+									{ $divide: [{ $subtract: ['$resolvedAt', '$createdAt'] }, 1000 * 60] },
+									null,
+								],
+							},
+						},
+					},
+					{
+						$group: {
+							_id: null,
+							avgResponseMinutes: { $avg: '$responseMinutes' },
+							avgResolutionMinutes: { $avg: '$resolutionMinutes' },
+						},
+					},
+				]),
+			]);
+
+			const avgResponseMinutes = aggregates[0]?.avgResponseMinutes || 0;
+			const avgResolutionMinutes = aggregates[0]?.avgResolutionMinutes || 0;
+			const responseRate = assigned ? Math.round((responded / assigned) * 100) : 0;
+
+			return res.json({
+				success: true,
+				metrics: {
+					assignedDoubts: assigned,
+					pendingDoubts: pending,
+					responseRate,
+					averageResponseTimeMinutes: Number(avgResponseMinutes.toFixed(1)),
+					averageResolutionTimeMinutes: Number(avgResolutionMinutes.toFixed(1)),
+				},
+			});
+		}
+
+		const [total, open, resolved, closed, highPriority] = await Promise.all([
+			Doubt.countDocuments(base),
+			Doubt.countDocuments({ ...base, status: { $in: [STATUS.OPEN, STATUS.TEACHER_RESPONDED, STATUS.WAITING_FOR_STUDENT] } }),
+			Doubt.countDocuments({ ...base, status: STATUS.RESOLVED }),
+			Doubt.countDocuments({ ...base, status: STATUS.CLOSED }),
+			Doubt.countDocuments({ ...base, priority: 'high' }),
+		]);
+
+		res.json({ success: true, metrics: { totalDoubts: total, openDoubts: open, resolvedDoubts: resolved, closedDoubts: closed, highPriorityDoubts: highPriority, generatedAt: now } });
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const getRetentionSettings = async (req, res) => {
+	try {
+		const settings = await DoubtSetting.findOne({ key: 'doubt_retention' }).lean();
+		res.json({ success: true, retentionDays: settings?.retentionDays || 180 });
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const updateRetentionSettings = async (req, res) => {
+	try {
+		if (req.user.role !== 'admin') {
+			return res.status(403).json({ success: false, message: 'Only admin can update retention.' });
+		}
+
+		const retentionDays = parseInt(req.body.retentionDays, 10);
+		if (!Number.isFinite(retentionDays) || retentionDays < 30 || retentionDays > 3650) {
+			return res.status(400).json({ success: false, message: 'retentionDays must be between 30 and 3650.' });
+		}
+
+		await DoubtSetting.findOneAndUpdate(
+			{ key: 'doubt_retention' },
+			{ retentionDays, updatedBy: req.user._id },
+			{ upsert: true, new: true }
+		);
+
+		await createAuditLog({ doubtId: null, actor: req.user, action: 'retention_updated', metadata: { retentionDays } });
+
+		res.json({ success: true, retentionDays });
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const exportDoubts = async (req, res) => {
+	try {
+		if (req.user.role !== 'admin') {
+			return res.status(403).json({ success: false, message: 'Only admin can export reports.' });
+		}
+
+		const query = buildDoubtQuery(req.user, req.query);
+		const doubts = await Doubt.find(query)
+			.populate('studentId', 'name displayName')
+			.populate('assignedTeachers', 'name displayName')
+			.sort({ createdAt: -1 })
+			.limit(2000)
+			.lean();
+
+		const format = trimSafe(req.query.format || 'json').toLowerCase();
+		if (format === 'csv') {
+			const header = ['id', 'title', 'status', 'student', 'teachers', 'createdAt', 'updatedAt'];
+			const rows = doubts.map((d) => [
+				d._id,
+				JSON.stringify(d.title || ''),
+				d.status,
+				JSON.stringify(d.studentId?.displayName || d.studentId?.name || ''),
+				JSON.stringify((d.assignedTeachers || []).map((t) => t.displayName || t.name).join('; ')),
+				d.createdAt,
+				d.updatedAt,
+			].join(','));
+
+			const csv = [header.join(','), ...rows].join('\n');
+			res.setHeader('Content-Type', 'text/csv');
+			res.setHeader('Content-Disposition', `attachment; filename="doubts-export-${Date.now()}.csv"`);
+			return res.send(csv);
+		}
 
 		return res.json({ success: true, count: doubts.length, doubts });
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const downloadAttachment = async (req, res) => {
+	try {
+		const doubt = await Doubt.findById(req.params.id);
+		if (!doubt || doubt.isDeleted) {
+			return res.status(404).json({ success: false, message: 'Doubt not found.' });
+		}
+		if (!canAccessDoubt(doubt, req.user)) {
+			return res.status(403).json({ success: false, message: 'Access denied.' });
+		}
+
+		const index = parseInt(req.params.index, 10);
+		if (isNaN(index) || !doubt.attachments || index < 0 || index >= doubt.attachments.length) {
+			return res.status(404).json({ success: false, message: 'Attachment not found.' });
+		}
+
+		const att = doubt.attachments[index];
+		const StorageService = require('../services/StorageService');
+		
+		const downloadUrl = StorageService.getSignedUrl(
+			att.publicId,
+			att.resourceType || 'raw',
+			900
+		);
+
+		res.json({
+			success: true,
+			url: downloadUrl,
+			filename: att.originalFilename || `attachment_${index}`,
+			mimeType: att.mimeType,
+			fileSize: att.fileSize || 0,
+		});
+	} catch (error) {
+		res.status(500).json({ success: false, message: error.message });
+	}
+};
+
+const downloadReplyAttachment = async (req, res) => {
+	try {
+		const doubt = await Doubt.findById(req.params.id);
+		if (!doubt || doubt.isDeleted) {
+			return res.status(404).json({ success: false, message: 'Doubt not found.' });
+		}
+		if (!canAccessDoubt(doubt, req.user)) {
+			return res.status(403).json({ success: false, message: 'Access denied.' });
+		}
+
+		const reply = await DoubtReply.findOne({ _id: req.params.replyId, doubtId: doubt._id, isDeleted: false });
+		if (!reply) {
+			return res.status(404).json({ success: false, message: 'Reply not found.' });
+		}
+
+		const index = parseInt(req.params.index, 10);
+		if (isNaN(index) || !reply.attachments || index < 0 || index >= reply.attachments.length) {
+			return res.status(404).json({ success: false, message: 'Attachment not found.' });
+		}
+
+		const att = reply.attachments[index];
+		const StorageService = require('../services/StorageService');
+		
+		const downloadUrl = StorageService.getSignedUrl(
+			att.publicId,
+			att.resourceType || 'raw',
+			900
+		);
+
+		res.json({
+			success: true,
+			url: downloadUrl,
+			filename: att.originalFilename || `attachment_${index}`,
+			mimeType: att.mimeType,
+			fileSize: att.fileSize || 0,
+		});
 	} catch (error) {
 		res.status(500).json({ success: false, message: error.message });
 	}

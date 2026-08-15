@@ -110,11 +110,17 @@ function AttachmentChip({ attachment, onOpen, isDoubt, doubtId, replyId, index }
           if (data.success) { url = data.url; filename = data.filename; }
         }
         
+        console.log('[PDF DOWNLOAD] starting for URL:', url);
         if (url) {
-          await downloadAndOpenFile(url, filename, (p) => setProgress(p));
+          const fileInfo = await downloadAndOpenFile(url, filename, (p) => setProgress(p));
+          console.log('[PDF DOWNLOAD] local URI:', fileInfo.uri);
         }
       } catch (e) {
-        Toast.show({ type: 'error', text1: 'Download Failed' });
+        console.log('[PDF DOWNLOAD] Error:', e.message);
+        console.log('[PDF DOWNLOAD] Stack:', e.stack);
+        import('react-native').then(({ Alert }) => {
+          Alert.alert('Download Error', e.message || 'Failed to download PDF.');
+        });
       } finally {
         setDownloading(false);
         setProgress(0);
