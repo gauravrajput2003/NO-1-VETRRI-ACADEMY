@@ -254,4 +254,65 @@ const deleteAnnouncement = async (req, res) => {
   }
 };
 
-module.exports = { createAnnouncement, getAnnouncements, getActiveAnnouncements, markAsRead, updateAnnouncement, deleteAnnouncement };
+const downloadMedia = async (req, res) => {
+  try {
+    const { id, mediaIndex } = req.params;
+    const user = req.user;
+
+    const announcement = await Announcement.findOne({ _id: id, deletedAt: null });
+    if (!announcement) {
+      return res.status(404).json({ success: false, message: 'Announcement not found.' });
+    }
+
+    // Access check similar to getActiveAnnouncements
+    if (user.role !== 'admin') {
+      if (announcement.targetRole !== 'all' && announcement.targetRole !== user.role) {
+        return res.status(403).json({ success: false, message: 'Access denied.' });
+      }
+      if (user.role === 'student') {
+        if (announcement.targetCourse && String(announcement.targetCourse) !== String(user.course)) {
+          return res.status(403).json({ success: false, message: 'Access denied (Course mismatch).' });
+        }
+        if (announcement.targetGrade && announcement.targetGrade !== user.grade) {
+          return res.status(403).json({ success: false, message: 'Access denied (Grade mismatch).' });
+        }
+      }
+    }
+
+    const index = parseInt(mediaIndex, 10);
+    if (isNaN(index) || !announcement.media || index < 0 || index >= announcement.media.length) {
+      return res.status(404).json({ success: false, message: 'Media not found at the specified index.' });
+    }
+
+    const mediaItem = announcement.media[index];
+    const mimeType = mediaItem.mimeType || 'application/pdf';
+
+    // Only allow download for document/pdf
+    if (mediaItem.type !== 'document' && mimeType !== 'application/pdf') {
+      return res.status(400).json({ success: false, message: 'Only documents/PDFs can be downloaded via this endpoint.' });
+    }
+
+    const StorageService = require('../services/StorageService');
+    const filename = mediaItem.originalFilename || `document_${index}.pdf`;
+    const extension = filename.split('.').pop() || 'pdf';
+
+    const downloadUrl = await StorageService.getDownloadUrl(
+      mediaItem.url,
+      'cloudinary',
+      { originalFilename: filename, extension },
+      true
+    );
+
+    res.json({
+      success: true,
+      url: downloadUrl,
+      filename,
+      mimeType,
+      fileSize: mediaItem.fileSize || 0,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { createAnnouncement, getAnnouncements, getActiveAnnouncements, markAsRead, updateAnnouncement, deleteAnnouncement, downloadMedia };

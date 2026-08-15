@@ -32,7 +32,10 @@ import {
   deleteDoubtContentAPI,
   searchDoubtTeachersAPI,
   uploadDoubtAttachmentAPI,
+  getDoubtAttachmentDownloadUrlAPI,
+  getDoubtReplyAttachmentDownloadUrlAPI,
 } from '../../services/api';
+import { downloadAndOpenFile } from '../../utils/fileUtils';
 import { joinRoom, leaveRoom, onSocketEvent } from '../../services/socket';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
@@ -81,17 +84,65 @@ const toUploadFile = (asset) => ({
   type: asset.mimeType || asset.type || 'application/octet-stream',
 });
 
-function AttachmentChip({ attachment, onOpen }) {
+function AttachmentChip({ attachment, onOpen, isDoubt, doubtId, replyId, index }) {
   const isAudio = attachment.attachmentType === 'audio';
-  const isPdf = attachment.attachmentType === 'pdf';
+  const isPdf = attachment.attachmentType === 'pdf' || attachment.mimeType === 'application/pdf';
   const icon = isAudio ? 'mic' : isPdf ? 'document-text' : 'image';
   const color = isAudio ? D.pinkDark : isPdf ? D.goldenDark : D.tealDark;
   const bg = isAudio ? D.pinkLight : isPdf ? D.goldenLight : D.tealLight;
+  
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handlePress = async () => {
+    if (isPdf) {
+      if (downloading) return;
+      try {
+        setDownloading(true);
+        setProgress(0);
+        
+        let url, filename;
+        if (isDoubt) {
+          const { data } = await getDoubtAttachmentDownloadUrlAPI(doubtId, index);
+          if (data.success) { url = data.url; filename = data.filename; }
+        } else {
+          const { data } = await getDoubtReplyAttachmentDownloadUrlAPI(doubtId, replyId, index);
+          if (data.success) { url = data.url; filename = data.filename; }
+        }
+        
+        if (url) {
+          await downloadAndOpenFile(url, filename, (p) => setProgress(p));
+        }
+      } catch (e) {
+        Toast.show({ type: 'error', text1: 'Download Failed' });
+      } finally {
+        setDownloading(false);
+        setProgress(0);
+      }
+    } else {
+      if (onOpen) onOpen();
+    }
+  };
+
   return (
-    <TouchableOpacity style={[styles.attachChip, { backgroundColor: bg }]} onPress={onOpen}>
-      <Ionicons name={icon} size={18} color={color} />
-      <Text style={[styles.attachChipText, { color }]} numberOfLines={1}>{attachment.originalFilename || attachment.attachmentType}</Text>
-    </TouchableOpacity>
+    <View style={{ marginBottom: 6 }}>
+      <TouchableOpacity style={[styles.attachChip, { backgroundColor: bg }]} onPress={handlePress} disabled={downloading}>
+        <Ionicons name={downloading ? 'hourglass-outline' : icon} size={18} color={color} />
+        <Text style={[styles.attachChipText, { color }]} numberOfLines={1}>{attachment.originalFilename || attachment.attachmentType}</Text>
+        {isPdf && !downloading && <Ionicons name="download-outline" size={16} color={color} />}
+      </TouchableOpacity>
+      {downloading && (
+         <View style={{ marginTop: 2, paddingHorizontal: 4 }}>
+           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+             <Text style={{ fontSize: 10, color: '#888' }}>Downloading...</Text>
+             <Text style={{ fontSize: 10, color: color, fontWeight: 'bold' }}>{Math.round(progress * 100)}%</Text>
+           </View>
+           <View style={{ height: 3, backgroundColor: '#E8E8E8', borderRadius: 2 }}>
+             <View style={{ height: '100%', width: `${progress * 100}%`, backgroundColor: color }} />
+           </View>
+         </View>
+      )}
+    </View>
   );
 }
 
@@ -410,7 +461,14 @@ export default function DoubtThreadScreen({ route, navigation }) {
           <View style={styles.replyAttachWrap}>
             {item.attachments.map((att, idx) => (
               <View key={`${att.publicId || idx}-${idx}`}>
-                <AttachmentChip attachment={att} onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })} />
+                <AttachmentChip
+                  attachment={att}
+                  isDoubt={false}
+                  doubtId={doubtId}
+                  replyId={item._id}
+                  index={idx}
+                  onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })}
+                />
                 {att.attachmentType === 'audio' ? <AudioAttachmentPlayer attachment={att} /> : null}
               </View>
             ))}
@@ -508,7 +566,13 @@ export default function DoubtThreadScreen({ route, navigation }) {
                 <View style={styles.replyAttachWrap}>
                   {currentDoubt.attachments.map((att, idx) => (
                     <View key={`${att.publicId || idx}-${idx}`}>
-                      <AttachmentChip attachment={att} onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })} />
+                      <AttachmentChip
+                        attachment={att}
+                        isDoubt={true}
+                        doubtId={doubtId}
+                        index={idx}
+                        onOpen={() => navigation.navigate('DocumentViewer', { url: att.url, title: att.originalFilename || att.attachmentType || 'Attachment', fileType: att.attachmentType, mimeType: att.mimeType, allowDownload: true })}
+                      />
                       {att.attachmentType === 'audio' ? <AudioAttachmentPlayer attachment={att} /> : null}
                     </View>
                   ))}

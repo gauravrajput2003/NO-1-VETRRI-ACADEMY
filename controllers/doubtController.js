@@ -772,4 +772,6 @@ module.exports = {
 	getRetentionSettings,
 	updateRetentionSettings,
 	exportDoubts,
+	downloadAttachment,
+	downloadReplyAttachment,
 };

@@ -632,6 +632,9 @@ export const getActiveAnnouncementsAPI = () =>
 export const markAnnouncementReadAPI = (id) =>
   api.post(`/announcements/${id}/read`);
 
+export const getAnnouncementDownloadUrlAPI = (id, index) =>
+  api.get(`/announcements/${id}/media/${index}/download`);
+
 // Storage — Cloudinary signed upload params (shared with materials)
 export const getCloudinaryUploadParamsAPI = (data) =>
   api.post('/storage/cloudinary/upload-params', data);

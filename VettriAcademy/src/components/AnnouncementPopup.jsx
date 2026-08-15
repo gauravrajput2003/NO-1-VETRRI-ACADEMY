@@ -223,74 +223,87 @@ function VideoAnnouncement({ video }) {
 // Document / PDF
 // ─────────────────────────────────────────────
 
-function DocumentAnnouncement({ document, navigation }) {
-  const openDocument = () => {
-    if (!document?.url) {
-      console.warn('[Announcement PDF] Missing URL:', document);
-      return;
-    }
+function DocumentAnnouncement({ document, announcementId, index }) {
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-    const normalizedUrl = normalizeMaterialFileUrl(
-      document.url,
-      {
-        resourceType:
-          document.resourceType ||
-          document.resource_type ||
-          'raw',
-        publicId:
-          document.publicId ||
-          document.public_id,
+  const handleDocumentAction = async () => {
+    const isPdf = document.mimeType === 'application/pdf' || document.type === 'pdf';
+
+    if (isPdf) {
+      if (downloading) return;
+      try {
+        setDownloading(true);
+        setProgress(0);
+        
+        const { getAnnouncementDownloadUrlAPI } = require('../services/api');
+        const { downloadAndOpenFile } = require('../utils/fileUtils');
+        
+        const { data } = await getAnnouncementDownloadUrlAPI(announcementId, index);
+        if (data.success && data.url) {
+          await downloadAndOpenFile(data.url, data.filename, (p) => setProgress(p));
+        }
+      } catch (e) {
+        console.log('PDF download failed:', e);
+      } finally {
+        setDownloading(false);
+        setProgress(0);
       }
-    );
-
-    console.log('[Announcement PDF] Opening:', {
-      originalUrl: document.url,
-      normalizedUrl,
-      filename: document.originalFilename,
-      mimeType: document.mimeType,
-      resourceType: document.resourceType || document.resource_type,
-      publicId: document.publicId || document.public_id,
-    });
-
-    navigation.navigate('PdfViewer', {
-      title: document.originalFilename || 'PDF Document',
-      pdfUrl: normalizedUrl,
-      materialId: document._id || null,
-      totalPages: document.totalPages || 0,
-    });
+    } else {
+      // Non-PDF documents fallback
+      if (document?.url) {
+        Linking.openURL(document.url).catch(() => {});
+      }
+    }
   };
 
   return (
-    <TouchableOpacity
-      style={styles.documentBox}
-      onPress={openDocument}
-      activeOpacity={0.8}
-    >
-      <View style={styles.documentIcon}>
-        <Text style={styles.documentIconText}>
-          📄
-        </Text>
-      </View>
+    <View style={{ marginBottom: 12 }}>
+      <TouchableOpacity
+        style={styles.documentBox}
+        onPress={handleDocumentAction}
+        activeOpacity={0.8}
+        disabled={downloading}
+      >
+        <View style={styles.documentIcon}>
+          <Text style={styles.documentIconText}>📄</Text>
+        </View>
 
-      <View style={styles.documentInfo}>
-        <Text
-          style={styles.documentName}
-          numberOfLines={1}
-        >
-          {document.originalFilename || 'File Attachment'}
-        </Text>
+        <View style={styles.documentInfo}>
+          <Text style={styles.documentName} numberOfLines={1}>
+            {document.originalFilename || 'File Attachment'}
+          </Text>
 
-        <Text style={styles.documentHint}>
-          {document.mimeType === 'application/pdf'
-            ? 'Tap to preview PDF'
-            : 'Tap to open attachment'}
-        </Text>
-      </View>
+          <Text style={styles.documentHint}>
+            {document.mimeType === 'application/pdf' || document.type === 'pdf'
+              ? 'Tap to download PDF'
+              : 'Tap to open attachment'}
+          </Text>
+        </View>
 
-      <Text style={styles.documentArrow}>
-        →
-      </Text>
-    </TouchableOpacity>
+        {downloading ? (
+          <Text style={styles.documentArrow}>⏳</Text>
+        ) : (
+          <Text style={styles.documentArrow}>
+            {document.mimeType === 'application/pdf' || document.type === 'pdf' ? '⬇' : '→'}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      {downloading && (
+        <View style={{ marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={{ fontSize: 12, color: '#888' }}>Downloading...</Text>
+            <Text style={{ fontSize: 12, color: '#FF4F8B', fontWeight: 'bold' }}>
+              {Math.round(progress * 100)}%
+            </Text>
+          </View>
+          <View style={{ height: 4, backgroundColor: '#E8E8E8', borderRadius: 2, overflow: 'hidden' }}>
+            <View style={{ height: '100%', width: `${progress * 100}%`, backgroundColor: '#FF4F8B' }} />
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -492,8 +505,7 @@ export function AnnouncementPopup() {
       : Colors.textSecondary.light;
 
 
-  const media =
-    current.media || [];
+  const media = (current.media || []).map((m, idx) => ({ ...m, _mediaIndex: idx }));
 
   const images =
     media.filter(
@@ -692,13 +704,12 @@ export function AnnouncementPopup() {
             )}
 
 
-            {/* FILE / PDF */}
-
-            {documents.map((document, index) => (
+            {documents.map((document) => (
               <DocumentAnnouncement
-                key={`document-${index}`}
+                key={`document-${document._mediaIndex}`}
                 document={document}
-                navigation={navigation}
+                announcementId={current._id}
+                index={document._mediaIndex}
               />
             ))}
 
