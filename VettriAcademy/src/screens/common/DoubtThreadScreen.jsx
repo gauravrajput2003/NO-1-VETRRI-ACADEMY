@@ -345,7 +345,7 @@ export default function DoubtThreadScreen({ route, navigation }) {
   const onPickAttachment = async () => {
     const result = await DocumentPicker.getDocumentAsync({
       multiple: true,
-      type: ['image/jpeg', 'image/png', 'application/pdf', 'audio/*'],
+      type: ['image/jpeg', 'image/png', 'application/pdf', 'audio/*', 'video/mp4', 'video/quicktime', 'video/webm'],
       copyToCacheDirectory: true,
     });
     if (result.canceled) return;

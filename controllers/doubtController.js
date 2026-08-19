@@ -11,6 +11,7 @@ const VALID_ATTACHMENT_MIMES = {
 	image: ['image/jpeg', 'image/png'],
 	pdf: ['application/pdf'],
 	audio: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'],
+	video: ['video/mp4', 'video/quicktime', 'video/webm'],
 };
 
 const STATUS = {
@@ -195,13 +196,14 @@ const uploadDoubtAttachment = async (req, res) => {
 		const isImage = VALID_ATTACHMENT_MIMES.image.includes(mimetype);
 		const isPdf = VALID_ATTACHMENT_MIMES.pdf.includes(mimetype);
 		const isAudio = VALID_ATTACHMENT_MIMES.audio.includes(mimetype);
+		const isVideo = VALID_ATTACHMENT_MIMES.video.includes(mimetype);
 
-		if (!isImage && !isPdf && !isAudio) {
-			return res.status(400).json({ success: false, message: 'Only JPG, PNG, PDF, and audio files are allowed.' });
+		if (!isImage && !isPdf && !isAudio && !isVideo) {
+			return res.status(400).json({ success: false, message: 'Only JPG, PNG, PDF, audio, and video files are allowed.' });
 		}
 
-		const attachmentType = isImage ? 'image' : isPdf ? 'pdf' : 'audio';
-		const resourceType = (isImage || isPdf) ? 'image' : 'raw';
+		const attachmentType = isImage ? 'image' : isPdf ? 'pdf' : isAudio ? 'audio' : 'video';
+		const resourceType = isVideo ? 'video' : (isImage || isPdf) ? 'image' : 'raw';
 
 		const uploaded = await uploadToCloudinary(buffer, {
 			folder: 'doubts/attachments',
@@ -231,33 +233,68 @@ const uploadDoubtAttachment = async (req, res) => {
 
 const createDoubt = async (req, res) => {
 	try {
-		if (req.user.role !== 'student') {
-			return res.status(403).json({ success: false, message: 'Only students can create doubts.' });
+		const userRole = req.user.role;
+		
+		// Both students and teachers can create doubts
+		if (userRole !== 'student' && userRole !== 'teacher') {
+			return res.status(403).json({ success: false, message: 'Only students and teachers can create doubts.' });
 		}
 
 		const title = trimSafe(req.body.title);
 		const description = trimSafe(req.body.description);
-
-		const assignedTeachers = parseTeacherIds(req.body.assignedTeachers);
 		const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
 
 		if (!title || !description) {
 			return res.status(400).json({ success: false, message: 'Title and description are required.' });
 		}
 
-		const validTeachers = assignedTeachers.length
-			? await User.find({ _id: { $in: assignedTeachers }, role: 'teacher', isActive: true }).select('_id')
-			: [];
-		const teacherIds = validTeachers.map((t) => t._id);
+		let studentId;
+		let assignedTeachers = [];
+		let participants = [];
+
+		if (userRole === 'student') {
+			// Student-initiated doubt (existing logic)
+			const parsedTeacherIds = parseTeacherIds(req.body.assignedTeachers);
+			
+			const validTeachers = parsedTeacherIds.length
+				? await User.find({ _id: { $in: parsedTeacherIds }, role: 'teacher', isActive: true }).select('_id')
+				: [];
+			assignedTeachers = validTeachers.map((t) => t._id);
+			
+			studentId = req.user._id;
+			participants = [req.user._id, ...assignedTeachers];
+		} else if (userRole === 'teacher') {
+			// Teacher-initiated doubt
+			const targetStudentId = toObjectId(req.body.targetStudentId);
+			
+			if (!targetStudentId) {
+				return res.status(400).json({ success: false, message: 'targetStudentId is required for teacher-initiated doubts.' });
+			}
+
+			// Validate target student exists, is a student, and is active
+			const targetStudent = await User.findOne({
+				_id: targetStudentId,
+				role: 'student',
+				isActive: true
+			}).select('_id');
+
+			if (!targetStudent) {
+				return res.status(404).json({ success: false, message: 'Target student not found or inactive.' });
+			}
+
+			studentId = targetStudent._id;
+			assignedTeachers = [req.user._id]; // The creating teacher is assigned
+			participants = [req.user._id, studentId];
+		}
 
 		const doubt = await Doubt.create({
 			title,
 			description,
 
-			studentId: req.user._id,
-			assignedTeachers: teacherIds,
+			studentId,
+			assignedTeachers,
 			attachments,
-			participants: [req.user._id, ...teacherIds],
+			participants,
 			status: STATUS.OPEN,
 			lastActivityAt: new Date(),
 		});
@@ -266,16 +303,30 @@ const createDoubt = async (req, res) => {
 			doubtId: doubt._id,
 			actor: req.user,
 			action: 'doubt_created',
-			metadata: { assignedTeachers: teacherIds.length },
+			metadata: { 
+				assignedTeachers: assignedTeachers.length,
+				initiatedBy: userRole
+			},
 		});
 
-		if (teacherIds.length) {
+		// Notify assigned teachers (for student-initiated) or the target student (for teacher-initiated)
+		if (userRole === 'student' && assignedTeachers.length) {
 			await emitNotificationAndSocket({
 				req,
-				recipients: teacherIds,
+				recipients: assignedTeachers,
 				type: 'doubt_assigned',
 				title: 'New Doubt Assigned',
 				message: `${req.user.displayName || req.user.name} tagged you in a doubt: ${title}`,
+				data: { doubtId: doubt._id, route: 'DoubtDetail' },
+			});
+		} else if (userRole === 'teacher') {
+			// Notify the target student about the teacher-initiated conversation
+			await emitNotificationAndSocket({
+				req,
+				recipients: [studentId],
+				type: 'doubt_assigned',
+				title: 'New Message from Teacher',
+				message: `${req.user.displayName || req.user.name} started a conversation with you: ${title}`,
 				data: { doubtId: doubt._id, route: 'DoubtDetail' },
 			});
 		}

@@ -90,8 +90,10 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
   // Modal state
   const [isUploadModalVisible, setUploadModalVisible] = useState(false);
+  const [isPreviewVisible, setPreviewVisible] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState(null);
-  
+  const [previewFile, setPreviewFile] = useState(null);
+
   // Form state
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -147,7 +149,14 @@ export default function TeacherMaterialsScreen({ navigation }) {
           return;
         }
 
+        // Store for preview
+        setPreviewFile(pickedFile);
         setFile(pickedFile);
+        
+        // Show preview before opening the full upload form
+        if (!editingMaterial) {
+          setPreviewVisible(true);
+        }
       }
     } catch (err) {
       console.log('Error picking file', err);
@@ -340,6 +349,9 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
                 {/* Right Side: Action Column */}
                 <View style={styles.actionCol}>
+                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => handlePreview(item)}>
+                    <Ionicons name="eye" size={18} color="#3B82F6" />
+                  </ScaleBtn>
                   <ScaleBtn style={styles.actionCircleBtn} onPress={() => handleToggleLock(item)}>
                     <Ionicons name={item.lockedForAll ? 'lock-open' : 'lock-closed'} size={18} color="#16A34A" />
                   </ScaleBtn>
@@ -461,6 +473,72 @@ export default function TeacherMaterialsScreen({ navigation }) {
           />
         )}
       </View>
+
+      {/* PREVIEW MODAL - Shows before upload form */}
+      <Modal visible={isPreviewVisible} animationType="slide" transparent={true} onRequestClose={() => { setPreviewVisible(false); setPreviewFile(null); }}>
+        <View style={styles.modalBackdrop}>
+          <LinearGradient colors={['#EC4899', '#F472B6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.previewModalCard}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Preview Material</Text>
+            
+            {/* File Preview */}
+            <View style={styles.previewContainer}>
+              {previewFile && previewFile.mimeType?.startsWith('image/') && (
+                <Image source={{ uri: previewFile.uri }} style={styles.previewImage} resizeMode="contain" />
+              )}
+              {previewFile && previewFile.mimeType?.startsWith('video/') && (
+                <View style={styles.previewVideoContainer}>
+                  <Ionicons name="videocam" size={48} color="#14B8A6" />
+                  <Text style={styles.previewVideoText}>Video: {previewFile.name}</Text>
+                  <Text style={styles.previewVideoSize}>{formatFileSize(previewFile.size)}</Text>
+                </View>
+              )}
+              {previewFile && previewFile.mimeType === 'application/pdf' && (
+                <View style={styles.previewPdfContainer}>
+                  <Ionicons name="document-text" size={48} color="#EF4444" />
+                  <Text style={styles.previewPdfText}>PDF: {previewFile.name}</Text>
+                  <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
+                  <Text style={styles.previewPdfNote}>Tap "Publish" to upload and preview full PDF</Text>
+                </View>
+              )}
+              {previewFile && (previewFile.mimeType?.includes('presentation') || previewFile.mimeType?.includes('powerpoint')) && (
+                <View style={styles.previewPdfContainer}>
+                  <Ionicons name="easel" size={48} color="#F97316" />
+                  <Text style={styles.previewPdfText}>Presentation: {previewFile.name}</Text>
+                  <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* File Info */}
+            <View style={styles.previewInfoCard}>
+              <Text style={styles.previewInfoLabel}>File Details</Text>
+              <View style={styles.previewInfoRow}>
+                <Text style={styles.previewInfoKey}>Name:</Text>
+                <Text style={styles.previewInfoValue}>{previewFile?.name}</Text>
+              </View>
+              <View style={styles.previewInfoRow}>
+                <Text style={styles.previewInfoKey}>Type:</Text>
+                <Text style={styles.previewInfoValue}>{previewFile?.mimeType || 'Unknown'}</Text>
+              </View>
+              <View style={styles.previewInfoRow}>
+                <Text style={styles.previewInfoKey}>Size:</Text>
+                <Text style={styles.previewInfoValue}>{formatFileSize(previewFile?.size || 0)}</Text>
+              </View>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.previewActions}>
+              <TouchableOpacity style={styles.previewCancelBtn} onPress={() => { setPreviewVisible(false); setPreviewFile(null); setFile(null); }}>
+                <Text style={styles.previewCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.previewPublishBtn} onPress={() => { setPreviewVisible(false); setUploadModalVisible(true); }}>
+                <Text style={styles.previewPublishText}>Publish</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
 
       {/* FULL SCREEN UPLOAD MODAL */}
       <Modal visible={isUploadModalVisible} animationType="slide" transparent={false} onRequestClose={closeUploadModal}>
@@ -681,4 +759,32 @@ const styles = StyleSheet.create({
 
   fsSubmitBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
   fsSubmitBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+
+  // Preview Modal Styles
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  previewModalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '85%' },
+  modalHandle: { width: 48, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
+
+  previewContainer: { alignItems: 'center', marginBottom: 20 },
+  previewImage: { width: '100%', maxHeight: 300, borderRadius: 16 },
+  previewVideoContainer: { alignItems: 'center', padding: 40, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, width: '100%' },
+  previewVideoText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 12, marginBottom: 4 },
+  previewVideoSize: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  previewPdfContainer: { alignItems: 'center', padding: 40, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, width: '100%' },
+  previewPdfText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 12, marginBottom: 4 },
+  previewPdfSize: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
+  previewPdfNote: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontStyle: 'italic' },
+
+  previewInfoCard: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, padding: 16, marginBottom: 24, width: '100%' },
+  previewInfoLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  previewInfoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 8 },
+  previewInfoKey: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
+  previewInfoValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', textAlign: 'right' },
+
+  previewActions: { flexDirection: 'row', gap: 12, width: '100%' },
+  previewCancelBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  previewCancelText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  previewPublishBtn: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 16, alignItems: 'center', shadowColor: '#EC4899', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  previewPublishText: { color: '#EC4899', fontSize: 16, fontWeight: '800' },
 });

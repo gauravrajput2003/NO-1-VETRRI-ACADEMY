@@ -264,7 +264,7 @@ const uploadDocument = multer({
  * DOUBT ATTACHMENT UPLOAD
  * - Memory storage for faster upload and immediate cloud push
  * - Max 25MB
- * - Images, PDFs, and audio only
+ * - Images, PDFs, audio, and video
  */
 const uploadDoubtAttachment = multer({
   storage: memStorage,
@@ -281,10 +281,13 @@ const uploadDoubtAttachment = multer({
       'audio/mp4',
       'audio/aac',
       'audio/ogg',
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
     ];
 
     if (!isMimetypeAllowed(file.mimetype, allowed)) {
-      return cb(new Error('Only JPG, PNG, PDF, and audio files are allowed for doubts.'));
+      return cb(new Error('Only JPG, PNG, PDF, audio, and video files are allowed for doubts.'));
     }
 
     cb(null, true);

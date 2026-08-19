@@ -35,6 +35,7 @@ import {
   updateDoubtRetentionAPI,
   uploadDoubtAttachmentAPI,
   getDoubtRetentionAPI,
+  getTeacherStudentsAPI,
 } from '../../services/api';
 
 // ---- BRAND PALETTE: teal + pink + golden + white ----
@@ -226,6 +227,14 @@ export default function DiscussScenarioScreen({ navigation }) {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
 
+  // Teacher-initiated conversation state
+  const [showMessageStudentModal, setShowMessageStudentModal] = useState(false);
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentResults, setStudentResults] = useState([]);
+  const [studentSearchLoading, setStudentSearchLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [creatingTeacherDoubt, setCreatingTeacherDoubt] = useState(false);
+
   const [recordingPaused, setRecordingPaused] = useState(false);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -277,9 +286,36 @@ export default function DiscussScenarioScreen({ navigation }) {
     return () => clearTimeout(timer);
   }, [teacherQuery, showCreateModal]);
 
+  // Student search effect for teacher-initiated conversations
   useEffect(() => {
-    loadList();
-  }, [activeFilter]);
+    if (!showMessageStudentModal || !studentQuery.trim() || studentQuery.trim().length < 2) {
+      setStudentResults([]);
+      setStudentSearchLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setStudentSearchLoading(true);
+        const { data } = await getTeacherStudentsAPI();
+        const candidates = data?.students || data?.results || data?.users || [];
+        const filtered = Array.isArray(candidates) 
+          ? candidates.filter((s) => 
+              (s.name && s.name.toLowerCase().includes(studentQuery.toLowerCase())) ||
+              (s.displayName && s.displayName.toLowerCase().includes(studentQuery.toLowerCase())) ||
+              (s.email && s.email.toLowerCase().includes(studentQuery.toLowerCase()))
+            )
+          : [];
+        setStudentResults(filtered);
+      } catch {
+        setStudentResults([]);
+      } finally {
+        setStudentSearchLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [studentQuery, showMessageStudentModal]);
 
   const selectedTeacherIds = useMemo(() => selectedTeachers.map((t) => t._id), [selectedTeachers]);
 
@@ -312,7 +348,7 @@ export default function DiscussScenarioScreen({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.8,
       allowsMultipleSelection: true,
@@ -340,6 +376,18 @@ export default function DiscussScenarioScreen({ navigation }) {
     const result = await DocumentPicker.getDocumentAsync({
       multiple: true,
       type: ['audio/*'],
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled) return;
+    const files = (result.assets || []).map(toUploadFile);
+    setAttachments((prev) => [...prev, ...files]);
+  };
+
+  const onPickVideo = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      multiple: true,
+      type: ['video/mp4', 'video/quicktime', 'video/webm'],
       copyToCacheDirectory: true,
     });
 
@@ -451,6 +499,47 @@ export default function DiscussScenarioScreen({ navigation }) {
       Toast.show({ type: 'error', text1: 'Failed to create doubt', text2: String(err || '') });
     }
   };
+
+  // Teacher-initiated: Create doubt with target student
+  const onCreateTeacherDoubt = async () => {
+    if (role !== 'teacher') return;
+
+    if (!selectedStudent) {
+      Toast.show({ type: 'error', text1: 'Please select a student first' });
+      return;
+    }
+
+    if (!title.trim() || !description.trim()) {
+      Toast.show({ type: 'error', text1: 'Title and description are required' });
+      return;
+    }
+
+    try {
+      setCreatingTeacherDoubt(true);
+      const uploadedAttachments = await uploadAllAttachments();
+      await dispatch(
+        createDoubt({
+          title: title.trim(),
+          description: description.trim(),
+          targetStudentId: selectedStudent._id,
+          attachments: uploadedAttachments,
+        })
+      ).unwrap();
+
+      Toast.show({ type: 'success', text1: 'Conversation started successfully' });
+      setShowMessageStudentModal(false);
+      resetForm();
+      
+      loadList();
+      loadMetrics();
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Failed to start conversation', text2: String(err || '') });
+    } finally {
+      setCreatingTeacherDoubt(false);
+    }
+  };
+
+ 
 
   const onExport = async (format) => {
     try {
@@ -629,6 +718,17 @@ export default function DiscussScenarioScreen({ navigation }) {
                 </ParticleWrapper>
               ) : null}
 
+              {role === 'teacher' ? (
+                <ParticleWrapper particleCount={18} size="small">
+                  <TouchableOpacity style={styles.primaryActionWrap} onPress={() => setShowMessageStudentModal(true)} activeOpacity={0.9}>
+                    <LinearGradient colors={[D.teal, D.tealDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryAction}>
+                      <Ionicons name="chatbubbles" size={22} color={D.white} />
+                      <Text style={styles.primaryActionText}>Message a Student</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </ParticleWrapper>
+              ) : null}
+
               {role === 'admin' ? (
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                   <TouchableOpacity style={styles.secondaryAction} onPress={() => onExport('json')}>
@@ -733,6 +833,10 @@ export default function DiscussScenarioScreen({ navigation }) {
                   <Ionicons name="document-text" size={24} color={D.goldenDark} />
                   <Text style={styles.attachText}>PDF</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE', borderWidth: 1 }]} onPress={onPickVideo}>
+                  <Ionicons name="videocam" size={24} color={'#A855F7'} />
+                  <Text style={styles.attachText}>Video</Text>
+                </TouchableOpacity>
                 {!recording ? (
                   <>
                     <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#E0E7FF', borderColor: '#C7D2FE', borderWidth: 1 }]} onPress={onPickAudio}>
@@ -779,6 +883,135 @@ export default function DiscussScenarioScreen({ navigation }) {
                 <TouchableOpacity style={styles.submitBtnWrap} onPress={onCreateDoubt} disabled={creating || uploading} activeOpacity={0.9}>
                   <LinearGradient colors={[D.pink, D.pinkDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtn}>
                     {creating || uploading ? <ActivityIndicator size="small" color={D.white} /> : <Text style={styles.submitText}>Post Doubt</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </LinearGradient>
+        </View>
+      </Modal>
+
+      {/* Teacher-initiated: Message a Student Modal */}
+      <Modal visible={showMessageStudentModal} transparent animationType="slide" onRequestClose={() => { setShowMessageStudentModal(false); resetForm(); }}>
+        <View style={styles.modalBackdrop}>
+          <LinearGradient colors={[D.tealLight, D.pinkLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.modalCard}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>Message a Student</Text>
+
+              <Text style={styles.fieldLabel}>Select Student</Text>
+              <View style={styles.teacherSearchWrap}>
+                <Ionicons name="search" size={18} color={D.muted} />
+                <TextInput
+                  style={styles.teacherSearchField}
+                  placeholder="Type at least 2 letters to search students"
+                  placeholderTextColor={D.muted}
+                  value={studentQuery}
+                  onChangeText={setStudentQuery}
+                  autoCapitalize="words"
+                />
+                {studentSearchLoading ? <ActivityIndicator size="small" color={D.pink} /> : null}
+              </View>
+              <View style={styles.teacherResultWrap}>
+                {studentSearchLoading ? (
+                  <Text style={styles.teacherHint}>Searching students...</Text>
+                ) : studentQuery.trim().length >= 2 ? (
+                  studentResults.length > 0 ? (
+                    studentResults.map((student) => (
+                      <TouchableOpacity key={student._id} style={styles.teacherRow} onPress={() => setSelectedStudent(student)}>
+                        <Text style={styles.teacherName}>{student.displayName || student.name}</Text>
+                        <Text style={styles.teacherSub}>{student.email || 'Student'} • {student.course?.title || student.grade || 'N/A'}</Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.teacherHint}>No students found for this search</Text>
+                  )
+                ) : (
+                  <Text style={styles.teacherHint}>Search for a student by name or email</Text>
+                )}
+              </View>
+
+              {selectedStudent && (
+                <View style={styles.selectedWrap}>
+                  <View style={styles.selectedChip}>
+                    <Text style={styles.selectedText}>{selectedStudent.displayName || selectedStudent.name}</Text>
+                    <TouchableOpacity onPress={() => setSelectedStudent(null)}>
+                      <Ionicons name="close-circle" size={18} color={D.pink} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.fieldLabel}>Title</Text>
+              <TextInput style={styles.input} placeholder="e.g. Follow up on homework" placeholderTextColor={D.muted} value={title} onChangeText={setTitle} />
+
+              <Text style={styles.fieldLabel}>Message</Text>
+              <TextInput style={[styles.input, styles.textarea]} multiline numberOfLines={4} placeholder="Type your message..." placeholderTextColor={D.muted} value={description} onChangeText={setDescription} />
+
+              <Text style={styles.fieldLabel}>Attach</Text>
+              <View style={styles.attachRow}>
+                <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#FFE4E6', borderColor: '#FECDD3', borderWidth: 1 }]} onPress={onTakePhoto}>
+                  <Ionicons name="camera" size={24} color={D.pinkDark} />
+                  <Text style={styles.attachText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#CCFBF1', borderColor: '#99F6E4', borderWidth: 1 }]} onPress={onPickImage}>
+                  <Ionicons name="images" size={24} color={D.tealDark} />
+                  <Text style={styles.attachText}>Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', borderWidth: 1 }]} onPress={onPickPdf}>
+                  <Ionicons name="document-text" size={24} color={D.goldenDark} />
+                  <Text style={styles.attachText}>PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE', borderWidth: 1 }]} onPress={onPickVideo}>
+                  <Ionicons name="videocam" size={24} color={'#A855F7'} />
+                  <Text style={styles.attachText}>Video</Text>
+                </TouchableOpacity>
+                {!recording ? (
+                  <>
+                    <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#E0E7FF', borderColor: '#C7D2FE', borderWidth: 1 }]} onPress={onPickAudio}>
+                      <Ionicons name="musical-notes" size={24} color={'#4F46E5'} />
+                      <Text style={styles.attachText}>Audio</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.attachBtn, { backgroundColor: '#FCE7F3', borderColor: '#FBCFE8', borderWidth: 1 }]} onPress={startRecording}>
+                      <Ionicons name="mic" size={24} color={'#DB2777'} />
+                      <Text style={styles.attachText}>Record</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <View style={styles.recordingWrap}>
+                    <TouchableOpacity style={styles.attachBtn} onPress={pauseOrResumeRecording}>
+                      <Ionicons name={recordingPaused ? 'play' : 'pause'} size={22} color={D.pinkDark} />
+                      <Text style={styles.attachText}>{recordingPaused ? 'Resume' : 'Pause'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.attachBtn, { backgroundColor: D.pinkLight }]} onPress={stopRecording}>
+                      <Ionicons name="stop-circle" size={22} color={D.pinkDark} />
+                      <Text style={[styles.attachText, { color: D.pinkDark }]}>Send {recordingDurationSec}s</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {attachments.length > 0 && (
+                <View style={styles.pendingWrap}>
+                  {attachments.map((file, idx) => (
+                    <View key={`${file.name}-${idx}`} style={styles.pendingChip}>
+                      <Ionicons name="document-attach" size={16} color={D.muted} style={{ marginRight: 6 }} />
+                      <Text style={styles.pendingText} numberOfLines={1}>{file.name}</Text>
+                      <TouchableOpacity onPress={() => setAttachments((prev) => prev.filter((_, i) => i !== idx))}>
+                        <Ionicons name="close-circle" size={18} color={D.pink} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowMessageStudentModal(false); resetForm(); }}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.submitBtnWrap} onPress={onCreateTeacherDoubt} disabled={creatingTeacherDoubt || uploading} activeOpacity={0.9}>
+                  <LinearGradient colors={[D.teal, D.tealDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtn}>
+                    {creatingTeacherDoubt || uploading ? <ActivityIndicator size="small" color={D.white} /> : <Text style={styles.submitText}>Start Conversation</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
