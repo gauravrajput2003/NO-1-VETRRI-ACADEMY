@@ -85,6 +85,7 @@ const toUploadFile = (asset) => ({
   uri: asset.uri,
   name: asset.fileName || asset.name || `upload-${Date.now()}`,
   type: asset.mimeType || asset.type || 'application/octet-stream',
+  file: asset.file,  // preserve File object on web (expo-image-picker returns it)
 });
 const formatDateTime = (value) => {
   if (!value) return '';

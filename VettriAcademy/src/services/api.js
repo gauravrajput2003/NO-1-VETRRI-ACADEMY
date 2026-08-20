@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
 import { getToken, getRefreshToken, setToken, clearAuthData } from './storage';
 
@@ -772,14 +773,26 @@ export const updateDoubtRetentionAPI = (retentionDays) =>
 export const exportDoubtsAPI = (params) =>
   api.get('/doubts/admin/export', { params, responseType: params?.format === 'csv' ? 'blob' : 'json' });
 
-export const uploadDoubtAttachmentAPI = async ({ uri, name, type }) => {
+export const uploadDoubtAttachmentAPI = async ({ uri, name, type, file }) => {
   const token = await getToken();
   const formData = new FormData();
-  formData.append('file', {
-    uri,
-    name,
-    type,
-  });
+
+  if (Platform.OS === 'web') {
+    // Web: prefer actual File object if provided, else fetch blob from blob: URI
+    if (file instanceof File) {
+      formData.append('file', file, name);
+    } else {
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error('Unable to read selected file');
+      }
+      const blob = await response.blob();
+      formData.append('file', blob, name);
+    }
+  } else {
+    // Native: React Native fetch accepts { uri, name, type }
+    formData.append('file', { uri, name, type });
+  }
 
   const response = await fetch(`${API_BASE_URL}/doubts/attachments`, {
     method: 'POST',
@@ -796,7 +809,7 @@ export const uploadDoubtAttachmentAPI = async ({ uri, name, type }) => {
     throw err;
   }
 
-  return { data };
+  return { data }
 };
 export const getDoubtAttachmentDownloadUrlAPI = (
   doubtId,

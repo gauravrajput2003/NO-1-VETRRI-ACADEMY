@@ -82,6 +82,7 @@ const toUploadFile = (asset) => ({
   uri: asset.uri,
   name: asset.name || asset.fileName || `attachment-${Date.now()}`,
   type: asset.mimeType || asset.type || 'application/octet-stream',
+  file: asset.file,  // preserve File object on web
 });
 
 function AttachmentChip({ attachment, onOpen, isDoubt, doubtId, replyId, index }) {
