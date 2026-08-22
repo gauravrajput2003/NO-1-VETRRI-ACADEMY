@@ -218,6 +218,10 @@ export default function DashboardScreen({ navigation }) {
   const materialsCount = dashboard?.materialsCount ?? dashboard?.studyMaterialsCount ?? dashboard?.materialCount;
   const loginStreak = user?.loginStreak ?? dashboard?.loginStreak ?? 0;
   const leaderboardRank = dashboard?.myRank ?? dashboard?.rank ?? null;
+  // assignedTeachers is an ARRAY (backend sends `assignedTeachers: studentData?.assignedTeachers || []`).
+  // Pull the first teacher out of the array to render — do not read .name/.displayName/.qualification
+  // directly off dashboard.assignedTeachers, since those live on an element inside the array, not the array itself.
+  const primaryTeacher = dashboard?.assignedTeachers?.[0];
 
   return (
     <View style={{ flex: 1, backgroundColor: D.pageBg }}>
@@ -420,8 +424,8 @@ export default function DashboardScreen({ navigation }) {
           <View style={{ paddingHorizontal: 16, paddingBottom: 20 }}>
              <LinearGradient colors={[D.tealLight, '#B2EBF2']} style={{ borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', shadowColor: D.teal, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
                 <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: D.teal, justifyContent: 'center', alignItems: 'center' }}>
-                   {dashboard?.assignedTeacher ? (
-                      <Text style={{ fontSize: 26, color: '#FFF', fontWeight: '800' }}>{dashboard.assignedTeacher.name?.charAt(0)}</Text>
+                   {primaryTeacher ? (
+                      <Text style={{ fontSize: 26, color: '#FFF', fontWeight: '800' }}>{primaryTeacher.name?.charAt(0)}</Text>
                    ) : (
                       <Ionicons name="person-outline" size={28} color="#FFF" />
                    )}
@@ -429,10 +433,10 @@ export default function DashboardScreen({ navigation }) {
                 <View style={{ flex: 1, marginLeft: 16 }}>
                    <Text style={{ fontSize: 13, color: D.tealDark, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Your Teacher</Text>
                    <Text style={{ fontSize: 19, fontWeight: '900', color: D.ink, marginBottom: 2 }} numberOfLines={1}>
-                      {dashboard?.assignedTeacher ? (dashboard.assignedTeacher.displayName || dashboard.assignedTeacher.name) : 'Unassigned'}
+                      {primaryTeacher ? (primaryTeacher.displayName || primaryTeacher.name) : 'Unassigned'}
                    </Text>
                    <Text style={{ fontSize: 14, fontWeight: '700', color: D.muted }}>
-                      {dashboard?.assignedTeacher ? (dashboard.assignedTeacher.qualification || 'Instructor') : 'Ask admin to assign one'}
+                      {primaryTeacher ? (primaryTeacher.qualification || 'Instructor') : 'Ask admin to assign one'}
                    </Text>
                 </View>
              </LinearGradient>
@@ -732,7 +736,7 @@ const st = StyleSheet.create({
   annAudioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, backgroundColor: '#FFF0F6', borderRadius: 14, padding: 12 },
   annAudioName: { fontSize: 13, color: D.ink, fontWeight: '700', marginBottom: 6 },
   annAudioBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: D.pink, justifyContent: 'center', alignItems: 'center' },
-  annSeekTrack: { height: 4, backgroundColor: 'rgba(255,79,139,0.2)', borderRadius: 2, overflow: 'hidden' },
+  annSeekTrack: { height: 4, backgroundColor: 'rgba(255,79,141,0.2)', borderRadius: 2, overflow: 'hidden' },
   annSeekFill: { height: 4, backgroundColor: D.pink, borderRadius: 2 },
   annTimeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   annTimeText: { fontSize: 10, fontWeight: '600', color: D.muted },

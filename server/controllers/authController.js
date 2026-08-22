@@ -183,7 +183,7 @@ const login = async (req, res) => {
         subjects: user.subjects,
         firstLogin: isFirstLogin,
         admissionFormFilled: user.admissionFormFilled,
-        assignedTeacher: user.assignedTeacher,
+        assignedTeachers: user.assignedTeachers,
         loginStreak: user.loginStreak,
       },
     });
@@ -219,7 +219,7 @@ const getMe = async (req, res) => {
   const user = await User.findById(req.user._id)
     .select('-password -refreshToken')
     .populate('course', 'title category')
-    .populate('assignedTeacher', 'name qualification subjects profilePic displayName teacherBio');
+    .populate('assignedTeachers', 'name qualification subjects profilePic displayName teacherBio');
 
   res.status(200).json({ success: true, user });
 };

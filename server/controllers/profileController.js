@@ -8,8 +8,7 @@ const getProfile = async (req, res) => {
     const user = await User.findById(req.user._id)
       .select('-password -refreshToken')
       .populate('course', 'title category')
-      .populate('assignedTeacher', 'name displayName subjects profilePic teacherBio');
-    // Return both keys for backward compatibility across client builds.
+      .populate('assignedTeachers', 'name displayName subjects profilePic teacherBio'); // was 'assignedTeacher'
     res.json({ success: true, profile: user, user });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

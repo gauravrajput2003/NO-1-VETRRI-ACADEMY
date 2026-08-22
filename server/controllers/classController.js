@@ -91,7 +91,7 @@ const createSchedule = async (req, res) => {
     if (studentIds.length > 0) {
       const validStudents = await User.countDocuments({
         _id: { $in: studentIds },
-        assignedTeacher: teacherId,
+        assignedTeachers: teacherId,
         role: 'student'
       });
       if (validStudents !== studentIds.length) {
