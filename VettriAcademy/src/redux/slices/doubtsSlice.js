@@ -50,7 +50,10 @@ export const postDoubtReply = createAsyncThunk('doubts/reply', async ({ doubtId,
     const { data } = await addDoubtReplyAPI(doubtId, payload);
     return { doubtId, reply: data.reply };
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || 'Failed to send reply');
+    return rejectWithValue({
+      message: error.response?.data?.message || 'Failed to send reply',
+      code: error.response?.data?.code,
+    });
   }
 });
 
@@ -221,10 +224,10 @@ const doubtsSlice = createSlice({
           }
         }
       })
-      .addCase(postDoubtReply.rejected, (state, action) => {
-        state.replying = false;
-        state.error = action.payload || action.error.message;
-      })
+    .addCase(postDoubtReply.rejected, (state, action) => {
+  state.replying = false;
+  state.error = action.payload?.message || action.error.message;
+})
       .addCase(patchDoubtStatus.fulfilled, (state, action) => {
         const { doubtId, status } = action.payload;
         state.list = state.list.map((d) => (d._id === doubtId ? { ...d, status } : d));

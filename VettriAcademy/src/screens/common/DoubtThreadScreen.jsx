@@ -41,6 +41,7 @@ import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { KeyboardAvoidingView, Platform } from 'react-native';
+import { containsContactInfo, contactInfoErrorMessage } from '../../utils/contactInfoFilter';
 
 // ---- BRAND PALETTE: teal + pink + golden + white ----
 const D = {
@@ -370,21 +371,44 @@ export default function DoubtThreadScreen({ route, navigation }) {
     }
   };
 
-  const onSendReply = async () => {
-    if (!message.trim() && !replyAttachments.length) {
-      return;
-    }
+ 
+const onSendReply = async () => {
+  if (!message.trim() && !replyAttachments.length) {
+    return;
+  }
 
-    try {
-      const uploaded = await uploadAttachments(replyAttachments);
-      await dispatch(postDoubtReply({ doubtId, payload: { message: message.trim(), attachments: uploaded } })).unwrap();
-      setMessage('');
-      setReplyAttachments([]);
-      Toast.show({ type: 'success', text1: 'Reply sent' });
-    } catch (err) {
-      Toast.show({ type: 'error', text1: 'Reply failed', text2: String(err || '') });
+  const contactCheck = containsContactInfo(message);
+  if (contactCheck.blocked) {
+    Toast.show({
+      type: 'error',
+      position: 'top',
+      text1: '🚫 Not Allowed',
+      text2: contactInfoErrorMessage(contactCheck.reason),
+      visibilityTime: 3000,
+    });
+    return;
+  }
+
+  try {
+    const uploaded = await uploadAttachments(replyAttachments);
+    await dispatch(postDoubtReply({ doubtId, payload: { message: message.trim(), attachments: uploaded } })).unwrap();
+    setMessage('');
+    setReplyAttachments([]);
+    Toast.show({ type: 'success', text1: 'Reply sent' });
+  } catch (err) {
+    if (err?.code === 'CONTACT_INFO_BLOCKED') {
+      Toast.show({
+        type: 'error',
+        position: 'top',
+        text1: '🚫 Not Allowed',
+        text2: 'Phone numbers or email addresses are not allowed in chat.',
+        visibilityTime: 3000,
+      });
+    } else {
+      Toast.show({ type: 'error', text1: 'Reply failed', text2: err?.message || String(err || '') });
     }
-  };
+  }
+};
 
   const onUpdateStatus = async (status) => {
     try {

@@ -136,6 +136,8 @@ export const askVettriAiAPI = (question) =>
 // Student
 export const getStudentDashboardAPI = () =>
   api.get('/student/dashboard');
+export const getMyTeachersAPI = () =>          // NEW
+  api.get('/student/my-teachers');
 
 export const getStudentMaterialsAPI = () =>
   api.get('/student/materials');
@@ -639,6 +641,12 @@ export const getAnnouncementDownloadUrlAPI = (id, index) =>
 // Storage — Cloudinary signed upload params (shared with materials)
 export const getCloudinaryUploadParamsAPI = (data) =>
   api.post('/storage/cloudinary/upload-params', data);
+
+export const confirmMaterialUploadAPI = (data) =>
+  api.post('/storage/confirm-upload', data);
+
+export const deleteStorageUploadAPI = (data) =>
+  api.delete('/storage/upload', { data });
 
 
 // Class scheduling (admin)

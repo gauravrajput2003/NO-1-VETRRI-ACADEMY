@@ -7,12 +7,14 @@ const {
   getCloudinaryUploadParams,
   confirmUpload,
   getDownloadUrl,
+  deleteStorageUpload,
 } = require('../controllers/storageController');
 
 // All uploads are protected and require teacher or admin role
 router.post('/s3/upload-url', verifyToken, teacherOrAdmin, getS3UploadUrl);
 router.post('/cloudinary/upload-params', verifyToken, teacherOrAdmin, getCloudinaryUploadParams);
 router.post('/confirm-upload', verifyToken, teacherOrAdmin, confirmUpload);
+router.delete('/upload', verifyToken, teacherOrAdmin, deleteStorageUpload);
 
 // Downloads require token verification but can be performed by students, teachers, or admins
 router.get('/download-url/:materialId', verifyToken, getDownloadUrl);

@@ -1,4 +1,4 @@
-import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+﻿import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -100,7 +100,7 @@ export default function ManageStudentsScreen({ navigation }) {
   const [editBoardQuery, setEditBoardQuery] = useState('');
   const [showEditBoardSuggestions, setShowEditBoardSuggestions] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
+const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeachers: [] });
   const [createGradeQuery, setCreateGradeQuery] = useState('');
   const [showCreateGradeSuggestions, setShowCreateGradeSuggestions] = useState(false);
   const [createBoardQuery, setCreateBoardQuery] = useState('');
@@ -129,6 +129,15 @@ export default function ManageStudentsScreen({ navigation }) {
   const editGradeSuggestions = filterGrades(editGradeQuery);
   const createBoardSuggestions = filterBoards(createBoardQuery);
   const editBoardSuggestions = filterBoards(editBoardQuery);
+  const toggleTeacher = (setter) => (teacherId) => {
+  setter((prev) => {
+    const current = Array.isArray(prev.assignedTeachers) ? prev.assignedTeachers : [];
+    const next = current.includes(teacherId)
+      ? current.filter((id) => id !== teacherId)
+      : [...current, teacherId];
+    return { ...prev, assignedTeachers: next };
+  });
+};
 
   const handleEdit = async () => {
     const result = await dispatch(editStudent({ id: editModal._id, updates: editData }));
@@ -150,19 +159,19 @@ export default function ManageStudentsScreen({ navigation }) {
       return;
     }
     try {
-      await registerAPI({
-        role: 'student',
-        name: createData.name.trim(),
-        mobile: createData.mobile.trim(),
-        email: createData.email.trim() || undefined,
-        password: createData.password,
-        grade: createData.grade.trim() || undefined,
-        board: createData.board.trim() || undefined,
-        assignedTeacher: createData.assignedTeacher || undefined,
-      });
+    await registerAPI({
+  role: 'student',
+  name: createData.name.trim(),
+  mobile: createData.mobile.trim(),
+  email: createData.email.trim() || undefined,
+  password: createData.password,
+  grade: createData.grade.trim() || undefined,
+  board: createData.board.trim() || undefined,
+  assignedTeachers: createData.assignedTeachers || [],
+});
       Toast.show({ type: 'success', text1: 'Student account created ✅' });
       setShowCreateModal(false);
-      setCreateData({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
+     setCreateData({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeachers: [] });
       setCreateGradeQuery('');
       setShowCreateGradeSuggestions(false);
       setCreateBoardQuery('');
@@ -353,7 +362,9 @@ export default function ManageStudentsScreen({ navigation }) {
                 </View>
                 <View style={styles.viewRow}>
                   <Ionicons name="person-outline" size={18} color={B.purple} />
-                  <Text style={styles.viewRowText}>Teacher: {viewModal?.assignedTeacher?.name || 'Unassigned'}</Text>
+<Text style={styles.viewRowText}>
+  Teachers: {viewModal?.assignedTeachers?.length ? viewModal.assignedTeachers.map((t) => t.name).join(', ') : 'Unassigned'}
+</Text>
                 </View>
               </View>
 
@@ -394,18 +405,18 @@ export default function ManageStudentsScreen({ navigation }) {
                   const item = viewModal;
                   setViewModal(null);
                   setEditModal(item);
-                  setEditData({
-                    name: item.name || '',
-                    mobile: item.mobile || '',
-                    email: item.email || '',
-                    grade: item.grade || '',
-                    board: item.board || '',
-                    assignedTeacher: item.assignedTeacher?._id || item.assignedTeacher || '',
-                    feeAmount: item.feeAmount || '',
-                    feeFrequency: item.feeFrequency || 'monthly',
-                    feeDueDate: item.feeDueDate || 1,
-                    feeNotes: item.feeNotes || '',
-                  });
+                setEditData({
+  name: item.name || '',
+  mobile: item.mobile || '',
+  email: item.email || '',
+  grade: item.grade || '',
+  board: item.board || '',
+  assignedTeachers: (item.assignedTeachers || []).map((t) => (typeof t === 'string' ? t : t._id)),
+  feeAmount: item.feeAmount || '',
+  feeFrequency: item.feeFrequency || 'monthly',
+  feeDueDate: item.feeDueDate || 1,
+  feeNotes: item.feeNotes || '',
+});
                   setEditGradeQuery(item.grade || '');
                   setEditBoardQuery(item.board || '');
                 }}
@@ -518,24 +529,30 @@ export default function ManageStudentsScreen({ navigation }) {
               )}
             </View>
 
-            <Text style={[styles.label, { color: textColor }]}>Your Teacher</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              <TouchableOpacity
-                style={[styles.teacherChip, !editData.assignedTeacher && styles.teacherChipActive]}
-                onPress={() => setEditData({ ...editData, assignedTeacher: '' })}
-              >
-                <Text style={[styles.teacherChipText, !editData.assignedTeacher && styles.teacherChipTextActive]}>Unassigned</Text>
-              </TouchableOpacity>
-              {(teachers || []).map((t) => (
-                <TouchableOpacity
-                  key={t._id}
-                  style={[styles.teacherChip, editData.assignedTeacher === t._id && styles.teacherChipActive]}
-                  onPress={() => setEditData({ ...editData, assignedTeacher: t._id })}
-                >
-                  <Text style={[styles.teacherChipText, editData.assignedTeacher === t._id && styles.teacherChipTextActive]}>{t.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+          
+<Text style={[styles.label, { color: textColor }]}>Teachers (tap to select multiple)</Text>
+<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+  <TouchableOpacity
+    style={[styles.teacherChip, (!editData.assignedTeachers || editData.assignedTeachers.length === 0) && styles.teacherChipActive]}
+    onPress={() => setEditData({ ...editData, assignedTeachers: [] })}
+  >
+    <Text style={[styles.teacherChipText, (!editData.assignedTeachers || editData.assignedTeachers.length === 0) && styles.teacherChipTextActive]}>Unassigned</Text>
+  </TouchableOpacity>
+  {(teachers || []).map((t) => {
+    const isSelected = (editData.assignedTeachers || []).includes(t._id);
+    return (
+      <TouchableOpacity
+        key={t._id}
+        style={[styles.teacherChip, isSelected && styles.teacherChipActive]}
+        onPress={() => toggleTeacher(setEditData)(t._id)}
+      >
+        <Text style={[styles.teacherChipText, isSelected && styles.teacherChipTextActive]}>
+          {isSelected ? '✓ ' : ''}{t.name}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</ScrollView>
 
             <Text style={[styles.label, { color: textColor }]}>Fee Amount</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={String(editData.feeAmount ?? '')} onChangeText={(v) => setEditData({ ...editData, feeAmount: v })} placeholder="e.g. 5000" placeholderTextColor={Colors.mediumGray} keyboardType="numeric" />
@@ -639,24 +656,32 @@ export default function ManageStudentsScreen({ navigation }) {
                 </ScrollView>
               )}
             </View>
-            <Text style={[styles.label, { color: textColor }]}>Your Teacher</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              <TouchableOpacity
-                style={[styles.teacherChip, !createData.assignedTeacher && styles.teacherChipActive]}
-                onPress={() => setCreateData({ ...createData, assignedTeacher: '' })}
-              >
-                <Text style={[styles.teacherChipText, !createData.assignedTeacher && styles.teacherChipTextActive]}>Unassigned</Text>
-              </TouchableOpacity>
-              {(teachers || []).map((t) => (
-                <TouchableOpacity
-                  key={`create-t-${t._id}`}
-                  style={[styles.teacherChip, createData.assignedTeacher === t._id && styles.teacherChipActive]}
-                  onPress={() => setCreateData({ ...createData, assignedTeacher: t._id })}
-                >
-                  <Text style={[styles.teacherChipText, createData.assignedTeacher === t._id && styles.teacherChipTextActive]}>{t.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+           
+
+// AFTER
+<Text style={[styles.label, { color: textColor }]}>Teachers (tap to select multiple)</Text>
+<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+  <TouchableOpacity
+    style={[styles.teacherChip, (!createData.assignedTeachers || createData.assignedTeachers.length === 0) && styles.teacherChipActive]}
+    onPress={() => setCreateData({ ...createData, assignedTeachers: [] })}
+  >
+    <Text style={[styles.teacherChipText, (!createData.assignedTeachers || createData.assignedTeachers.length === 0) && styles.teacherChipTextActive]}>Unassigned</Text>
+  </TouchableOpacity>
+  {(teachers || []).map((t) => {
+    const isSelected = (createData.assignedTeachers || []).includes(t._id);
+    return (
+      <TouchableOpacity
+        key={`create-t-${t._id}`}
+        style={[styles.teacherChip, isSelected && styles.teacherChipActive]}
+        onPress={() => toggleTeacher(setCreateData)(t._id)}
+      >
+        <Text style={[styles.teacherChipText, isSelected && styles.teacherChipTextActive]}>
+          {isSelected ? '✓ ' : ''}{t.name}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</ScrollView>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCreateModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={styles.confirmBtn} onPress={handleCreate}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>

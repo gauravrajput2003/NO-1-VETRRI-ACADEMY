@@ -4,6 +4,7 @@ const DoubtReply = require('../models/DoubtReply');
 const DoubtAuditLog = require('../models/DoubtAuditLog');
 const DoubtSetting = require('../models/DoubtSetting');
 const cloudinaryService = require('../services/cloudinaryService');
+const { containsContactInfo } = require('../utils/contactInfoFilter');
 const User = require('../models/User');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
 const { sendBulkNotifications } = require('../services/notificationService');
@@ -243,12 +244,22 @@ const createDoubt = async (req, res) => {
 		}
 
 		const title = trimSafe(req.body.title);
-		const description = trimSafe(req.body.description);
-		const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
+const description = trimSafe(req.body.description);
+const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
 
-		if (!title || !description) {
-			return res.status(400).json({ success: false, message: 'Title and description are required.' });
-		}
+if (!title || !description) {
+  return res.status(400).json({ success: false, message: 'Title and description are required.' });
+}
+
+const titleCheck = containsContactInfo(title);
+const descCheck = containsContactInfo(description);
+if (titleCheck.blocked || descCheck.blocked) {
+  return res.status(400).json({
+    success: false,
+    code: 'CONTACT_INFO_BLOCKED',
+    message: 'Sharing phone numbers or email addresses is not allowed in doubts.',
+  });
+}
 
 		let studentId;
 		let assignedTeachers = [];
@@ -448,12 +459,21 @@ const addReply = async (req, res) => {
 		}
 
 		const message = trimSafe(req.body.message);
-		const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
-		const parentReplyId = toObjectId(req.body.parentReplyId);
+const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
+const parentReplyId = toObjectId(req.body.parentReplyId);
 
-		if (!message && !attachments.length) {
-			return res.status(400).json({ success: false, message: 'Reply needs text or attachment.' });
-		}
+if (!message && !attachments.length) {
+  return res.status(400).json({ success: false, message: 'Reply needs text or attachment.' });
+}
+
+const messageCheck = containsContactInfo(message);
+if (messageCheck.blocked) {
+  return res.status(400).json({
+    success: false,
+    code: 'CONTACT_INFO_BLOCKED',
+    message: 'Sharing phone numbers or email addresses is not allowed in chat.',
+  });
+}
 
 		const reply = await DoubtReply.create({
 			doubtId: doubt._id,

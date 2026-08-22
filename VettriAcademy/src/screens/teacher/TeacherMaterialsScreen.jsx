@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar, Image } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,20 +8,35 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate, formatFileSize } from '../../utils/formatters';
-import { fetchTeacherMaterials, toggleLock, uploadMaterial, deleteMaterial, editMaterial } from '../../redux/slices/teacherSlice';
+import { detectFileType, normalizeMaterialFileUrl } from '../../utils/fileUtils';
+import {
+  fetchTeacherMaterials, toggleLock, uploadMaterial, deleteMaterial, editMaterial,
+  uploadMaterialDraft, confirmMaterialUpload, deleteMaterialDraft,
+} from '../../redux/slices/teacherSlice';
 import { getCoursesMetaAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
+let WebView;
+try { WebView = require('react-native-webview').WebView; } catch (e) { WebView = null; }
+
+const isWeb = Platform.OS === 'web';
+
 const ScaleBtn = ({ onPress, children, activeScale = 0.96, style, disabled }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const handlePressIn = () => Animated.spring(scale, { toValue: activeScale, useNativeDriver: true }).start();
   const handlePressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+  
+  // Extract layout styles (flex, width, height) to pass to Animated.View
+  // so the flex chain isn't broken by the Animated.View wrapper
+  const layoutStyle = StyleSheet.flatten(style || {});
+  const { transform, ...animatedStyle } = layoutStyle;
+  
   return (
     <TouchableOpacity activeOpacity={1} onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={onPress} disabled={disabled} style={style}>
-      <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>
+      <Animated.View style={[{ transform: [{ scale }] }, animatedStyle]}>{children}</Animated.View>
     </TouchableOpacity>
   );
 };
@@ -43,8 +58,8 @@ const getTypeConfig = (type) => {
   if (type === 'pdf') return { color: '#EF4444', bg: '#FEE2E2', icon: 'document-text' };
   if (type === 'image') return { color: '#22C55E', bg: '#DCFCE7', icon: 'image' };
   if (type === 'video') return { color: '#A855F7', bg: '#F3E8FF', icon: 'videocam' };
-  if (type === 'ppt' || type?.includes('presentation')) return { color: '#F97316', bg: '#FFEDD5', icon: 'easel' };
-  return { color: '#3B82F6', bg: '#DBEAFE', icon: 'document' };
+  if (type === 'ppt' || type?.includes('presentation')) return { color: '#F97316', bg: '#FFEDD5', icon: 'document-text' };
+  return { color: '#3B82F6', bg: '#DBEAFE', icon: 'document-text' };
 };
 
 const FILTER_ICONS = {
@@ -102,6 +117,9 @@ export default function TeacherMaterialsScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [isLocked, setIsLocked] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [pdfDraft, setPdfDraft] = useState(null);
+  const [draftUploading, setDraftUploading] = useState(false);
+  const [previewPublishing, setPreviewPublishing] = useState(false);
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
   const insets = useSafeAreaInsets();
@@ -127,6 +145,14 @@ export default function TeacherMaterialsScreen({ navigation }) {
     }
   };
 
+  const resetPreviewState = () => {
+    setPreviewVisible(false);
+    setPreviewFile(null);
+    setPdfDraft(null);
+    setDraftUploading(false);
+    setPreviewPublishing(false);
+  };
+
   const handlePickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -149,18 +175,107 @@ export default function TeacherMaterialsScreen({ navigation }) {
           return;
         }
 
-        // Store for preview
         setPreviewFile(pickedFile);
         setFile(pickedFile);
-        
-        // Show preview before opening the full upload form
+        setPdfDraft(null);
+
         if (!editingMaterial) {
           setPreviewVisible(true);
+
+          if (pickedFile.mimeType === 'application/pdf') {
+            setDraftUploading(true);
+            const resultAction = await dispatch(uploadMaterialDraft(pickedFile));
+            setDraftUploading(false);
+            if (uploadMaterialDraft.fulfilled.match(resultAction)) {
+              setPdfDraft(resultAction.payload);
+            } else {
+              Toast.show({ type: 'error', text1: 'Preview upload failed', text2: resultAction.payload });
+            }
+          }
         }
       }
     } catch (err) {
+      setDraftUploading(false);
       console.log('Error picking file', err);
     }
+  };
+
+  const handlePreviewCancel = async () => {
+    if (pdfDraft) {
+      await dispatch(deleteMaterialDraft(pdfDraft));
+    }
+    resetPreviewState();
+    setFile(null);
+    setTitle('');
+    setSubject('');
+    setGrade('');
+    setDescription('');
+  };
+
+  const handlePdfPreviewPublish = async () => {
+    if (!pdfDraft) return;
+    if (!title.trim()) return Toast.show({ type: 'error', text1: 'Please enter a title' });
+    if (!subject) return Toast.show({ type: 'error', text1: 'Please select a subject' });
+    if (!grade) return Toast.show({ type: 'error', text1: 'Please select a grade' });
+
+    setPreviewPublishing(true);
+    try {
+      const resultAction = await dispatch(confirmMaterialUpload({
+        title,
+        subject,
+        grade,
+        description,
+        lockedForAll: isLocked,
+        fileUrl: pdfDraft.url,
+        publicId: pdfDraft.publicId,
+        storageType: pdfDraft.storageType,
+        originalFilename: pdfDraft.originalFilename,
+        extension: pdfDraft.extension,
+        resourceType: pdfDraft.resourceType,
+        fileSize: pdfDraft.fileSize,
+        mimeType: pdfDraft.mimeType,
+      }));
+
+      if (confirmMaterialUpload.fulfilled.match(resultAction)) {
+        Toast.show({ type: 'success', text1: 'Uploaded successfully!' });
+        resetPreviewState();
+        setFile(null);
+        setTitle('');
+        setSubject('');
+        setGrade('');
+        setDescription('');
+        setIsLocked(true);
+      } else {
+        Toast.show({ type: 'error', text1: 'Upload failed', text2: resultAction.payload });
+      }
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Upload failed', text2: 'Network error' });
+    } finally {
+      setPreviewPublishing(false);
+    }
+  };
+
+  const handlePreview = (material) => {
+    const url = normalizeMaterialFileUrl(material.fileUrl, {
+      resourceType: material.resourceType,
+      publicId: material.publicId,
+    });
+    const fileType = detectFileType({
+      type: material.type,
+      mimeType: material.mimeType,
+      extension: material.extension,
+      url,
+      filename: material.originalFilename,
+    });
+
+    navigation.navigate('DocumentViewer', {
+      url,
+      title: material.title,
+      fileType,
+      mimeType: material.mimeType,
+      extension: material.extension,
+      filename: material.originalFilename,
+    });
   };
 
   const handleUpload = async () => {
@@ -192,7 +307,13 @@ export default function TeacherMaterialsScreen({ navigation }) {
           data: updateData
         }));
         if (editMaterial.fulfilled.match(resultAction)) {
-          Toast.show({ type: 'success', text1: isReplacingFile ? 'Replacement sent for approval!' : 'Updated successfully!' });
+          // All edits (text-only or with file replacement) are pending admin approval
+          Toast.show({ 
+            type: 'pendingApproval', 
+            text1: 'Edit Submitted', 
+            text2: 'Waiting for admin approval' ,
+             position: 'top',
+          });
           closeUploadModal();
         } else {
           Toast.show({ type: 'error', text1: 'Update failed', text2: resultAction.payload });
@@ -241,30 +362,26 @@ export default function TeacherMaterialsScreen({ navigation }) {
   };
 
   const openEditModal = (material) => {
+    // Check if material already has a pending request
+    if (material.approvalStatus && material.approvalStatus.startsWith('pending_')) {
+      Toast.show({ 
+        type: 'pendingApproval', 
+        text1: 'Pending Request', 
+        text2: 'This material already has a pending request — please wait for admin review' ,
+          position: 'top',
+      });
+      return; // Don't open the modal
+    }
+    
     setEditingMaterial(material);
     setTitle(material.title);
     setSubject(material.subject);
     setGrade(material.grade);
     setDescription(material.description || '');
-    setIsLocked(material.lockedForAll);
+    // Ensure lockedForAll is a boolean - default to true if undefined
+    setIsLocked(Boolean(material.lockedForAll));
     setFile(null);
     setUploadModalVisible(true);
-  };
-
-  const handleToggleLock = (material) => {
-    const action = material.lockedForAll ? 'Unlock for all' : 'Lock for all';
-    Alert.alert(`${action}?`, `${material.title}`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm', onPress: async () => {
-          const result = await dispatch(toggleLock({ materialId: material._id, studentId: null, unlock: material.lockedForAll, lockedForAll: !material.lockedForAll }));
-          if (toggleLock.fulfilled.match(result)) {
-            Toast.show({ type: 'success', text1: material.lockedForAll ? 'Unlocked! 🔓' : 'Locked! 🔒' });
-            dispatch(fetchTeacherMaterials());
-          }
-        },
-      },
-    ]);
   };
 
   const handleDelete = (material) => {
@@ -274,7 +391,12 @@ export default function TeacherMaterialsScreen({ navigation }) {
         text: 'Delete', onPress: async () => {
           const result = await dispatch(deleteMaterial(material._id));
           if (deleteMaterial.fulfilled.match(result)) {
-            Toast.show({ type: 'success', text1: 'Material deleted' });
+            Toast.show({ 
+              type: 'pendingApproval', 
+              text1: 'Deletion Requested', 
+              text2: 'Pending admin approval' ,
+                position: 'top',
+            });
           } else {
             Toast.show({ type: 'error', text1: 'Delete failed', text2: result.payload });
           }
@@ -345,22 +467,19 @@ export default function TeacherMaterialsScreen({ navigation }) {
                       )}
                     </View>
                   </View>
-                </View>
 
-                {/* Right Side: Action Column */}
-                <View style={styles.actionCol}>
-                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => handlePreview(item)}>
-                    <Ionicons name="eye" size={18} color="#3B82F6" />
-                  </ScaleBtn>
-                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => handleToggleLock(item)}>
-                    <Ionicons name={item.lockedForAll ? 'lock-open' : 'lock-closed'} size={18} color="#16A34A" />
-                  </ScaleBtn>
-                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => openEditModal(item)}>
-                    <Ionicons name="pencil" size={18} color="#EC4899" />
-                  </ScaleBtn>
-                  <ScaleBtn style={styles.actionCircleBtn} onPress={() => handleDelete(item)}>
-                    <Ionicons name="trash" size={18} color="#EF4444" />
-                  </ScaleBtn>
+                  {/* Action Bar - Horizontal row below metaRow */}
+                  <View style={styles.actionBar}>
+                    <ScaleBtn style={styles.actionCircleBtn} onPress={() => handlePreview(item)}>
+                      <Ionicons name="eye" size={18} color="#3B82F6" />
+                    </ScaleBtn>
+                    <ScaleBtn style={styles.actionCircleBtn} onPress={() => openEditModal(item)}>
+                      <Ionicons name="pencil" size={18} color="#EC4899" />
+                    </ScaleBtn>
+                    <ScaleBtn style={styles.actionCircleBtn} onPress={() => handleDelete(item)}>
+                      <Ionicons name="trash" size={18} color="#EF4444" />
+                    </ScaleBtn>
+                  </View>
                 </View>
               </View>
             </View>
@@ -475,66 +594,154 @@ export default function TeacherMaterialsScreen({ navigation }) {
       </View>
 
       {/* PREVIEW MODAL - Shows before upload form */}
-      <Modal visible={isPreviewVisible} animationType="slide" transparent={true} onRequestClose={() => { setPreviewVisible(false); setPreviewFile(null); }}>
+      <Modal visible={isPreviewVisible} animationType="slide" transparent={true} onRequestClose={handlePreviewCancel}>
         <View style={styles.modalBackdrop}>
           <LinearGradient colors={['#EC4899', '#F472B6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.previewModalCard}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Preview Material</Text>
             
             {/* File Preview */}
-            <View style={styles.previewContainer}>
-              {previewFile && previewFile.mimeType?.startsWith('image/') && (
-                <Image source={{ uri: previewFile.uri }} style={styles.previewImage} resizeMode="contain" />
-              )}
-              {previewFile && previewFile.mimeType?.startsWith('video/') && (
-                <View style={styles.previewVideoContainer}>
-                  <Ionicons name="videocam" size={48} color="#14B8A6" />
-                  <Text style={styles.previewVideoText}>Video: {previewFile.name}</Text>
-                  <Text style={styles.previewVideoSize}>{formatFileSize(previewFile.size)}</Text>
-                </View>
-              )}
-              {previewFile && previewFile.mimeType === 'application/pdf' && (
-                <View style={styles.previewPdfContainer}>
-                  <Ionicons name="document-text" size={48} color="#EF4444" />
-                  <Text style={styles.previewPdfText}>PDF: {previewFile.name}</Text>
-                  <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
-                  <Text style={styles.previewPdfNote}>Tap "Publish" to upload and preview full PDF</Text>
-                </View>
-              )}
-              {previewFile && (previewFile.mimeType?.includes('presentation') || previewFile.mimeType?.includes('powerpoint')) && (
-                <View style={styles.previewPdfContainer}>
-                  <Ionicons name="easel" size={48} color="#F97316" />
-                  <Text style={styles.previewPdfText}>Presentation: {previewFile.name}</Text>
-                  <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
-                </View>
-              )}
-            </View>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.previewContainer}>
+                {previewFile && previewFile.mimeType?.startsWith('image/') && (
+                  <Image source={{ uri: previewFile.uri }} style={styles.previewImage} resizeMode="contain" />
+                )}
+                {previewFile && previewFile.mimeType?.startsWith('video/') && !isWeb && WebView && (
+                  <View style={styles.previewVideoPlayer}>
+                    <WebView
+                      source={{ uri: previewFile.uri }}
+                      style={{ flex: 1, minHeight: 220, borderRadius: 16, backgroundColor: '#000' }}
+                      allowsInlineMediaPlayback
+                      mediaPlaybackRequiresUserAction={false}
+                    />
+                  </View>
+                )}
+                {previewFile && previewFile.mimeType?.startsWith('video/') && (isWeb || !WebView) && (
+                  <View style={styles.previewVideoPlayer}>
+                    <video
+                      src={previewFile.uri}
+                      style={{ flex: 1, minHeight: 220, borderRadius: 16, backgroundColor: '#000' }}
+                      controls
+                      playsInline
+                    />
+                  </View>
+                )}
+                {previewFile && previewFile.mimeType === 'application/pdf' && (
+                  <View style={styles.previewPdfWebViewWrap}>
+                    {draftUploading && (
+                      <View style={styles.draftUploadOverlay}>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                        <Text style={styles.draftUploadText}>Uploading for preview...</Text>
+                      </View>
+                    )}
+                    {!draftUploading && pdfDraft && !isWeb && WebView && (
+                      <WebView
+                        source={{ uri: pdfDraft.url }}
+                        style={styles.previewPdfWebView}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        scalesPageToFit
+                      />
+                    )}
+                    {!draftUploading && pdfDraft && (isWeb || !WebView) && (
+                      <iframe
+                        src={pdfDraft.url}
+                        style={styles.previewPdfWebView}
+                        title="PDF Preview"
+                      />
+                    )}
+                    {!draftUploading && !pdfDraft && (
+                      <View style={styles.previewPdfContainer}>
+                        <Ionicons name="document-text" size={48} color="#EF4444" />
+                        <Text style={styles.previewPdfText}>PDF: {previewFile.name}</Text>
+                        <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
+                        <Text style={styles.previewPdfNote}>Could not load preview. Try picking the file again.</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+                {previewFile && (previewFile.mimeType?.includes('presentation') || previewFile.mimeType?.includes('powerpoint')) && (
+                  <View style={styles.previewPdfContainer}>
+                    <Ionicons name="easel" size={48} color="#F97316" />
+                    <Text style={styles.previewPdfText}>Presentation: {previewFile.name}</Text>
+                    <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
+                  </View>
+                )}
+              </View>
 
-            {/* File Info */}
-            <View style={styles.previewInfoCard}>
-              <Text style={styles.previewInfoLabel}>File Details</Text>
-              <View style={styles.previewInfoRow}>
-                <Text style={styles.previewInfoKey}>Name:</Text>
-                <Text style={styles.previewInfoValue}>{previewFile?.name}</Text>
+              {/* PDF publish fields — shown once draft is ready */}
+              {previewFile?.mimeType === 'application/pdf' && pdfDraft && (
+                <View style={styles.previewFormSection}>
+                  <Text style={styles.previewFormLabel}>Title *</Text>
+                  <TextInput
+                    style={styles.previewFormInput}
+                    placeholder="e.g. Chapter 5 - Quadratic Equations"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={title}
+                    onChangeText={setTitle}
+                    maxLength={100}
+                  />
+                  <Text style={styles.previewFormLabel}>Subject *</Text>
+                  <TextInput
+                    style={styles.previewFormInput}
+                    placeholder="Enter subject"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={subject}
+                    onChangeText={setSubject}
+                    maxLength={60}
+                  />
+                  <Text style={styles.previewFormLabel}>Grade / Class *</Text>
+                  <TextInput
+                    style={styles.previewFormInput}
+                    placeholder="Enter grade or class"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={grade}
+                    onChangeText={setGrade}
+                    maxLength={30}
+                  />
+                </View>
+              )}
+
+              {/* File Info */}
+              <View style={styles.previewInfoCard}>
+                <Text style={styles.previewInfoLabel}>File Details</Text>
+                <View style={styles.previewInfoRow}>
+                  <Text style={styles.previewInfoKey}>Name:</Text>
+                  <Text style={styles.previewInfoValue}>{previewFile?.name}</Text>
+                </View>
+                <View style={styles.previewInfoRow}>
+                  <Text style={styles.previewInfoKey}>Type:</Text>
+                  <Text style={styles.previewInfoValue}>{previewFile?.mimeType || 'Unknown'}</Text>
+                </View>
+                <View style={styles.previewInfoRow}>
+                  <Text style={styles.previewInfoKey}>Size:</Text>
+                  <Text style={styles.previewInfoValue}>{formatFileSize(previewFile?.size || 0)}</Text>
+                </View>
               </View>
-              <View style={styles.previewInfoRow}>
-                <Text style={styles.previewInfoKey}>Type:</Text>
-                <Text style={styles.previewInfoValue}>{previewFile?.mimeType || 'Unknown'}</Text>
-              </View>
-              <View style={styles.previewInfoRow}>
-                <Text style={styles.previewInfoKey}>Size:</Text>
-                <Text style={styles.previewInfoValue}>{formatFileSize(previewFile?.size || 0)}</Text>
-              </View>
-            </View>
+            </ScrollView>
 
             {/* Actions */}
             <View style={styles.previewActions}>
-              <TouchableOpacity style={styles.previewCancelBtn} onPress={() => { setPreviewVisible(false); setPreviewFile(null); setFile(null); }}>
+              <TouchableOpacity style={styles.previewCancelBtn} onPress={handlePreviewCancel} disabled={previewPublishing || draftUploading}>
                 <Text style={styles.previewCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.previewPublishBtn} onPress={() => { setPreviewVisible(false); setUploadModalVisible(true); }}>
-                <Text style={styles.previewPublishText}>Publish</Text>
-              </TouchableOpacity>
+              {previewFile?.mimeType === 'application/pdf' ? (
+                <TouchableOpacity
+                  style={[styles.previewPublishBtn, (!pdfDraft || draftUploading) && { opacity: 0.5 }]}
+                  onPress={handlePdfPreviewPublish}
+                  disabled={!pdfDraft || draftUploading || previewPublishing}
+                >
+                  {previewPublishing ? (
+                    <ActivityIndicator color="#EC4899" size="small" />
+                  ) : (
+                    <Text style={styles.previewPublishText}>Publish</Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.previewPublishBtn} onPress={() => { setPreviewVisible(false); setUploadModalVisible(true); }}>
+                  <Text style={styles.previewPublishText}>Publish</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </LinearGradient>
         </View>
@@ -566,12 +773,17 @@ export default function TeacherMaterialsScreen({ navigation }) {
               <ScaleBtn activeScale={0.98} onPress={handlePickFile}>
                 <View style={styles.uploadCard}>
                   {file ? (
-                    <View style={styles.fileSelectedState}>
-                      <View style={styles.fileIconWrap}>
-                        <Ionicons name="document-text" size={40} color="#14B8A6" />
+                    <View style={styles.uploadCardPlaceholder}>
+                      <View style={styles.uploadIconBigWrap}>
+                        <Ionicons name="cloud-upload" size={40} color="#14B8A6" />
                       </View>
-                      <Text style={styles.fileSelectedName} numberOfLines={1}>{file.name}</Text>
-                      <Text style={styles.fileSelectedSize}>{formatFileSize(file.size)}</Text>
+                      <Text style={styles.uploadCardTitle}>{editingMaterial ? 'Select Replacement File' : 'Select File'}</Text>
+                      <Text style={styles.uploadCardSupported}>Supported: PDF • PPT • Video • Image</Text>
+                      <Text style={styles.uploadCardLimits}>Max: 500MB Video / 50MB Document</Text>
+                      
+                      <View style={styles.chooseFileBtnBig}>
+                        <Text style={styles.chooseFileBtnText}>{editingMaterial ? 'Choose Replacement' : 'Choose File'}</Text>
+                      </View>
                     </View>
                   ) : (
                     <View style={styles.uploadCardPlaceholder}>
@@ -589,6 +801,73 @@ export default function TeacherMaterialsScreen({ navigation }) {
                   )}
                 </View>
               </ScaleBtn>
+
+              {/* ATTACHMENT CHIP - Shows below upload card when file is selected */}
+              {file && (
+                <View style={styles.attachmentChip}>
+                  {file.mimeType?.startsWith('image/') && previewFile && (
+                    <Image
+                      source={{ uri: previewFile.uri }}
+                      style={styles.attachmentThumbnail}
+                      resizeMode="cover"
+                    />
+                  )}
+                  {!file.mimeType?.startsWith('image/') && (
+                    <View style={[styles.attachmentIconWrap, { backgroundColor: getTypeConfig(detectFileType({
+                      type: detectFileType({
+                        mimeType: file.mimeType,
+                        extension: file.name?.split('.').pop()?.toLowerCase() || '',
+                        filename: file.name
+                      }).type,
+                      mimeType: file.mimeType,
+                      extension: file.name?.split('.').pop()?.toLowerCase() || '',
+                      filename: file.name
+                    })).bg }]}>
+                      <Ionicons 
+                        name={getTypeConfig(detectFileType({
+                          type: detectFileType({
+                            mimeType: file.mimeType,
+                            extension: file.name?.split('.').pop()?.toLowerCase() || '',
+                            filename: file.name
+                          }).type,
+                          mimeType: file.mimeType,
+                          extension: file.name?.split('.').pop()?.toLowerCase() || '',
+                          filename: file.name
+                        })).icon} 
+                        size={24} 
+                        color={getTypeConfig(detectFileType({
+                          type: detectFileType({
+                            mimeType: file.mimeType,
+                            extension: file.name?.split('.').pop()?.toLowerCase() || '',
+                            filename: file.name
+                          }).type,
+                          mimeType: file.mimeType,
+                          extension: file.name?.split('.').pop()?.toLowerCase() || '',
+                          filename: file.name
+                        })).color} 
+                      />
+                    </View>
+                  )}
+<View style={[styles.attachmentInfo, { flex: 1 }]}>                    <Text style={styles.attachmentName} numberOfLines={1}>
+                      {file.name}
+                    </Text>
+                    <Text style={styles.attachmentSize}>
+                      {formatFileSize(file.size)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.attachmentRemoveBtn}
+                    onPress={() => {
+                      setFile(null);
+                      setPreviewFile(null);
+                      setPdfDraft(null);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close" size={20} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* FORM FIELDS */}
               <View style={styles.formSection}>
@@ -714,7 +993,7 @@ const styles = StyleSheet.create({
   statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusPillText: { fontSize: 12, fontWeight: '700' },
   
-  actionCol: { marginLeft: 16, alignItems: 'center', gap: 10 },
+  actionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
   actionCircleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
   
   empty: { alignItems: 'center', marginTop: 40 },
@@ -752,7 +1031,7 @@ const styles = StyleSheet.create({
   fsInput: { flex: 1, fontSize: 16, color: '#1E293B', fontWeight: '500', height: '100%' },
 
   segmentedControl: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 16, padding: 4, height: 52 },
-  segmentBtn: { flex: 1, flexDirection: 'row', height: '100%', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  segmentBtn: { flex: 1, flexDirection: 'row', height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   segmentBtnActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   segmentText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
   segmentTextActive: { color: '#14B8A6' },
@@ -787,4 +1066,38 @@ const styles = StyleSheet.create({
   previewCancelText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   previewPublishBtn: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 16, alignItems: 'center', shadowColor: '#EC4899', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   previewPublishText: { color: '#EC4899', fontSize: 16, fontWeight: '800' },
+
+  previewVideoPlayer: { width: '100%', height: 240, borderRadius: 16, overflow: 'hidden', backgroundColor: '#000' },
+  previewPdfWebViewWrap: { width: '100%', height: 320, borderRadius: 16, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.1)', position: 'relative' },
+  previewPdfWebView: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16 },
+  draftUploadOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 2, borderRadius: 16 },
+  draftUploadText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginTop: 12 },
+  
+  // Attachment Chip Styles
+  attachmentChip: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 12, 
+    paddingHorizontal: 12, 
+    paddingVertical: 10, 
+    marginTop: 12,
+    marginHorizontal: 4,
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 8, 
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB'
+  },
+  attachmentThumbnail: { width: 48, height: 48, borderRadius: 8, marginRight: 12 },
+  attachmentIconWrap: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  attachmentInfo: { flex: 1, justifyContent: 'center', minWidth: 0 },
+  attachmentName: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 2 },
+  attachmentSize: { fontSize: 12, color: '#64748B' },
+  attachmentRemoveBtn: { padding: 4, marginLeft: 8 },
+  previewFormSection: { marginBottom: 16, width: '100%' },
+  previewFormLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginBottom: 6, marginLeft: 4 },
+  previewFormInput: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#FFFFFF', fontSize: 15, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
 });

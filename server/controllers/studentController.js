@@ -98,7 +98,7 @@ const getStudentDashboard = async (req, res) => {
       Notification.countDocuments({ recipient: studentId, isRead: false }),
 
       // Assigned Teacher profile
-      User.findById(studentId).select('assignedTeacher').populate('assignedTeacher', 'name displayName qualification subjects'),
+     User.findById(studentId).select('assignedTeachers').populate('assignedTeachers', 'name displayName qualification subjects'),
     ]);
 
     // Weekly leaderboard (top 3 by total score this week)
@@ -128,17 +128,17 @@ const getStudentDashboard = async (req, res) => {
       select: 'name grade',
     });
 
-    res.status(200).json({
-      success: true,
-      dashboard: {
-        todayClass,
-        recentScores,
-        attendanceSummary,
-        unreadNotifications,
-        leaderboard,
-        assignedTeacher: studentData?.assignedTeacher || null,
-      },
-    });
+   res.status(200).json({
+  success: true,
+  dashboard: {
+    todayClass,
+    recentScores,
+    attendanceSummary,
+    unreadNotifications,
+    leaderboard,
+    assignedTeachers: studentData?.assignedTeachers || [],
+  },
+});
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -152,17 +152,18 @@ const getStudentMaterials = async (req, res) => {
     const studentId = req.user._id;
 
     // Get materials for student's course and grade
-    const student = await User.findById(studentId).select('course grade assignedTeacher');
+   const student = await User.findById(studentId).select('course grade assignedTeachers');
 
-    const materials = await StudyMaterial.find({
-      approvalStatus: 'approved',
-      $and: [
-        {
-          $or: [
-            { teacher: student.assignedTeacher },
-            { course: student.course },
-          ]
-        },
+
+   const materials = await StudyMaterial.find({
+  approvalStatus: 'approved',
+  $and: [
+    {
+      $or: [
+        { teacher: { $in: student.assignedTeachers || [] } },
+        { course: student.course },
+      ]
+    },
         {
           $or: [
             { grade: student.grade },
@@ -208,7 +209,7 @@ const getStudentMaterials = async (req, res) => {
 // @access  Student
 const getStudentFolder = async (req, res) => {
   try {
-    const student = await User.findById(req.user._id).select('course grade assignedTeacher');
+   const student = await User.findById(req.user._id).select('course grade assignedTeachers');
     if (!student.grade) {
       return res.status(404).json({ success: false, message: 'Student grade is not set.' });
     }
@@ -247,6 +248,23 @@ const getStudentFolder = async (req, res) => {
     });
 
     res.status(200).json({ success: true, folder, materials: materialsWithAccess });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+// @desc    Get the list of teachers assigned to this student (for chat picker)
+// @route   GET /api/student/my-teachers
+// @access  Student
+const getMyTeachers = async (req, res) => {
+  try {
+    const student = await User.findById(req.user._id)
+      .select('assignedTeachers')
+      .populate('assignedTeachers', 'name displayName qualification subjects profilePic');
+
+    res.status(200).json({
+      success: true,
+      teachers: student?.assignedTeachers || [],
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -692,4 +710,5 @@ module.exports = {
   getNotifications,
   submitAdmissionForm,
   getChatMessages,
+   getMyTeachers, // NEW
 };

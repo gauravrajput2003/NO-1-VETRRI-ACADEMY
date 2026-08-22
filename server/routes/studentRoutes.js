@@ -18,6 +18,7 @@ const {
   submitAdmissionForm,
   getChatMessages,
   getStudentFolder,
+   getMyTeachers, // NEW
 } = require('../controllers/studentController');
 
 // ─── Material routes — accessible to ALL authenticated users ───────────────────
@@ -33,6 +34,7 @@ router.get('/folder', verifyToken, getStudentFolder);
 router.use(verifyToken, studentOnly);
 
 router.get('/dashboard', getStudentDashboard);
+router.get('/my-teachers', getMyTeachers);
 router.get('/scores', getStudentScores);
 router.get('/attendance', getStudentAttendance);
 router.get('/schedule', getStudentSchedule);

@@ -23,6 +23,7 @@ import { Colors } from '../../utils/colors';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import { containsContactInfo, contactInfoErrorMessage } from '../../utils/contactInfoFilter';
 import {
   createDoubt,
   fetchDoubtMetrics,
@@ -31,11 +32,11 @@ import {
 } from '../../redux/slices/doubtsSlice';
 import {
   exportDoubtsAPI,
-  searchDoubtTeachersAPI,
   updateDoubtRetentionAPI,
   uploadDoubtAttachmentAPI,
   getDoubtRetentionAPI,
   getTeacherStudentsAPI,
+  getMyTeachersAPI,
 } from '../../services/api';
 
 // ---- BRAND PALETTE: teal + pink + golden + white ----
@@ -56,7 +57,15 @@ const D = {
   violet: '#7C3AED',
   violetDark: '#5B21B6',
 };
-
+const showContactInfoBlockedToast = (reason) => {
+  Toast.show({
+    type: 'error',
+    position: 'top',
+    text1: '🚫 Not Allowed',
+    text2: contactInfoErrorMessage(reason),
+    visibilityTime: 3000,
+  });
+};
 const STATUS_LABEL = {
   open: 'Open',
   teacher_responded: 'Teacher Responded',
@@ -222,9 +231,9 @@ export default function DiscussScenarioScreen({ navigation }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [teacherQuery, setTeacherQuery] = useState('');
-  const [teacherResults, setTeacherResults] = useState([]);
-  const [teacherSearchLoading, setTeacherSearchLoading] = useState(false);
-  const [selectedTeachers, setSelectedTeachers] = useState([]);
+const [myTeachers, setMyTeachers] = useState([]);
+const [myTeachersLoading, setMyTeachersLoading] = useState(false);
+const [selectedTeachers, setSelectedTeachers] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
 
@@ -264,28 +273,24 @@ export default function DiscussScenarioScreen({ navigation }) {
     }, [loadList, loadMetrics, role])
   );
 
-  useEffect(() => {
-    if (!showCreateModal || !teacherQuery.trim() || teacherQuery.trim().length < 2) {
-      setTeacherResults([]);
-      setTeacherSearchLoading(false);
-      return;
-    }
+ useEffect(() => {
+  if (role !== 'student') return;
+  setMyTeachersLoading(true);
+  getMyTeachersAPI()
+    .then(({ data }) => setMyTeachers(data.teachers || []))
+    .catch(() => setMyTeachers([]))
+    .finally(() => setMyTeachersLoading(false));
+}, [role]);
 
-    const timer = setTimeout(async () => {
-      try {
-        setTeacherSearchLoading(true);
-        const { data } = await searchDoubtTeachersAPI(teacherQuery.trim());
-        const candidates = data?.teachers || data?.results || data?.users || [];
-        setTeacherResults(Array.isArray(candidates) ? candidates : []);
-      } catch {
-        setTeacherResults([]);
-      } finally {
-        setTeacherSearchLoading(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [teacherQuery, showCreateModal]);
+const teacherResults = useMemo(() => {
+  const q = teacherQuery.trim().toLowerCase();
+  if (!q) return myTeachers;
+  return myTeachers.filter((t) =>
+    (t.name || '').toLowerCase().includes(q) ||
+    (t.displayName || '').toLowerCase().includes(q) ||
+    (t.subjects || []).some((s) => (s || '').toLowerCase().includes(q))
+  );
+  }, [teacherQuery, myTeachers]);
 
   // Student search effect for teacher-initiated conversations
   useEffect(() => {
@@ -472,73 +477,99 @@ export default function DiscussScenarioScreen({ navigation }) {
     setRecordingPaused(false);
   };
 
-  const onCreateDoubt = async () => {
-    if (role !== 'student') return;
+  
+const onCreateDoubt = async () => {
+  if (role !== 'student') return;
 
-    if (!title.trim() || !description.trim()) {
-      Toast.show({ type: 'error', text1: 'Title and description are required' });
-      return;
-    }
+  if (!title.trim() || !description.trim()) {
+    Toast.show({ type: 'error', text1: 'Title and description are required' });
+    return;
+  }
 
-    try {
-      const uploadedAttachments = await uploadAllAttachments();
-      await dispatch(
-        createDoubt({
-          title: title.trim(),
-          description: description.trim(),
-          assignedTeachers: selectedTeacherIds,
-          attachments: uploadedAttachments,
-        })
-      ).unwrap();
+  const titleCheck = containsContactInfo(title);
+  const descCheck = containsContactInfo(description);
+  if (titleCheck.blocked || descCheck.blocked) {
+    showContactInfoBlockedToast((titleCheck.blocked ? titleCheck : descCheck).reason);
+    return;
+  }
 
-      Toast.show({ type: 'success', text1: 'Doubt created successfully' });
-      setShowCreateModal(false);
-      resetForm();
-      loadList();
-      loadMetrics();
-    } catch (err) {
+  try {
+    const uploadedAttachments = await uploadAllAttachments();
+    await dispatch(
+      createDoubt({
+        title: title.trim(),
+        description: description.trim(),
+        assignedTeachers: selectedTeacherIds,
+        attachments: uploadedAttachments,
+      })
+    ).unwrap();
+
+    Toast.show({ type: 'success', text1: 'Doubt created successfully' });
+    setShowCreateModal(false);
+    resetForm();
+    loadList();
+    loadMetrics();
+  } catch (err) {
+    // Backend rejects too (defense in depth) — surface that specific error nicely
+    const backendPayload = err?.response?.data || err;
+    if (backendPayload?.code === 'CONTACT_INFO_BLOCKED') {
+      showContactInfoBlockedToast();
+    } else {
       Toast.show({ type: 'error', text1: 'Failed to create doubt', text2: String(err || '') });
     }
-  };
+  }
+};
 
-  // Teacher-initiated: Create doubt with target student
-  const onCreateTeacherDoubt = async () => {
-    if (role !== 'teacher') return;
 
-    if (!selectedStudent) {
-      Toast.show({ type: 'error', text1: 'Please select a student first' });
-      return;
-    }
+const onCreateTeacherDoubt = async () => {
+  if (role !== 'teacher') return;
 
-    if (!title.trim() || !description.trim()) {
-      Toast.show({ type: 'error', text1: 'Title and description are required' });
-      return;
-    }
+  if (!selectedStudent) {
+    Toast.show({ type: 'error', text1: 'Please select a student first' });
+    return;
+  }
 
-    try {
-      setCreatingTeacherDoubt(true);
-      const uploadedAttachments = await uploadAllAttachments();
-      await dispatch(
-        createDoubt({
-          title: title.trim(),
-          description: description.trim(),
-          targetStudentId: selectedStudent._id,
-          attachments: uploadedAttachments,
-        })
-      ).unwrap();
+  if (!title.trim() || !description.trim()) {
+    Toast.show({ type: 'error', text1: 'Title and description are required' });
+    return;
+  }
 
-      Toast.show({ type: 'success', text1: 'Conversation started successfully' });
-      setShowMessageStudentModal(false);
-      resetForm();
-      
-      loadList();
-      loadMetrics();
-    } catch (err) {
+  const titleCheck = containsContactInfo(title);
+  const descCheck = containsContactInfo(description);
+  if (titleCheck.blocked || descCheck.blocked) {
+    showContactInfoBlockedToast((titleCheck.blocked ? titleCheck : descCheck).reason);
+    return;
+  }
+
+  try {
+    setCreatingTeacherDoubt(true);
+    const uploadedAttachments = await uploadAllAttachments();
+    await dispatch(
+      createDoubt({
+        title: title.trim(),
+        description: description.trim(),
+        targetStudentId: selectedStudent._id,
+        attachments: uploadedAttachments,
+      })
+    ).unwrap();
+
+    Toast.show({ type: 'success', text1: 'Conversation started successfully' });
+    setShowMessageStudentModal(false);
+    resetForm();
+    
+    loadList();
+    loadMetrics();
+  } catch (err) {
+    const backendPayload = err?.response?.data || err;
+    if (backendPayload?.code === 'CONTACT_INFO_BLOCKED') {
+      showContactInfoBlockedToast();
+    } else {
       Toast.show({ type: 'error', text1: 'Failed to start conversation', text2: String(err || '') });
-    } finally {
-      setCreatingTeacherDoubt(false);
     }
-  };
+  } finally {
+    setCreatingTeacherDoubt(false);
+  }
+};
 
  
 
@@ -772,40 +803,41 @@ export default function DiscussScenarioScreen({ navigation }) {
               <Text style={styles.fieldLabel}>Description</Text>
               <TextInput style={[styles.input, styles.textarea]} multiline numberOfLines={4} placeholder="Describe your doubt in detail" placeholderTextColor={D.muted} value={description} onChangeText={setDescription} />
 
-              <Text style={styles.fieldLabel}>Assign teachers (optional)</Text>
-              <View style={styles.teacherSearchWrap}>
-                <Ionicons name="search" size={18} color={D.muted} />
-                <TextInput
-                  style={styles.teacherSearchField}
-                  placeholder="Type at least 2 letters"
-                  placeholderTextColor={D.muted}
-                  value={teacherQuery}
-                  onChangeText={setTeacherQuery}
-                  autoCapitalize="words"
-                />
-                {teacherSearchLoading ? <ActivityIndicator size="small" color={D.pink} /> : null}
-              </View>
-              <View style={styles.teacherResultWrap}>
-                {teacherSearchLoading ? (
-                  <Text style={styles.teacherHint}>Searching teachers...</Text>
-                ) : teacherQuery.trim().length >= 2 ? (
-                  teacherResults
-                    .filter((t) => !selectedTeacherIds.includes(t._id))
-                    .slice(0, 6)
-                    .map((teacher) => (
-                      <TouchableOpacity key={teacher._id} style={styles.teacherRow} onPress={() => setSelectedTeachers((prev) => [...prev, teacher])}>
-                        <Text style={styles.teacherName}>{teacher.displayName || teacher.name}</Text>
-                        <Text style={styles.teacherSub}>{(teacher.subjects || []).join(', ') || 'Teacher'}</Text>
-                      </TouchableOpacity>
-                    ))
-                ) : (
-                  <Text style={styles.teacherHint}>Search teachers by name</Text>
-                )}
+           
 
-                {!teacherSearchLoading && teacherQuery.trim().length >= 2 && teacherResults.filter((t) => !selectedTeacherIds.includes(t._id)).length === 0 ? (
-                  <Text style={styles.teacherHint}>No teachers found for this search</Text>
-                ) : null}
-              </View>
+// AFTER
+<Text style={styles.fieldLabel}>Assign teacher(s) (optional)</Text>
+<View style={styles.teacherSearchWrap}>
+  <Ionicons name="search" size={18} color={D.muted} />
+  <TextInput
+    style={styles.teacherSearchField}
+    placeholder="Search your teachers"
+    placeholderTextColor={D.muted}
+    value={teacherQuery}
+    onChangeText={setTeacherQuery}
+    autoCapitalize="words"
+  />
+  {myTeachersLoading ? <ActivityIndicator size="small" color={D.pink} /> : null}
+</View>
+<View style={styles.teacherResultWrap}>
+  {myTeachersLoading ? (
+    <Text style={styles.teacherHint}>Loading your teachers...</Text>
+  ) : myTeachers.length === 0 ? (
+    <Text style={styles.teacherHint}>No teachers assigned to you yet. Contact admin.</Text>
+  ) : teacherResults.filter((t) => !selectedTeacherIds.includes(t._id)).length > 0 ? (
+    teacherResults
+      .filter((t) => !selectedTeacherIds.includes(t._id))
+      .slice(0, 6)
+      .map((teacher) => (
+        <TouchableOpacity key={teacher._id} style={styles.teacherRow} onPress={() => setSelectedTeachers((prev) => [...prev, teacher])}>
+          <Text style={styles.teacherName}>{teacher.displayName || teacher.name}</Text>
+          <Text style={styles.teacherSub}>{(teacher.subjects || []).join(', ') || 'Teacher'}</Text>
+        </TouchableOpacity>
+      ))
+  ) : (
+    <Text style={styles.teacherHint}>No matching teacher found</Text>
+  )}
+</View>
 
               {selectedTeachers.length > 0 && (
                 <View style={styles.selectedWrap}>

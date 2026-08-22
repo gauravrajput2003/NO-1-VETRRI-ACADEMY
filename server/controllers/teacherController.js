@@ -104,7 +104,7 @@ const getTeacherStudentFilter = async (teacherId) => {
   const students = await User.find({
     role: 'student',
     isActive: true,
-    assignedTeacher: teacherId,
+    assignedTeachers: teacherId, // Mongo matches a scalar against array fields automatically
   }).select('_id');
 
   return students.map((student) => student._id.toString());

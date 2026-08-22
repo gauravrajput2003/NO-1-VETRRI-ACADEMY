@@ -141,7 +141,7 @@ const getAllStudents = async (req, res) => {
     const students = await User.find(filter)
       .select('-password -refreshToken')
       .populate('course', 'title category')
-      .populate('assignedTeacher', 'name') // Only name — no contact for student-facing
+      .populate('assignedTeachers', 'name') // Only name — no contact for student-facing
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
@@ -178,15 +178,23 @@ const getAllTeachers = async (req, res) => {
 // @access  Admin
 const updateStudent = async (req, res) => {
   try {
-    const { course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes } = req.body;
+    const { course, assignedTeachers, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes } = req.body;
+
+    const updatePayload = { course, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes };
+    // Only touch assignedTeachers if the client actually sent it, so partial updates
+    // (e.g. just toggling isActive) can't accidentally wipe the teacher list.
+    if (assignedTeachers !== undefined) {
+      updatePayload.assignedTeachers = Array.isArray(assignedTeachers) ? assignedTeachers : [];
+    }
+
     const student = await User.findByIdAndUpdate(
       req.params.id,
-      { course, assignedTeacher, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes },
+      updatePayload,
       { new: true, runValidators: true }
     )
       .select('-password -refreshToken')
       .populate('course', 'title')
-      .populate('assignedTeacher', 'name');
+      .populate('assignedTeachers', 'name');
 
     if (!student) return res.status(404).json({ success: false, message: 'Student not found.' });
 
@@ -321,7 +329,7 @@ const deleteTeacher = async (req, res) => {
     const liveClassIds = await LiveClass.find({ teacher: teacher._id }).distinct('_id');
 
     await Promise.all([
-      User.updateMany({ assignedTeacher: teacher._id }, { $unset: { assignedTeacher: '' } }),
+     User.updateMany({ assignedTeachers: teacher._id }, { $pull: { assignedTeachers: teacher._id } }),
       AdmissionForm.updateMany({ assignedTeacher: teacher._id }, { $unset: { assignedTeacher: '' } }),
       DemoBooking.updateMany({ assignedTeacher: teacher._id }, { $unset: { assignedTeacher: '' } }),
       Doubt.updateMany({ assignedTeachers: teacher._id }, { $pull: { assignedTeachers: teacher._id, participants: teacher._id } }),

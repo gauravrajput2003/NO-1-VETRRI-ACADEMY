@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema(
     grade: { type: String },
     board: { type: String, trim: true, default: '' },
     course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
-    assignedTeacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    assignedTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     admissionFormFilled: { type: Boolean, default: false },
     firstLogin: { type: Boolean, default: true },
     feeAmount: { type: Number, default: 0 },
