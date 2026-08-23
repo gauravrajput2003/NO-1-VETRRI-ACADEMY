@@ -267,7 +267,7 @@ export default function Students() {
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-[35%] justify-start lg:justify-center">
               <span className="px-3.5 py-1.5 rounded-full text-[13px] font-bold bg-purple-500/10 text-purple-600 border border-purple-500/20 flex items-center gap-1.5">
                 <FiUser size={13} />
-                {s.assignedTeacher?.name || 'Unassigned'}
+                {s.assignedTeachers?.length ? s.assignedTeachers.map((t) => t.name).join(', ') : (s.assignedTeacher?.name || 'Unassigned')}
               </span>
               <span className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold border ${s.feePaid !== false ? 'bg-[#20C7C9]/10 text-[#149596] border-[#20C7C9]/20' : 'bg-[#F6C453]/10 text-[#b58b29] border-[#F6C453]/20'}`}>
                 {s.feePaid !== false ? 'Paid' : 'Pending'}
@@ -574,7 +574,7 @@ export default function Students() {
               </div>
               <p><strong>Mobile:</strong> {viewStudent.mobile || 'N/A'}</p>
               <p><strong>Email:</strong> {viewStudent.email || 'N/A'}</p>
-              <p><strong>Assigned Teacher:</strong> {viewStudent.assignedTeacher?.name || 'Unassigned'}</p>
+              <p><strong>Assigned Teacher:</strong> {viewStudent.assignedTeachers?.length ? viewStudent.assignedTeachers.map((t) => t.name).join(', ') : (viewStudent.assignedTeacher?.name || 'Unassigned')}</p>
               <p><strong>Status:</strong> {viewStudent.isActive !== false ? 'Active' : 'Discontinued / Inactive'}</p>
             </div>
             <div className="flex justify-end gap-3 mt-6 pt-3 border-t">

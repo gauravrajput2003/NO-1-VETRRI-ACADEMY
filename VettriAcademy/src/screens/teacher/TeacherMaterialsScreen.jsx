@@ -461,9 +461,9 @@ export default function TeacherMaterialsScreen({ navigation }) {
                         <View style={[styles.statusPill, { backgroundColor: '#DCFCE7' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>✅ Approved</Text></View>
                       )}
                       {item.lockedForAll ? (
-                        <View style={[styles.statusPill, { backgroundColor: '#FFF7ED' }]}><Text style={[styles.statusPillText, { color: '#EA580C' }]}>🔒 Locked</Text></View>
+                        <View style={[styles.statusPill, { backgroundColor: '#FFF7ED' }]}><Text style={[styles.statusPillText, { color: '#EA580C' }]}>🔒 </Text></View>
                       ) : (
-                        <View style={[styles.statusPill, { backgroundColor: '#F0FDF4' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>🔓 Unlocked</Text></View>
+                        <View style={[styles.statusPill, { backgroundColor: '#F0FDF4' }]}><Text style={[styles.statusPillText, { color: '#16A34A' }]}>🔓</Text></View>
                       )}
                     </View>
                   </View>
@@ -560,14 +560,27 @@ export default function TeacherMaterialsScreen({ navigation }) {
                       const isActive = filterSubject === sub;
                       const icon = FILTER_ICONS[sub];
                       return (
-                        <ScaleBtn key={sub} activeScale={0.92} onPress={() => setFilterSubject(sub)}>
-                          <View style={[styles.chipModernHeader, isActive ? styles.chipModernHeaderActive : styles.chipModernHeaderInactive]}>
-                            {isActive && <LinearGradient colors={['#EC4899', '#F472B6']} style={StyleSheet.absoluteFillObject} start={{x:0, y:0}} end={{x:1, y:1}} />}
-                            <Text style={[styles.chipTextModernHeader, isActive ? { color: '#FFF' } : { color: '#1E293B' }]}>
-                              {icon ? `${icon} ${sub}` : sub}
-                            </Text>
-                          </View>
-                        </ScaleBtn>
+                       <ScaleBtn key={sub} activeScale={0.92} onPress={() => setFilterSubject(sub)}>
+  <View style={[styles.chipModernHeader, isActive ? styles.chipModernHeaderActive : styles.chipModernHeaderInactive]}>
+    {isActive && (
+      <LinearGradient
+        colors={['#EC4899', '#F472B6']}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+    )}
+    <Text
+      style={[
+        styles.chipTextModernHeader,
+        { color: isActive ? '#FFFFFF' : '#1E293B', zIndex: 1 },
+      ]}
+      numberOfLines={1}
+    >
+      {icon ? `${icon} ${sub}` : sub}
+    </Text>
+  </View>
+</ScaleBtn>
                       );
                     })}
                   </ScrollView>
@@ -969,11 +982,24 @@ const styles = StyleSheet.create({
   searchInputModern: { flex: 1, fontSize: 16, color: '#1E293B', fontWeight: '500' },
   
   chipScrollModern: { paddingBottom: 16 },
-  chipModernHeader: { height: 46, paddingHorizontal: 20, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
+ chipModernHeader: {
+  height: 46,
+  paddingHorizontal: 20,
+  borderRadius: 999,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+  // keep overflow hidden only for the gradient corners, text is above it via zIndex now
+  overflow: 'hidden',
+  minWidth: 60, // ensures short/empty labels don't collapse to an invisible sliver
+},
   chipModernHeaderActive: { backgroundColor: '#EC4899', shadowColor: '#EC4899', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
   chipModernHeaderInactive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
-  chipTextModernHeader: { fontSize: 15, fontWeight: '600' },
-
+chipTextModernHeader: {
+  fontSize: 15,
+  fontWeight: '700',
+  zIndex: 1,
+},
   listContent: { paddingBottom: 140 },
   
   card: { marginHorizontal: 24, borderRadius: 24, marginBottom: 18, shadowColor: '#1E293B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 8, overflow: 'hidden' },

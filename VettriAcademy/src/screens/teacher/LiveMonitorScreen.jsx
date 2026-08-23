@@ -15,6 +15,7 @@ import { onSocketEvent, joinRoom, leaveRoom, getSocket } from '../../services/so
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TouchableOpacity = (props) => {
   const { particleCount = 20, size = "small", colors, children, ...rest } = props;
@@ -43,6 +44,7 @@ export default function LiveMonitorScreen({ navigation, route }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const pollRef = useRef(null);
 
+  const insets = useSafeAreaInsets();
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
 
@@ -236,7 +238,7 @@ export default function LiveMonitorScreen({ navigation, route }) {
       </Animated.View>
 
       <ScrollView 
-        contentContainerStyle={{ paddingBottom: bottomPadding || 120 }} 
+        contentContainerStyle={{ paddingBottom: (bottomPadding || 20) + insets.bottom + 90 }} 
         showsVerticalScrollIndicator={false}
         onScroll={onTabBarScroll}
         scrollEventThrottle={16}
@@ -306,7 +308,14 @@ export default function LiveMonitorScreen({ navigation, route }) {
       </ScrollView>
 
       {/* ═══ Bottom Action Buttons ═══ */}
-      <View style={[styles.bottomActions, { backgroundColor: isDark ? '#152238' : Colors.white }]}>
+      <View style={[
+        styles.bottomActions,
+        {
+          backgroundColor: isDark ? '#152238' : Colors.white,
+          bottom: bottomPadding || 0,
+          paddingBottom: (bottomPadding ? 12 : Math.max(insets.bottom, 12)) + 4,
+        }
+      ]}>
         <TouchableOpacity style={styles.actionBtnBrowser} onPress={handleOpenBrowser} activeOpacity={0.8}>
           <Ionicons name="phone-portrait-outline" size={18} color={Colors.primary} />
           <Text style={styles.actionBtnBrowserText}>Open in Browser</Text>

@@ -262,7 +262,7 @@ export default function ClassScheduler() {
             </div>
             <div>
               <label className="input-label">Date *</label>
-              <input {...register('scheduledDate')} type="date" className="input-field" />
+              <input {...register('scheduledDate')} type="date" min={new Date().toISOString().split('T')[0]} className="input-field" />
               {errors.scheduledDate && <p className="text-red-400 text-xs mt-1">{errors.scheduledDate.message}</p>}
             </div>
             <div>

@@ -1,6 +1,6 @@
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import React, { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, Animated, Easing, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, Animated, Easing, useWindowDimensions, Platform, Keyboard, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -178,81 +178,101 @@ export default function StudentFeeHistoryScreen({ route, navigation }) {
         />
       </FadeInUp>
 
-      <Modal visible={payModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: Math.max(vs(32), bottomPadding) }]}>
+      <Modal visible={payModal} transparent animationType="slide" onRequestClose={() => setPayModal(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setPayModal(false);
+            }}
+          />
+          <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Record Payment</Text>
             <Text style={styles.modalSub}>{studentName}</Text>
 
-            <Text style={styles.label}>Amount Paid</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              placeholder="Enter amount paid"
-              placeholderTextColor="#9CA3AF"
-              value={payData.amount}
-              onChangeText={(v) => setPayData({ ...payData, amount: v })}
-            />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: Math.max(vs(20), bottomPadding) }}
+            >
+              <Text style={styles.label}>Amount Paid</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="Enter amount paid"
+                placeholderTextColor="#9CA3AF"
+                selectionColor={BRAND.primaryTeal}
+                value={payData.amount}
+                onChangeText={(v) => setPayData({ ...payData, amount: v })}
+              />
 
-            <Text style={styles.label}>Month / Period</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. July 2026"
-              placeholderTextColor="#9CA3AF"
-              value={payData.month}
-              onChangeText={(v) => setPayData({ ...payData, month: v })}
-            />
+              <Text style={styles.label}>Month / Period</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. July 2026"
+                placeholderTextColor="#9CA3AF"
+                selectionColor={BRAND.primaryTeal}
+                value={payData.month}
+                onChangeText={(v) => setPayData({ ...payData, month: v })}
+              />
 
-            <Text style={styles.label}>Payment Method</Text>
-            <View style={styles.methodRow}>
-              {['cash', 'upi', 'bank_transfer', 'cheque', 'card'].map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={[styles.methodChip, payData.paymentMethod === m && styles.methodActive]}
-                  onPress={() => setPayData({ ...payData, paymentMethod: m })}
-                >
-                  <Text style={[styles.methodText, payData.paymentMethod === m && { color: BRAND.white }]}>
-                    {m.toUpperCase().replace('_', ' ')}
-                  </Text>
+              <Text style={styles.label}>Payment Method</Text>
+              <View style={styles.methodRow}>
+                {['cash', 'upi', 'bank_transfer', 'cheque', 'card'].map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.methodChip, payData.paymentMethod === m && styles.methodActive]}
+                    onPress={() => setPayData({ ...payData, paymentMethod: m })}
+                  >
+                    <Text style={[styles.methodText, payData.paymentMethod === m && { color: BRAND.white }]}>
+                      {m.toUpperCase().replace('_', ' ')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Status</Text>
+              <View style={styles.methodRow}>
+                {['paid', 'partial'].map((st) => (
+                  <TouchableOpacity
+                    key={st}
+                    style={[styles.methodChip, payData.status === st && styles.methodActive]}
+                    onPress={() => setPayData({ ...payData, status: st })}
+                  >
+                    <Text style={[styles.methodText, payData.status === st && { color: BRAND.white }]}>
+                      {st.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Remarks (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Any notes..."
+                placeholderTextColor="#9CA3AF"
+                selectionColor={BRAND.primaryTeal}
+                value={payData.remarks}
+                onChangeText={(v) => setPayData({ ...payData, remarks: v })}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setPayModal(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Status</Text>
-            <View style={styles.methodRow}>
-              {['paid', 'partial'].map((st) => (
-                <TouchableOpacity
-                  key={st}
-                  style={[styles.methodChip, payData.status === st && styles.methodActive]}
-                  onPress={() => setPayData({ ...payData, status: st })}
-                >
-                  <Text style={[styles.methodText, payData.status === st && { color: BRAND.white }]}>
-                    {st.toUpperCase()}
-                  </Text>
+                <TouchableOpacity style={styles.primaryBtn} onPress={handleRecordPayment}>
+                  <Text style={styles.primaryBtnText}>Confirm Payment</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Remarks (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Any notes..."
-              placeholderTextColor="#9CA3AF"
-              value={payData.remarks}
-              onChangeText={(v) => setPayData({ ...payData, remarks: v })}
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setPayModal(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleRecordPayment}>
-                <Text style={styles.primaryBtnText}>Confirm Payment</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -300,18 +320,20 @@ function createStyles({ isTablet, insets, width, s, vs }) {
     modalContent: {
       backgroundColor: '#FFF',
       borderTopLeftRadius: 28, borderTopRightRadius: 28,
-      padding: sidePadding + 4,
+      paddingTop: vs(16),
+      paddingHorizontal: sidePadding + 4,
       width: '100%',
       maxWidth: isTablet ? 560 : undefined,
+      maxHeight: isTablet ? '80%' : '88%',
       borderBottomLeftRadius: isTablet ? 28 : 0,
       borderBottomRightRadius: isTablet ? 28 : 0,
       marginBottom: isTablet ? insets.bottom + 24 : 0,
     },
-    modalHandle: { width: 36, height: 4, backgroundColor: BRAND.border, borderRadius: 2, alignSelf: 'center', marginBottom: vs(18) },
+    modalHandle: { width: 36, height: 4, backgroundColor: BRAND.border, borderRadius: 2, alignSelf: 'center', marginBottom: vs(12) },
     modalTitle: { fontSize: f(18, 20), fontWeight: '800', color: BRAND.darkText },
-    modalSub: { fontSize: f(12.5, 14), fontWeight: '500', color: BRAND.muted, marginTop: 5, marginBottom: vs(18) },
-    label: { fontSize: f(12, 13.5), fontWeight: '700', color: BRAND.darkText, marginBottom: 8, marginTop: vs(14) },
-    input: { borderWidth: 1, borderColor: BRAND.border, borderRadius: 14, paddingHorizontal: s(16), paddingVertical: vs(13), fontSize: f(14, 15.5), fontWeight: '600', color: BRAND.darkText, backgroundColor: BRAND.bg },
+    modalSub: { fontSize: f(12.5, 14), fontWeight: '500', color: BRAND.muted, marginTop: 4, marginBottom: vs(12) },
+    label: { fontSize: f(12, 13.5), fontWeight: '700', color: BRAND.darkText, marginBottom: 6, marginTop: vs(12) },
+    input: { borderWidth: 1, borderColor: BRAND.border, borderRadius: 14, paddingHorizontal: s(16), paddingVertical: vs(12), minHeight: vs(46), fontSize: f(14, 15.5), fontWeight: '600', color: BRAND.darkText, backgroundColor: BRAND.bg },
     methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     methodChip: { paddingHorizontal: s(14), paddingVertical: vs(9), borderRadius: 10, backgroundColor: BRAND.bg, borderWidth: 1, borderColor: BRAND.border },
     methodActive: { backgroundColor: BRAND.primaryTeal, borderColor: BRAND.primaryTeal },

@@ -164,7 +164,7 @@ const getMyStudents = async (req, res) => {
       role: 'student',
       isActive: true,
     })
-      .select('name displayName grade board course assignedTeacher createdAt isActive')
+      .select('name displayName grade board course assignedTeachers createdAt isActive')
       .populate('course', 'title category');
 
     res.status(200).json({ success: true, students });

@@ -56,6 +56,36 @@ const notifyStudentsClassScheduled = async ({ req, schedule }) => {
   });
 };
 
+const cleanupStaleLiveClasses = async () => {
+  try {
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const staleClasses = await ClassSchedule.find({
+      status: 'live',
+      $or: [
+        { scheduledDate: { $lt: startOfToday } },
+        { updatedAt: { $lt: fourHoursAgo } },
+      ],
+    });
+
+    if (staleClasses.length > 0) {
+      const staleIds = staleClasses.map((c) => c._id);
+      await ClassSchedule.updateMany(
+        { _id: { $in: staleIds } },
+        { $set: { status: 'completed' } }
+      );
+      await LiveSession.updateMany(
+        { classId: { $in: staleIds }, isLive: true },
+        { $set: { isLive: false, endedAt: new Date() } }
+      );
+    }
+  } catch (err) {
+    console.error('[ClassSchedule] Cleanup stale live classes error:', err.message);
+  }
+};
+
 const createSchedule = async (req, res) => {
   try {
     const {
@@ -103,6 +133,16 @@ const createSchedule = async (req, res) => {
     if (Number.isNaN(parsedScheduledDate.getTime())) {
       return res.status(400).json({ success: false, message: 'scheduledDate is invalid' });
     }
+
+    // DISALLOW BACK-DATES: Cannot schedule a class for past dates
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const scheduledDateOnly = new Date(parsedScheduledDate);
+    scheduledDateOnly.setHours(0, 0, 0, 0);
+    if (scheduledDateOnly < startOfToday) {
+      return res.status(400).json({ success: false, message: 'Cannot schedule a class in the past. Please select today or a future date.' });
+    }
+
     const validateOptionalUrl = (value, label) => {
       if (!value) return null;
       try {
@@ -140,6 +180,7 @@ const createSchedule = async (req, res) => {
 // ─── Get Schedules (role-filtered, NEVER includes meetLink) ──────────────────
 const getSchedules = async (req, res) => {
   try {
+    await cleanupStaleLiveClasses();
     const { page = 1, limit = 20, course, grade, status, from, to } = req.query;
     const user = req.user;
 
@@ -180,6 +221,7 @@ const getSchedules = async (req, res) => {
 // ─── Get Today's Classes ──────────────────────────────────────────────────────
 const getTodayClasses = async (req, res) => {
   try {
+    await cleanupStaleLiveClasses();
     const user = req.user;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -205,6 +247,7 @@ const getTodayClasses = async (req, res) => {
 // ─── Get Upcoming Classes (next 7 days) ───────────────────────────────────────
 const getUpcomingClasses = async (req, res) => {
   try {
+    await cleanupStaleLiveClasses();
     const user = req.user;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -331,64 +374,101 @@ const joinClass = async (req, res) => {
     const cls = await ClassSchedule.findById(classId).populate('teacherId', 'name displayName');
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
 
-    // Validate student is enrolled
-    const isEnrolled = cls.studentIds.some((id) => id.toString() === studentId.toString());
-    if (!isEnrolled) {
-      return res.status(403).json({ success: false, message: 'You are not enrolled in this class.' });
+    // Validate student is enrolled (students only, teachers/admins can also join)
+    if (req.user.role === 'student') {
+      const isEnrolled = cls.studentIds.some((id) => id.toString() === studentId.toString());
+      if (!isEnrolled) {
+        return res.status(403).json({ success: false, message: 'You are not enrolled in this class.' });
+      }
     }
 
-    if (cls.status !== 'live') {
-      return res.status(400).json({ success: false, message: 'Class is not live yet.' });
+    if (cls.status === 'completed' || cls.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'This class has already ended.' });
     }
 
-    // Get meetLink from LiveSession (not directly from ClassSchedule in response)
-    const session = await LiveSession.findOne({ classId, isLive: true });
-    if (!session) return res.status(404).json({ success: false, message: 'Live session not found.' });
+    // Try to find active LiveSession first
+    let session = await LiveSession.findOne({ classId, isLive: true });
+
+    // Resolve meeting link from session or schedule
+    let resolvedMeetLink = session?.meetLink || cls.meetLink || cls.googleMeetLink || cls.zoomMeetingLink || '';
+    let resolvedMeetLinkType = session?.meetLinkType || cls.meetLinkType || (cls.googleMeetLink ? 'googlemeet' : cls.zoomMeetingLink ? 'zoom' : 'googlemeet');
+
+    if (!resolvedMeetLink && cls.status !== 'live') {
+      return res.status(400).json({
+        success: false,
+        message: 'Teacher has not started the live session or provided a meeting link yet.',
+      });
+    }
+
+    // If teacher provided a meeting link during scheduling but hasn't explicitly tapped Go Live, activate session
+    if (!session && resolvedMeetLink) {
+      cls.status = 'live';
+      cls.meetLink = resolvedMeetLink;
+      cls.meetLinkType = resolvedMeetLinkType;
+      await cls.save();
+
+      session = await LiveSession.create({
+        classId,
+        teacherId: cls.teacherId?._id || cls.teacherId,
+        meetLink: resolvedMeetLink,
+        meetLinkType: resolvedMeetLinkType,
+        isLive: true,
+        startedAt: new Date(),
+      });
+    }
 
     // Record attendance
     const today = new Date().toISOString().split('T')[0];
     const joinTime = new Date();
 
     // Determine if late (10+ min after session start)
-    const minsAfterStart = session.startedAt
+    const minsAfterStart = session?.startedAt
       ? Math.round((joinTime - session.startedAt) / 60000)
       : 0;
     const status = minsAfterStart >= 10 ? 'late' : 'present';
 
-    await ClassAttendance.findOneAndUpdate(
-      { classId, studentId },
-      {
-        classId, studentId, joinTime,
-        status, date: today,
-      },
-      { upsert: true, new: true }
-    );
+    if (req.user.role === 'student') {
+      await ClassAttendance.findOneAndUpdate(
+        { classId, studentId },
+        {
+          classId, studentId, joinTime,
+          status, date: today,
+        },
+        { upsert: true, new: true }
+      );
+    }
 
-    // Update LiveSession stats
-    await LiveSession.findByIdAndUpdate(session._id, {
-      $inc: { totalJoined: 1 },
-    });
+    // Update LiveSession stats if session exists
+    if (session) {
+      await LiveSession.findByIdAndUpdate(session._id, {
+        $inc: { totalJoined: 1 },
+      });
 
-    // Update peakStudentCount
-    const joinedCount = await ClassAttendance.countDocuments({ classId, status: { $in: ['present', 'late'] } });
-    await LiveSession.findByIdAndUpdate(session._id, {
-      $max: { peakStudentCount: joinedCount },
-    });
+      // Update peakStudentCount
+      const joinedCount = await ClassAttendance.countDocuments({ classId, status: { $in: ['present', 'late'] } });
+      await LiveSession.findByIdAndUpdate(session._id, {
+        $max: { peakStudentCount: joinedCount },
+      });
 
-    // Notify teacher room
-    io.to(`teacher_${cls.teacherId._id}`).emit('student:joined', {
-      studentName: req.user.displayName || req.user.name,
-      count: joinedCount,
-      classId,
-    });
+      // Notify teacher room & class room with complete student payload
+      const joinPayload = {
+        studentName: req.user.displayName || req.user.name,
+        studentId: req.user._id.toString(),
+        joinedAt: joinTime,
+        count: joinedCount,
+        classId,
+      };
+      if (io) {
+        if (cls.teacherId?._id) io.to(`teacher_${cls.teacherId._id}`).emit('student:joined', joinPayload);
+        io.to(`class_${classId}`).emit('student:joined', joinPayload);
+        io.to('admin_room').emit('attendance:updated', { classId, presentCount: joinedCount });
+      }
+    }
 
-    // Notify admin room
-    io.to('admin_room').emit('attendance:updated', { classId, presentCount: joinedCount });
-
-    // Return meetLink HERE ONLY
+    // Return meetLink
     res.json({
       success: true,
-      meetLink: session.meetLink,
+      meetLink: resolvedMeetLink,
       status,
       message: status === 'late' ? 'You joined late. Attendance marked as LATE.' : 'Attendance recorded!',
     });
@@ -607,7 +687,7 @@ const generateYearSchedule = async (req, res) => {
     if (studentIds.length > 0) {
       const validStudents = await User.countDocuments({
         _id: { $in: studentIds },
-        assignedTeacher: teacherId,
+        assignedTeachers: teacherId,
         role: 'student'
       });
       if (validStudents !== studentIds.length) {
@@ -717,6 +797,133 @@ const getClassDetails = async (req, res) => {
   }
 };
 
+// ─── Teacher/Admin: Get Live Monitor Data for a Single Class ─────────────────
+// @route   GET /api/classes/:id/live-monitor
+// @access  Teacher / Admin
+const getClassLiveMonitor = async (req, res) => {
+  try {
+    const classId = req.params.id;
+    const cls = await ClassSchedule.findById(classId)
+      .populate('studentIds', 'name displayName grade board profilePic')
+      .populate('teacherId', 'name displayName profilePic');
+
+    if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
+
+    // Allow teacher of the class or admin
+    if (req.user.role !== 'admin' && cls.teacherId?._id?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to monitor this class.' });
+    }
+
+    const attendances = await ClassAttendance.find({ classId, status: { $in: ['present', 'late'] } })
+      .populate('studentId', 'name displayName grade board profilePic');
+
+    const joinedStudentMap = new Map();
+    attendances.forEach((a) => {
+      if (a.studentId) {
+        joinedStudentMap.set(a.studentId._id.toString(), {
+          _id: a.studentId._id,
+          name: a.studentId.displayName || a.studentId.name,
+          grade: a.studentId.grade,
+          profilePic: a.studentId.profilePic,
+          joinedAt: a.joinTime || a.createdAt,
+          status: a.status,
+        });
+      }
+    });
+
+    const enrolledStudents = cls.studentIds || [];
+    const joinedStudents = Array.from(joinedStudentMap.values());
+    const pendingStudents = enrolledStudents
+      .filter((s) => !joinedStudentMap.has(s._id.toString()))
+      .map((s) => ({
+        _id: s._id,
+        name: s.displayName || s.name,
+        grade: s.grade,
+        profilePic: s.profilePic,
+      }));
+
+    const monitorData = {
+      _id: cls._id,
+      title: cls.title || cls.subject,
+      subject: cls.subject,
+      grade: cls.grade,
+      course: cls.course,
+      status: cls.status,
+      meetLink: cls.meetLink || cls.googleMeetLink || cls.zoomMeetingLink || '',
+      meetLinkType: cls.meetLinkType,
+      teacher: {
+        _id: cls.teacherId?._id,
+        name: cls.teacherId?.displayName || cls.teacherId?.name,
+      },
+      totalStudents: enrolledStudents.length,
+      studentsJoined: joinedStudents.length,
+      joinedStudents,
+      pendingStudents,
+    };
+
+    res.json({ success: true, class: monitorData });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── Teacher: Send Message to All Students in Live Class ─────────────────────
+// @route   POST /api/classes/:id/message
+// @access  Teacher / Admin
+const sendClassMessage = async (req, res) => {
+  try {
+    const classId = req.params.id;
+    const { message } = req.body;
+    const io = req.app.get('io');
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message content is required.' });
+    }
+
+    const cls = await ClassSchedule.findById(classId);
+    if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
+
+    if (req.user.role !== 'admin' && cls.teacherId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to send messages to this class.' });
+    }
+
+    const notifications = (cls.studentIds || []).map((sid) => ({
+      recipient: sid,
+      sender: req.user._id,
+      type: 'live_class',
+      title: `Message from Teacher (${cls.subject || 'Class'})`,
+      message: message.trim(),
+      link: '/student/classes',
+      data: { classId },
+    }));
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
+    if (io) {
+      io.to(`class_${classId}`).emit('class:message', {
+        classId,
+        message: message.trim(),
+        senderName: req.user.displayName || req.user.name,
+        timestamp: new Date().toISOString(),
+      });
+      (cls.studentIds || []).forEach((sid) => {
+        io.to(`user_${sid}`).emit('class:message', {
+          classId,
+          message: message.trim(),
+          senderName: req.user.displayName || req.user.name,
+          timestamp: new Date().toISOString(),
+        });
+      });
+    }
+
+    res.json({ success: true, message: 'Message sent to all students.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createSchedule,
   getSchedules,
@@ -735,4 +942,6 @@ module.exports = {
   manualAttendance,
   getLiveMonitor,
   getClassDetails,
+  getClassLiveMonitor,
+  sendClassMessage,
 };

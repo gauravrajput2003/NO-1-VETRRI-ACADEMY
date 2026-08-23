@@ -120,11 +120,11 @@ export default function ClassDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Join button for live classes */}
-        {isLive && (
+        {/* Join button for live or scheduled classes */}
+        {(isLive || cls.status === 'scheduled') && !isCompleted && (
           <TouchableOpacity style={styles.joinBtn} onPress={() => dispatch(joinClass(classId))}>
             <Ionicons name="videocam" size={22} color={Colors.white} />
-            <Text style={styles.joinText}>JOIN LIVE CLASS</Text>
+            <Text style={styles.joinText}>{isLive ? 'JOIN LIVE CLASS' : 'JOIN CLASS NOW'}</Text>
           </TouchableOpacity>
         )}
 

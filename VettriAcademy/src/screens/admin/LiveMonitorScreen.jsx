@@ -34,7 +34,7 @@ export default function LiveMonitorScreen() {
         <Text style={[styles.countText, { color: textSec }]}>{classes.length} class{classes.length !== 1 ? 'es' : ''}</Text>
       </View>
 
-      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={classes} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16 }}
+      <FlatList onScroll={onTabBarScroll} scrollEventThrottle={16} data={classes} keyExtractor={(i) => i._id} contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding || 24 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: Colors.error }]}>
             <View style={styles.cardTop}>

@@ -55,12 +55,12 @@ export default function App() {
           >
             <RootNavigator />
             <Toast
-              position="bottom"
+              position="top"
               swipeable={true}
               visibilityTime={4000}
               autoHide={true}
-              topOffset={30}
-              bottomOffset={100}
+              topOffset={50}
+              bottomOffset={40}
               textStyle={{ fontWeight: '600' }}
               config={toastConfig}
             />

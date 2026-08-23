@@ -8,6 +8,7 @@ const {
   getCalendarData, goLive, joinClass, endClass, uploadRecording,
   getUploadSignature, getClassAttendance, updateSchedule, cancelSchedule,
   generateYearSchedule, manualAttendance, getLiveMonitor, getClassDetails,
+  getClassLiveMonitor, sendClassMessage,
 } = require('../controllers/classController');
 
 // ─── Upload Signature (teacher only) ─────────────────────────────────────────
@@ -27,11 +28,13 @@ router.get('/today', verifyToken, getTodayClasses);
 router.get('/upcoming', verifyToken, getUpcomingClasses);
 router.get('/calendar', verifyToken, getCalendarData);
 router.get('/:id/details', verifyToken, getClassDetails);
+router.get('/:id/live-monitor', verifyToken, teacherOrAdmin, getClassLiveMonitor);
 router.get('/:id/attendance', verifyToken, getClassAttendance);
 
 // ─── Teacher Routes ───────────────────────────────────────────────────────────
 router.post('/:id/go-live', verifyToken, teacherOnly, goLive);
 router.post('/:id/end', verifyToken, teacherOnly, endClass);
+router.post('/:id/message', verifyToken, teacherOrAdmin, sendClassMessage);
 router.patch('/:id/recording', verifyToken, teacherOnly, uploadRecording);
 
 // ─── Student Routes ───────────────────────────────────────────────────────────

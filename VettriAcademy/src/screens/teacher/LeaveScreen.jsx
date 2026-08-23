@@ -323,11 +323,42 @@ export default function LeaveScreen() {
 
               <Text style={[styles.label, { color: textColor }]}>Leave Type</Text>
               <View style={styles.typeRow}>
-                {leaveTypes.map((t) => (
-                  <TouchableOpacity key={t} style={[styles.typeChip, form.leaveType === t && { backgroundColor: THEME.primaryPink }]} onPress={() => setForm({ ...form, leaveType: t })}>
-                    <Text style={[styles.typeText, form.leaveType === t && { color: THEME.white }]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
+                {leaveTypes.map((t) => {
+                  const isSelected = form.leaveType === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.typeChip,
+                        isSelected
+                          ? styles.typeChipActive
+                          : {
+                              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
+                              borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+                            },
+                      ]}
+                      onPress={() => setForm({ ...form, leaveType: t })}
+                    >
+                      <Ionicons
+                        name={leaveTypeIcons[t] || 'calendar-outline'}
+                        size={15}
+                        color={isSelected ? THEME.white : (isDark ? THEME.primaryTeal : '#475569')}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={[
+                          styles.typeText,
+                          isSelected
+                            ? styles.typeTextActive
+                            : { color: isDark ? '#E2E8F0' : '#475569' },
+                        ]}
+                      >
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <Text style={[styles.label, { color: textColor }]}>From Date *</Text>
@@ -739,9 +770,41 @@ const styles = StyleSheet.create({
   dateOptionLabel: { fontSize: 15, fontWeight: '600' },
   dateOptionValue: { fontSize: 13, marginTop: 4 },
   textArea: { height: 100, textAlignVertical: 'top' },
-  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  typeChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(20, 200, 196, 0.1)' },
-  typeText: { fontSize: 14, fontWeight: '600', color: THEME.primaryTeal },
+  typeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  typeChipActive: {
+    backgroundColor: THEME.primaryPink,
+    borderColor: THEME.primaryPink,
+    shadowColor: THEME.primaryPink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  typeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
+  typeTextActive: {
+    color: THEME.white,
+    fontWeight: '700',
+  },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 30 },
   cancelBtn: { flex: 1, paddingVertical: 16, alignItems: 'center', borderRadius: 16, backgroundColor: '#F0F0F0' },
   cancelText: { fontSize: 16, fontWeight: '600', color: '#666' },

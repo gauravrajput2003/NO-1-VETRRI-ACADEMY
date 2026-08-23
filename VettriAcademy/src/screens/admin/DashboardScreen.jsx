@@ -10,6 +10,8 @@ const ASSETS = {
   newEnquiry: require('../../../assets/new_enquiry.png'),
   newLeave: require('../../../assets/new_leave.png'),
   newFee: require('../../../assets/new_fees.png'),
+  download: require('../../../assets/download.png'),
+  chat: require('../../../assets/chat.png'),
   newSalary: require('../../../assets/new_salary.png'),
   newNotice: require('../../../assets/new_notice.png'),
   newSchedular: require('../../../assets/new_schedular.png'),
@@ -224,8 +226,9 @@ export default function AdminDashboard({ navigation }) {
     { id: '8', icon: ASSETS.materialUpload, label: 'Materials', subtitle: 'Manage Study Materials', screen: 'AdminMaterials', gradient: ['#3B82F6', '#60A5FA'] },
     { id: '9', icon: ASSETS.pendingApproval, label: 'Approvals', subtitle: 'Review Pending Requests', screen: 'AdminPendingApprovals', gradient: ['#F59E0B', '#FBBF24'], badge: s.pendingMaterialsCount || 0 },
     { id: '10', icon: ASSETS.libraryAccess, label: 'Library Access', subtitle: 'Approve Teacher Access', screen: 'LibraryAccess', gradient: ['#8B5CF6', '#A78BFA'] },
-      { id: '11', iconName: 'cloud-download-outline', label: 'Downloads', subtitle: 'NCERT Books & Materials', screen: 'Downloads', gradient: ['#16D6D1', '#0A8C89'] },
-      { id: '12', iconName: 'chatbubbles-outline', label: 'Discussions', subtitle: 'Review & Moderate', screen: 'DoubtCenter', gradient: ['#EC4899', '#F472B6'] },
+     { id: '11', icon: ASSETS.download, label: 'Downloads', subtitle: 'NCERT Books & Materials', screen: 'Downloads', gradient: ['#16D6D1', '#0A8C89'] },
+
+     { id: '12', icon: ASSETS.chat, label: 'Discussions', subtitle: 'Review & Moderate', screen: 'DoubtCenter', gradient: ['#EC4899', '#F472B6'] },
 
   ];
 
@@ -295,32 +298,22 @@ export default function AdminDashboard({ navigation }) {
           </View>
         </FadeInUp>
 
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-          snapToAlignment="start"
-          decelerationRate="fast"
-          snapToInterval={175 + 16}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8 }}
-          data={quickActions}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <View style={{ marginRight: index === quickActions.length - 1 ? 0 : 16 }}>
-              <PremiumCard 
-                width={175}
-                height={160}
-                icon={item.icon}
-                iconName={item.iconName}
-                badge={item.badge}
-                gradient={item.gradient}
-                onPress={() => navigation.navigate(item.screen)}
-                delay={700 + (index * 100)}
-                footerText="Open"
-              />
-            </View>
-          )}
-        />
+      <View style={styles.manageGrid}>
+  {quickActions.map((item, index) => (
+    <View key={item.id} style={[styles.manageCardWrap, { width: cardWidth }]}>
+      <PremiumCard
+        height={155}
+        icon={item.icon}
+        iconName={item.iconName}
+        badge={item.badge}
+        gradient={item.gradient}
+        onPress={() => navigation.navigate(item.screen)}
+        delay={700 + (index * 60)}
+        footerText="Open"
+      />
+    </View>
+  ))}
+</View>
       </View>
 
       {/* MONTHLY TOP RANKERS SINGLE CARD */}
@@ -387,7 +380,8 @@ const styles = StyleSheet.create({
   sectionStats: { paddingHorizontal: 20, marginTop: 16, paddingBottom: 28 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   statCardWrap: { },
-
+manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8 },
+manageCardWrap: {},
   section: { paddingBottom: 20 },
   sectionPad: { paddingHorizontal: 20, paddingBottom: 28 },
   sectionHeaderFlex: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingHorizontal: 20 },

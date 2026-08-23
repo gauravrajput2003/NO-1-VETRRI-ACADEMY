@@ -291,9 +291,13 @@ export default function ClassSchedulerScreen({ navigation }) {
     const targetTeacherId = form.teacherId;
     if (!targetTeacherId) return false;
     
-    const assignedId = typeof s.assignedTeacher === 'object' ? s.assignedTeacher?._id : s.assignedTeacher;
-    if (assignedId !== targetTeacherId && String(assignedId) !== String(targetTeacherId)) {
-        return false;
+    const teachersList = Array.isArray(s.assignedTeachers)
+      ? s.assignedTeachers.map((t) => (typeof t === 'object' ? t?._id : t)?.toString())
+      : s.assignedTeacher
+      ? [(typeof s.assignedTeacher === 'object' ? s.assignedTeacher?._id : s.assignedTeacher)?.toString()]
+      : [];
+    if (!teachersList.includes(String(targetTeacherId))) {
+      return false;
     }
 
     if (form.grade && form.grade !== 'All' && s.grade !== form.grade) return false;
@@ -358,6 +362,11 @@ export default function ClassSchedulerScreen({ navigation }) {
     const tid = form.teacherId || (isTeacher ? loggedInTeacherId : '');
     if (!tid || !form.scheduledDate || !form.scheduledTime) {
       Toast.show({ type: 'error', text1: 'Please select date, time and teacher' }); return;
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (form.scheduledDate < todayStr) {
+      Toast.show({ type: 'error', text1: 'Cannot schedule in the past', text2: 'Please select today or a future date.' });
+      return;
     }
     if (!isValidOptionalUrl(form.googleMeetLink) || !isValidOptionalUrl(form.zoomMeetingLink)) {
       Toast.show({ type: 'error', text1: 'Invalid meeting link', text2: 'Please enter a valid URL.' }); return;

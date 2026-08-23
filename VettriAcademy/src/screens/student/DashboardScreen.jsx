@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Linking,
   Animated, Easing, StatusBar, Dimensions
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -12,11 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { formatScheduledTime } from '../../utils/formatters';
-import { fetchTodayClasses, fetchUpcomingClasses } from '../../redux/slices/classesSlice';
+import { fetchTodayClasses, fetchUpcomingClasses, joinClass, clearJoinResult } from '../../redux/slices/classesSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
 import { getStudentDashboardAPI, getActiveAnnouncementsAPI } from '../../services/api';
@@ -135,7 +136,7 @@ function formatRelativeTime(value) {
 export default function DashboardScreen({ navigation }) {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
-  const { todayClasses } = useSelector((s) => s.classes);
+  const { todayClasses, joinResult } = useSelector((s) => s.classes);
   const { unreadCount } = useSelector((s) => s.notifications);
   const insets = useSafeAreaInsets();
   const bottomPadding = useBottomTabBarPadding();
@@ -146,6 +147,26 @@ export default function DashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('1');
+
+  useEffect(() => {
+    if (joinResult) {
+      if (joinResult.meetLink) {
+        Toast.show({ type: 'success', text1: 'Joining Class...', text2: joinResult.message });
+        Linking.openURL(joinResult.meetLink);
+      }
+      dispatch(clearJoinResult());
+    }
+  }, [joinResult, dispatch]);
+
+  const handleJoinTodayClass = (targetClass) => {
+    if (!targetClass) return;
+    const cid = targetClass._id || targetClass.id;
+    if (targetClass.status === 'live' || targetClass.status === 'scheduled') {
+      dispatch(joinClass(cid));
+    } else {
+      navigation.navigate('ClassDetail', { classId: cid });
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -221,8 +242,7 @@ export default function DashboardScreen({ navigation }) {
   // assignedTeachers is an ARRAY (backend sends `assignedTeachers: studentData?.assignedTeachers || []`).
   // Pull the first teacher out of the array to render — do not read .name/.displayName/.qualification
   // directly off dashboard.assignedTeachers, since those live on an element inside the array, not the array itself.
-  const primaryTeacher = dashboard?.assignedTeachers?.[0];
-
+const myTeachers = dashboard?.assignedTeachers || [];
   return (
     <View style={{ flex: 1, backgroundColor: D.pageBg }}>
       <StatusBar barStyle="light-content" backgroundColor={D.pink} />
@@ -320,7 +340,7 @@ export default function DashboardScreen({ navigation }) {
         {/* TODAY'S CLASS (Teal Gradient) */}
         <Animated.View style={slide(anims[2])}>
           <SectionHeader label="Today's Class" onSeeAll={() => navigation.navigate('Classes')} />
-          <ScaleButton>
+          <ScaleButton onPress={() => todayClass && handleJoinTodayClass(todayClass)}>
             <LinearGradient colors={[D.tealLight, D.teal]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.scheduleCard}>
               {todayClass ? (
                 <>
@@ -335,9 +355,13 @@ export default function DashboardScreen({ navigation }) {
                     <Text style={st.scheduleSubject}>{todayClass.subject || todayClass.title}</Text>
                     <Text style={st.scheduleTeacher}>👨‍🏫 {todayClass.teacher?.name || todayClass.teacherId?.name || 'Teacher'}</Text>
                     <Text style={st.scheduleTime}>{formatScheduledTime(todayClass.scheduledTime)}</Text>
-                    <View style={st.joinButton}>
-                      <Text style={st.joinButtonText}>JOIN NOW</Text>
-                    </View>
+                    <TouchableOpacity
+                      style={st.joinButton}
+                      activeOpacity={0.8}
+                      onPress={() => handleJoinTodayClass(todayClass)}
+                    >
+                      <Text style={st.joinButtonText}>{todayClass.status === 'live' ? 'JOIN LIVE' : 'JOIN NOW'}</Text>
+                    </TouchableOpacity>
                   </View>
                   <Image source={require('../../../assets/classes.png')} style={st.scheduleImage} resizeMode="contain" />
                 </>
@@ -421,26 +445,53 @@ export default function DashboardScreen({ navigation }) {
           </View>
 
           {/* YOUR TEACHER CARD (Inside Explore) */}
-          <View style={{ paddingHorizontal: 16, paddingBottom: 20 }}>
-             <LinearGradient colors={[D.tealLight, '#B2EBF2']} style={{ borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', shadowColor: D.teal, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
-                <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: D.teal, justifyContent: 'center', alignItems: 'center' }}>
-                   {primaryTeacher ? (
-                      <Text style={{ fontSize: 26, color: '#FFF', fontWeight: '800' }}>{primaryTeacher.name?.charAt(0)}</Text>
-                   ) : (
-                      <Ionicons name="person-outline" size={28} color="#FFF" />
-                   )}
-                </View>
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                   <Text style={{ fontSize: 13, color: D.tealDark, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Your Teacher</Text>
-                   <Text style={{ fontSize: 19, fontWeight: '900', color: D.ink, marginBottom: 2 }} numberOfLines={1}>
-                      {primaryTeacher ? (primaryTeacher.displayName || primaryTeacher.name) : 'Unassigned'}
-                   </Text>
-                   <Text style={{ fontSize: 14, fontWeight: '700', color: D.muted }}>
-                      {primaryTeacher ? (primaryTeacher.qualification || 'Instructor') : 'Ask admin to assign one'}
-                   </Text>
-                </View>
-             </LinearGradient>
+          
+
+<View style={{ paddingHorizontal: 16, paddingBottom: 20, gap: 12 }}>
+   <View style={st.teacherHeadingPill}>
+     <View style={st.teacherHeadingIconWrap}>
+       <Ionicons name="person" size={18} color={D.white} />
+     </View>
+     <Text style={st.teacherHeadingText}>
+       {myTeachers.length > 1 ? 'Your Teachers' : 'Your Teacher'}
+     </Text>
+   </View>
+   {myTeachers.length === 0 ? (
+     <LinearGradient colors={[D.tealLight, '#B2EBF2']} style={{ borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', shadowColor: D.teal, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
+        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: D.teal, justifyContent: 'center', alignItems: 'center' }}>
+           <Ionicons name="person-outline" size={28} color="#FFF" />
+        </View>
+        <View style={{ flex: 1, marginLeft: 16 }}>
+           <Text style={{ fontSize: 13, color: D.tealDark, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Your Teacher</Text>
+           <Text style={{ fontSize: 19, fontWeight: '900', color: D.ink, marginBottom: 2 }}>Unassigned</Text>
+           <Text style={{ fontSize: 14, fontWeight: '700', color: D.muted }}>Ask admin to assign one</Text>
+        </View>
+     </LinearGradient>
+   ) : (
+     myTeachers.map((teacher, idx) => (
+       <LinearGradient
+         key={teacher._id || idx}
+         colors={[D.tealLight, '#B2EBF2']}
+         style={{ borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', shadowColor: D.teal, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}
+       >
+          <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: D.teal, justifyContent: 'center', alignItems: 'center' }}>
+             <Text style={{ fontSize: 26, color: '#FFF', fontWeight: '800' }}>{teacher.name?.charAt(0)}</Text>
           </View>
+          <View style={{ flex: 1, marginLeft: 16 }}>
+             <Text style={{ fontSize: 13, color: D.tealDark, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+               {myTeachers.length > 1 ? `Teacher ${idx + 1}` : 'Your Teacher'}
+             </Text>
+             <Text style={{ fontSize: 19, fontWeight: '900', color: D.ink, marginBottom: 2 }} numberOfLines={1}>
+                {teacher.displayName || teacher.name}
+             </Text>
+             <Text style={{ fontSize: 14, fontWeight: '700', color: D.muted }}>
+                {teacher.qualification || 'Instructor'}
+             </Text>
+          </View>
+       </LinearGradient>
+     ))
+   )}
+</View>
         </Animated.View>
 
         {/* FEATURE CARDS (Teal & Golden tints — on brand) */}
@@ -741,4 +792,34 @@ const st = StyleSheet.create({
   annTimeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   annTimeText: { fontSize: 10, fontWeight: '600', color: D.muted },
   annMoreImages: { fontSize: 12, color: D.muted, marginTop: 6, fontWeight: '600' },
+  teacherHeadingPill: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  alignSelf: 'flex-start',
+  backgroundColor: D.pink,
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  borderRadius: 999,
+  marginBottom: 4,
+  shadowColor: D.pink,
+  shadowOpacity: 0.3,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 5,
+},
+teacherHeadingIconWrap: {
+  width: 26,
+  height: 26,
+  borderRadius: 13,
+  backgroundColor: 'rgba(255,255,255,0.25)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+teacherHeadingText: {
+  fontSize: 15,
+  fontWeight: '900',
+  color: D.white,
+  letterSpacing: 0.3,
+},
 });

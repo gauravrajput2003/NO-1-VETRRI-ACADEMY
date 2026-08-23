@@ -84,6 +84,24 @@ function PulseDot() {
   );
 }
 
+const isClassToday = (dateStr) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+         d.getMonth() === now.getMonth() &&
+         d.getDate() === now.getDate();
+};
+
+const isPastDate = (dateStr) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  d.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return d < now;
+};
+
 export default function ClassesScreen({ navigation }) {
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
@@ -107,15 +125,33 @@ export default function ClassesScreen({ navigation }) {
   useEffect(() => { loadClasses(); }, [filter]);
   useEffect(() => { dispatch(fetchUnreadNotificationCount()); }, [dispatch]);
 
+  // Clean / sanitize classes list so past abandoned live classes are treated as completed
+  const sanitizedSchedules = useMemo(() => {
+    return schedules.map((c) => {
+      if (c.status === 'live' && isPastDate(c.scheduledDate)) {
+        return { ...c, status: 'completed' };
+      }
+      return c;
+    });
+  }, [schedules]);
+
+  const filteredSchedules = useMemo(() => {
+    if (filter === 'all') return sanitizedSchedules;
+    if (filter === 'live') return sanitizedSchedules.filter((c) => c.status === 'live');
+    if (filter === 'completed') return sanitizedSchedules.filter((c) => c.status === 'completed');
+    if (filter === 'scheduled') return sanitizedSchedules.filter((c) => c.status === 'scheduled');
+    return sanitizedSchedules;
+  }, [sanitizedSchedules, filter]);
+
   useEffect(() => {
     if (filter !== 'all') return;
     setSummaryStats({
-      total: schedules.length,
-      live: schedules.filter((c) => c.status === 'live').length,
-      completed: schedules.filter((c) => c.status === 'completed').length,
-      upcoming: schedules.filter((c) => c.status === 'scheduled').length,
+      total: sanitizedSchedules.length,
+      live: sanitizedSchedules.filter((c) => c.status === 'live').length,
+      completed: sanitizedSchedules.filter((c) => c.status === 'completed').length,
+      upcoming: sanitizedSchedules.filter((c) => c.status === 'scheduled').length,
     });
-  }, [schedules, filter]);
+  }, [sanitizedSchedules, filter]);
 
   useEffect(() => {
     if (joinResult) {
@@ -154,6 +190,7 @@ export default function ClassesScreen({ navigation }) {
     const emoji = getSubjectEmoji(item.subject, item.title);
     const duration = item.durationMinutes || 60;
     const status = item.status;
+    const isToday = isClassToday(item.scheduledDate);
 
     if (status === 'cancelled') {
       return (
@@ -183,7 +220,9 @@ export default function ClassesScreen({ navigation }) {
       ? ['rgba(255,77,141,0.12)', 'rgba(255,159,67,0.10)']
       : status === 'completed'
         ? [T.greenLight, '#F0FDF4']
-        : ['rgba(20,200,196,0.12)', 'rgba(110,231,229,0.08)'];
+        : isToday
+          ? ['rgba(255,77,141,0.08)', 'rgba(20,200,196,0.12)']
+          : ['rgba(20,200,196,0.12)', 'rgba(110,231,229,0.08)'];
 
     return (
       <View style={[st.classCardWrap, cardStyle]}>
@@ -217,8 +256,10 @@ export default function ClassesScreen({ navigation }) {
                 </View>
               )}
               {status === 'scheduled' && (
-                <View style={st.upcomingBadge}>
-                  <Text style={st.upcomingBadgeText}>Upcoming</Text>
+                <View style={[st.upcomingBadge, isToday && { backgroundColor: 'rgba(255,77,141,0.15)' }]}>
+                  <Text style={[st.upcomingBadgeText, isToday && { color: T.pink, fontWeight: 'bold' }]}>
+                    {isToday ? 'Today' : 'Upcoming'}
+                  </Text>
                 </View>
               )}
               {status === 'completed' && (
@@ -238,7 +279,32 @@ export default function ClassesScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {status === 'scheduled' && (
+          {status === 'scheduled' && isToday && (
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                style={{ flex: 2 }}
+                onPress={() => handleJoin(item._id)}
+                activeOpacity={0.9}
+              >
+                <LinearGradient colors={[T.pink, T.pinkLight]} style={st.joinBtn}>
+                  <Ionicons name="videocam" size={18} color={T.white} />
+                  <Text style={st.joinBtnText}>Join Class</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => navigation.navigate('ClassDetail', { classId: item._id })}
+                activeOpacity={0.9}
+              >
+                <LinearGradient colors={[T.teal, T.tealLight]} style={st.actionBtn}>
+                  <Text style={st.actionBtnText}>Details</Text>
+                  <Ionicons name="arrow-forward" size={14} color={T.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {status === 'scheduled' && !isToday && (
             <TouchableOpacity onPress={() => navigation.navigate('ClassDetail', { classId: item._id })} activeOpacity={0.9}>
               <LinearGradient colors={[T.teal, T.tealLight]} style={st.actionBtn}>
                 <Text style={st.actionBtnText}>View Details</Text>
@@ -324,7 +390,7 @@ export default function ClassesScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={schedules}
+          data={filteredSchedules}
           keyExtractor={(item) => item._id}
           renderItem={renderClass}
           ListHeaderComponent={renderHeader}

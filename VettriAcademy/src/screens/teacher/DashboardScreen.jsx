@@ -619,26 +619,22 @@ export default function TeacherDashboard({ navigation }) {
         </FloatingView>
       </LinearGradient>
 
-      {/* ── QUICK ACTIONS ── */}
-      <View style={st.quickSection}>
-        <Text style={st.sectionTitle}>Quick Actions</Text>
-        <FlatList
-          data={quickActions}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={st.quickScroll}
-          renderItem={({ item }) => (
-            <QuickActionCard
-              item={item}
-              onPress={() => navigation.navigate(item.screen)}
-            />
-          )}
-        />
-        {doubtCount > 0 && (
-          <Text style={st.doubtHint}>{doubtCount} doubt{doubtCount !== 1 ? 's' : ''} awaiting reply</Text>
-        )}
-      </View>
+    {/* ── QUICK ACTIONS ── */}
+<View style={st.quickSection}>
+  <Text style={st.sectionTitle}>Quick Actions</Text>
+  <View style={st.quickGrid}>
+    {quickActions.map((item) => (
+      <QuickActionCard
+        key={item.id}
+        item={item}
+        onPress={() => navigation.navigate(item.screen)}
+      />
+    ))}
+  </View>
+  {doubtCount > 0 && (
+    <Text style={st.doubtHint}>{doubtCount} doubt{doubtCount !== 1 ? 's' : ''} awaiting reply</Text>
+  )}
+</View>
 
       {/* ── ANNOUNCEMENTS ── */}
       {announcements.length > 0 && (
@@ -913,15 +909,28 @@ const st = StyleSheet.create({
   bannerImageWrap: { flex: 0.35, alignItems: 'center', justifyContent: 'center' },
   bannerImage: { width: 95, height: 95 },
 
-  quickSection: { marginTop: 8, paddingLeft: 16 },
-  quickScroll: { gap: 10, paddingRight: 16, paddingTop: 4 },
-  quickCardWrap: { borderRadius: 16 },
+quickSection: { marginTop: 8, paddingHorizontal: 16 },
+quickGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  marginTop: 4,
+},
+quickCardWrap: { width: '48%', borderRadius: 16, marginBottom: 12 },
   quickCard: {
-    width: 145, height: 145, borderRadius: 16, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8,
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 10, elevation: 4,
-  },
+  width: '100%',
+  height: 145,
+  borderRadius: 16,
+  paddingHorizontal: 8,
+  paddingTop: 6,
+  paddingBottom: 8,
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.1,
+  shadowRadius: 10,
+  elevation: 4,
+},
   quickGlass: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 32,
     backgroundColor: 'rgba(255,255,255,0.14)', borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
