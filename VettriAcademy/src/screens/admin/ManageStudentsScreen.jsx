@@ -658,7 +658,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
             </View>
            
 
-// AFTER
+
 <Text style={[styles.label, { color: textColor }]}>Teachers (tap to select multiple)</Text>
 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
   <TouchableOpacity

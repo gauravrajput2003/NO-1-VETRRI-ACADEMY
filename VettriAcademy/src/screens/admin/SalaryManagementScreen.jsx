@@ -1,9 +1,14 @@
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity as RNTouchableOpacity, FlatList, Modal, TextInput, ActivityIndicator, RefreshControl, Image ,Platform} from 'react-native';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity as RNTouchableOpacity,
+  FlatList, Modal, TextInput, ActivityIndicator, RefreshControl, Image, Platform,
+  Animated, Easing
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -165,6 +170,8 @@ export default function SalaryManagementScreen({ navigation, route }) {
   // Download / component selection state
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [downloadingSlipId, setDownloadingSlipId] = useState(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generationStep, setGenerationStep] = useState('');
   const [componentModalFor, setComponentModalFor] = useState(null); // 'single' | 'bulk' | null
   const [componentModalTeacher, setComponentModalTeacher] = useState(null);
   const [selectedComponents, setSelectedComponents] = useState(ALL_COMPONENT_KEYS);
@@ -339,30 +346,41 @@ const handlePickProof = async () => {
 
 const handleDownloadReport = async (components) => {
   setDownloadingReport(true);
+  setGeneratingPdf(true);
+  setGenerationStep('Generating salary report PDF from server...');
   try {
     const { data } = await downloadSalaryReportAPI(`${month} ${year}`, components);
+    setGenerationStep('Preparing PDF file for sharing & saving...');
     const filename = `salary-report-${month}-${year}.pdf`.toLowerCase();
     await savePdfAndShare(data, filename);
-    Toast.show({ type: 'success', text1: 'Report ready', text2: 'Choose where to save or share it.' });
+    Toast.show({ type: 'success', text1: 'Report ready! 📄', text2: 'Choose where to save or share it.' });
   } catch (error) {
     console.error('[Download Report Error]:', parseApiError(error));
     Toast.show({ type: 'error', text1: 'Download failed', text2: parseApiError(error) });
   } finally {
     setDownloadingReport(false);
+    setGeneratingPdf(false);
+    setGenerationStep('');
   }
 };
 
 const handleDownloadSlip = async (teacher, components) => {
   setDownloadingSlipId(teacher.teacherId);
+  setGeneratingPdf(true);
+  setGenerationStep(`Generating salary slip for ${teacher.teacherName}...`);
   try {
     const { data } = await getTeacherSalarySlipAPI(teacher.teacherId, `${month} ${year}`, components);
+    setGenerationStep('Preparing salary slip PDF...');
     const filename = `salary-slip-${teacher.teacherName}-${month}-${year}.pdf`.replace(/\s+/g, '-').toLowerCase();
     await savePdfAndShare(data, filename);
+    Toast.show({ type: 'success', text1: 'Slip ready! 📄', text2: 'Choose where to save or share it.' });
   } catch (error) {
     console.error('[Download Slip Error]:', parseApiError(error));
     Toast.show({ type: 'error', text1: 'Download failed', text2: parseApiError(error) });
   } finally {
     setDownloadingSlipId(null);
+    setGeneratingPdf(false);
+    setGenerationStep('');
   }
 };
 
@@ -370,13 +388,27 @@ const handleDownloadSlip = async (teacher, components) => {
     setSelectedComponents((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
+  const selectAllComponents = () => {
+    setSelectedComponents(ALL_COMPONENT_KEYS);
+  };
+
+  const deselectAllComponents = () => {
+    setSelectedComponents([]);
+  };
+
   const openComponentModal = (mode, teacher = null) => {
     setComponentModalFor(mode);
     setComponentModalTeacher(teacher);
     setSelectedComponents(ALL_COMPONENT_KEYS);
+    setGeneratingPdf(false);
+    setGenerationStep('');
   };
 
   const handleConfirmComponentSelection = async () => {
+    if (selectedComponents.length === 0) {
+      Toast.show({ type: 'error', text1: 'No Components Selected', text2: 'Please select at least one component.' });
+      return;
+    }
     if (componentModalFor === 'single' && componentModalTeacher) {
       await handleDownloadSlip(componentModalTeacher, selectedComponents);
     } else if (componentModalFor === 'bulk') {
@@ -459,7 +491,10 @@ const handleDownloadSlip = async (teacher, components) => {
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => openComponentModal('bulk')} disabled={downloadingReport}>
             {downloadingReport ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
+              <>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.secondaryBtnText}>Generating Report...</Text>
+              </>
             ) : (
               <>
                 <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
@@ -852,49 +887,262 @@ const handleDownloadSlip = async (teacher, components) => {
       </Modal>
 
       {/* Component Selection Modal (for slip / bulk report generation) */}
-      <Modal visible={!!componentModalFor} transparent animationType="slide">
+      <Modal
+        visible={!!componentModalFor}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!generatingPdf) {
+            setComponentModalFor(null);
+            setComponentModalTeacher(null);
+          }
+        }}
+      >
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalSheet} contentContainerStyle={{ padding: 20 }}>
-            <Text style={styles.modalTitle}>Select Salary Components</Text>
-            <Text style={[styles.modalSubTitle, { color: textSec, marginBottom: 16 }]}>
-              Choose which components to include in the {componentModalFor === 'bulk' ? 'report' : 'slip'}
-            </Text>
-
-         <Text style={[styles.label, { marginTop: 4 }]}>Earnings</Text>
-{EARNING_FIELDS.map((f) => (
-  <RNTouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
-    <Ionicons
-      name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
-      size={20}
-      color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
-    />
-    <Text style={styles.checkRowText}>{f.label}</Text>
-  </RNTouchableOpacity>
-))}
-
-<Text style={[styles.label, { marginTop: 14 }]}>Deductions</Text>
-{DEDUCTION_FIELDS.map((f) => (
-  <RNTouchableOpacity key={f.key} style={styles.checkRow} onPress={() => toggleComponent(f.key)}>
-    <Ionicons
-      name={selectedComponents.includes(f.key) ? 'checkbox' : 'square-outline'}
-      size={20}
-      color={selectedComponents.includes(f.key) ? Colors.pink : Colors.mediumGray}
-    />
-    <Text style={styles.checkRowText}>{f.label}</Text>
-  </RNTouchableOpacity>
-))}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setComponentModalFor(null); setComponentModalTeacher(null); }}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleConfirmComponentSelection}>
-                <Text style={styles.saveBtnText}>Generate & Download</Text>
-              </TouchableOpacity>
+          <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
+            {/* Modal Header */}
+            <View style={styles.componentModalHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name={componentModalFor === 'bulk' ? 'document-text' : 'receipt-outline'}
+                    size={22}
+                    color={Colors.pink}
+                  />
+                  <Text style={styles.modalTitle}>
+                    {componentModalFor === 'bulk' ? 'Download Salary Report' : 'Download Salary Slip'}
+                  </Text>
+                </View>
+                <Text style={[styles.modalSubTitle, { color: textSec, marginTop: 2 }]}>
+                  {componentModalFor === 'bulk'
+                    ? `Period: ${month} ${year} · PDF Report`
+                    : `${componentModalTeacher?.teacherName || 'Teacher'} · ${month} ${year}`}
+                </Text>
+              </View>
+              <RNTouchableOpacity
+                onPress={() => {
+                  if (!generatingPdf) {
+                    setComponentModalFor(null);
+                    setComponentModalTeacher(null);
+                  }
+                }}
+                disabled={generatingPdf}
+                style={[styles.closeModalBtn, generatingPdf && { opacity: 0.3 }]}
+              >
+                <Ionicons name="close" size={20} color={Colors.textSecondary.light} />
+              </RNTouchableOpacity>
             </View>
-          </ScrollView>
+
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+              {/* Quick Action Selection Bar */}
+              <View style={styles.selectionQuickBar}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <RNTouchableOpacity
+                    style={[styles.quickSelectPill, selectedComponents.length === ALL_COMPONENT_KEYS.length && styles.quickSelectPillActive]}
+                    onPress={selectAllComponents}
+                    disabled={generatingPdf}
+                  >
+                    <Ionicons
+                      name="checkmark-done"
+                      size={14}
+                      color={selectedComponents.length === ALL_COMPONENT_KEYS.length ? Colors.white : Colors.primary}
+                    />
+                    <Text style={[styles.quickSelectPillText, selectedComponents.length === ALL_COMPONENT_KEYS.length && styles.quickSelectPillTextActive]}>
+                      Select All
+                    </Text>
+                  </RNTouchableOpacity>
+
+                  <RNTouchableOpacity
+                    style={[styles.quickSelectPill, selectedComponents.length === 0 && styles.quickSelectPillActive]}
+                    onPress={deselectAllComponents}
+                    disabled={generatingPdf}
+                  >
+                    <Ionicons
+                      name="close-outline"
+                      size={14}
+                      color={selectedComponents.length === 0 ? Colors.white : textSec}
+                    />
+                    <Text style={[styles.quickSelectPillText, selectedComponents.length === 0 && styles.quickSelectPillTextActive]}>
+                      Clear All
+                    </Text>
+                  </RNTouchableOpacity>
+                </View>
+
+                <View style={styles.selectedCountBadge}>
+                  <Text style={styles.selectedCountBadgeText}>
+                    {selectedComponents.length}/{ALL_COMPONENT_KEYS.length} Selected
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress & Generating Box (Visible when generating PDF) */}
+              {generatingPdf && (
+                <View style={styles.generatingCard}>
+                  <View style={styles.generatingHeader}>
+                    <View style={styles.generatingIconWrap}>
+                      <ActivityIndicator size="small" color={Colors.pink} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.generatingTitle}>Generating PDF Document...</Text>
+                      <Text style={styles.generatingSubtitle}>{generationStep || 'Processing salary components and layout...'}</Text>
+                    </View>
+                  </View>
+                  <IndeterminateProgressBar active={generatingPdf} />
+                  <Text style={styles.generatingHint}>
+                    ⏳ Please wait. The save / share dialog will open automatically once ready.
+                  </Text>
+                </View>
+              )}
+
+              {/* Earnings Section */}
+              <View style={styles.componentSection}>
+                <View style={styles.componentSectionHeader}>
+                  <Text style={styles.componentSectionTitle}>💰 Earnings Components</Text>
+                  <Text style={styles.componentSectionCount}>
+                    {selectedComponents.filter((k) => EARNING_FIELDS.some((f) => f.key === k)).length}/{EARNING_FIELDS.length} included
+                  </Text>
+                </View>
+                <View style={styles.componentCardsGrid}>
+                  {EARNING_FIELDS.map((f) => {
+                    const isSelected = selectedComponents.includes(f.key);
+                    return (
+                      <RNTouchableOpacity
+                        key={f.key}
+                        style={[styles.componentCard, isSelected && styles.componentCardSelected]}
+                        onPress={() => !generatingPdf && toggleComponent(f.key)}
+                        activeOpacity={0.7}
+                        disabled={generatingPdf}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'checkbox' : 'square-outline'}
+                          size={20}
+                          color={isSelected ? Colors.pink : Colors.mediumGray}
+                        />
+                        <Text style={[styles.componentCardText, isSelected && styles.componentCardTextSelected]}>
+                          {f.label}
+                        </Text>
+                      </RNTouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Deductions Section */}
+              <View style={styles.componentSection}>
+                <View style={styles.componentSectionHeader}>
+                  <Text style={styles.componentSectionTitle}>📉 Deductions & Adjustments</Text>
+                  <Text style={styles.componentSectionCount}>
+                    {selectedComponents.filter((k) => DEDUCTION_FIELDS.some((f) => f.key === k)).length}/{DEDUCTION_FIELDS.length} included
+                  </Text>
+                </View>
+                <View style={styles.componentCardsGrid}>
+                  {DEDUCTION_FIELDS.map((f) => {
+                    const isSelected = selectedComponents.includes(f.key);
+                    return (
+                      <RNTouchableOpacity
+                        key={f.key}
+                        style={[styles.componentCard, isSelected && styles.componentCardSelected]}
+                        onPress={() => !generatingPdf && toggleComponent(f.key)}
+                        activeOpacity={0.7}
+                        disabled={generatingPdf}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'checkbox' : 'square-outline'}
+                          size={20}
+                          color={isSelected ? Colors.pink : Colors.mediumGray}
+                        />
+                        <Text style={[styles.componentCardText, isSelected && styles.componentCardTextSelected]}>
+                          {f.label}
+                        </Text>
+                      </RNTouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Actions */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.cancelBtn, generatingPdf && { opacity: 0.5 }]}
+                  onPress={() => {
+                    setComponentModalFor(null);
+                    setComponentModalTeacher(null);
+                  }}
+                  disabled={generatingPdf}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.saveBtn,
+                    (generatingPdf || selectedComponents.length === 0) && { opacity: 0.7 }
+                  ]}
+                  onPress={handleConfirmComponentSelection}
+                  disabled={generatingPdf || selectedComponents.length === 0}
+                >
+                  {generatingPdf ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ActivityIndicator size="small" color={Colors.white} />
+                      <Text style={styles.saveBtnText}>Generating PDF...</Text>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="cloud-download-outline" size={18} color={Colors.white} />
+                      <Text style={styles.saveBtnText}>
+                        Generate & Download ({selectedComponents.length})
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
+    </View>
+  );
+}
+
+function IndeterminateProgressBar({ active }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let loopAnim;
+    if (active) {
+      loopAnim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 1100,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
+            useNativeDriver: false,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 1100,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      loopAnim.start();
+    } else {
+      anim.setValue(0);
+    }
+    return () => {
+      if (loopAnim) loopAnim.stop();
+    };
+  }, [active]);
+
+  const left = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '65%'],
+  });
+
+  return (
+    <View style={styles.progressBarTrack}>
+      <Animated.View style={[styles.progressBarThumb, { left }]} />
     </View>
   );
 }
@@ -960,4 +1208,170 @@ const styles = StyleSheet.create({
 
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   checkRowText: { fontSize: 14, color: Colors.text.light, fontWeight: '600' },
+
+  // Component Selection Modal UI
+  componentModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f2f5',
+  },
+  closeModalBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f4f6f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionQuickBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 12,
+  },
+  quickSelectPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f4f6f8',
+    borderWidth: 1,
+    borderColor: '#e4e9f2',
+  },
+  quickSelectPillActive: {
+    backgroundColor: Colors.pink,
+    borderColor: Colors.pink,
+  },
+  quickSelectPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.text.light,
+  },
+  quickSelectPillTextActive: {
+    color: Colors.white,
+  },
+  selectedCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: Colors.pink + '15',
+  },
+  selectedCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.pink,
+  },
+  generatingCard: {
+    backgroundColor: Colors.pink + '0c',
+    borderWidth: 1,
+    borderColor: Colors.pink + '30',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  generatingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  generatingIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.pink + '18',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  generatingTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.navy || '#152238',
+  },
+  generatingSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary.light,
+    marginTop: 2,
+  },
+  progressBarTrack: {
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    position: 'relative',
+    marginVertical: 8,
+  },
+  progressBarThumb: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: '35%',
+    backgroundColor: Colors.pink,
+    borderRadius: 3,
+  },
+  generatingHint: {
+    fontSize: 11,
+    color: Colors.pink,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  componentSection: {
+    marginBottom: 16,
+  },
+  componentSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  componentSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.navy || '#152238',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  componentSectionCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textSecondary.light,
+  },
+  componentCardsGrid: {
+    gap: 6,
+  },
+  componentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fc',
+    borderWidth: 1,
+    borderColor: '#e8edf3',
+  },
+  componentCardSelected: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.pink + '40',
+    ...Shadows.light,
+  },
+  componentCardText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary.light,
+    flex: 1,
+  },
+  componentCardTextSelected: {
+    color: Colors.navy || '#152238',
+    fontWeight: '700',
+  },
 });

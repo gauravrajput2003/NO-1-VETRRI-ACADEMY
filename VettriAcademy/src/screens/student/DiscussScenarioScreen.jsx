@@ -804,8 +804,6 @@ const onCreateTeacherDoubt = async () => {
               <TextInput style={[styles.input, styles.textarea]} multiline numberOfLines={4} placeholder="Describe your doubt in detail" placeholderTextColor={D.muted} value={description} onChangeText={setDescription} />
 
            
-
-// AFTER
 <Text style={styles.fieldLabel}>Assign teacher(s) (optional)</Text>
 <View style={styles.teacherSearchWrap}>
   <Ionicons name="search" size={18} color={D.muted} />
