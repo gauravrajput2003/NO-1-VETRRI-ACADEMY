@@ -29,10 +29,21 @@ const updateProfile = async (req, res) => {
     const resolvedName = trimValue(name);
     const resolvedDisplayName = trimValue(displayName ?? name);
 
-    if (resolvedName !== undefined) allowedFields.name = resolvedName;
-    if (resolvedDisplayName !== undefined) allowedFields.displayName = resolvedDisplayName;
+    if (req.user.role === 'student' || req.user.role === 'teacher') {
+      // Name/mobile/email edits by student/teacher are intentionally disabled — only admins can update these fields, via the admin panel.
+      if ([name, displayName, mobile, email].some((value) => value !== undefined)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Name, mobile, and email can only be updated by an administrator.',
+        });
+      }
+    } else {
+      if (resolvedName !== undefined) allowedFields.name = resolvedName;
+      if (resolvedDisplayName !== undefined) allowedFields.displayName = resolvedDisplayName;
+      if (mobile !== undefined) allowedFields.mobile = trimValue(mobile);
+    }
+
     if (bio !== undefined) allowedFields.bio = trimValue(bio);
-    if (mobile !== undefined) allowedFields.mobile = trimValue(mobile);
 
     if (req.file) {
       const user = await User.findById(req.user._id);
@@ -54,9 +65,7 @@ const updateProfile = async (req, res) => {
     }
 
     // Role-specific fields
-    if (req.user.role === 'student') {
-      if (email !== undefined) allowedFields.email = trimValue(email);
-    } else if (req.user.role === 'teacher') {
+    if (req.user.role === 'teacher') {
       if (subjects !== undefined) allowedFields.subjects = subjects;
       if (qualification !== undefined) allowedFields.qualification = trimValue(qualification);
       if (experienceYears !== undefined && experienceYears !== '') {

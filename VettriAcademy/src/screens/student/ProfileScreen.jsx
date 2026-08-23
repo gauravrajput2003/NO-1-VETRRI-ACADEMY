@@ -8,7 +8,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity as RNTouchableOpacity,
   Image, Alert, Platform, RefreshControl,
-  Pressable as RNPressable, StatusBar, Modal, TextInput, ActivityIndicator,
+  Pressable as RNPressable, StatusBar, Modal, ActivityIndicator,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
-import { getProfileAPI, updateProfileAPI, updateProfileAvatarAPI } from '../../services/api';
+import { getProfileAPI, updateProfileAvatarAPI } from '../../services/api';
 import { logoutUser, updateUser } from '../../redux/slices/authSlice';
 import { getDiceBearUrl, APP_VERSION } from '../../utils/constants';
 import { formatDate } from '../../utils/formatters';
@@ -238,8 +238,6 @@ export default function ProfileScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editMobile, setEditMobile] = useState('');
   const [editImageUri, setEditImageUri] = useState(null);
   const [editImageAsset, setEditImageAsset] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -292,10 +290,7 @@ export default function ProfileScreen({ navigation }) {
     profilePicture: nextUser?.profilePicture || nextUser?.profilePic,
   });
 
-  const openEditProfile = () => {
-    const currentProfile = profile || user || {};
-    setEditName(currentProfile.displayName || currentProfile.name || '');
-    setEditMobile(currentProfile.mobile || '');
+  const openPhotoEditor = () => {
     setEditImageUri(null);
     setEditImageAsset(null);
     setEditMode(true);
@@ -325,53 +320,37 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const saveProfileChanges = async () => {
-    const trimmedName = editName.trim();
-    const trimmedMobile = editMobile.trim();
-
-    if (!trimmedName || !trimmedMobile) {
-      Toast.show({ type: 'error', text1: 'Name and mobile are required.' });
+  const saveProfilePhoto = async () => {
+    if (!editImageUri) {
+      Toast.show({ type: 'error', text1: 'Choose a photo to save.' });
       return;
     }
 
     try {
       setSaving(true);
-      const profileResponse = await updateProfileAPI({
-        name: trimmedName,
-        displayName: trimmedName,
-        mobile: trimmedMobile,
-      });
-      let updatedUser = normalizeProfileUser(profileResponse.data.user || profileResponse.data.profile || {});
+      const extension = editImageUri.split('.').pop()?.toLowerCase();
+      const imageType = extension === 'png' ? 'image/png' : 'image/jpeg';
+      const avatarData = new FormData();
+      const fileName = editImageAsset?.fileName || `profile.${extension === 'png' ? 'png' : 'jpg'}`;
 
-      if ((updatedUser?.mobile || '').trim() !== trimmedMobile) {
-        throw new Error('Mobile number was not updated by the server. Please deploy the latest backend changes.');
-      }
-
-      if (editImageUri) {
-        const extension = editImageUri.split('.').pop()?.toLowerCase();
-        const imageType = extension === 'png' ? 'image/png' : 'image/jpeg';
-        const avatarData = new FormData();
-        const fileName = editImageAsset?.fileName || `profile.${extension === 'png' ? 'png' : 'jpg'}`;
-
-        if (Platform.OS === 'web') {
-          if (editImageAsset?.file) {
-            avatarData.append('avatar', editImageAsset.file, fileName);
-          } else {
-            const imageResponse = await fetch(editImageUri);
-            const imageBlob = await imageResponse.blob();
-            avatarData.append('avatar', imageBlob, fileName);
-          }
+      if (Platform.OS === 'web') {
+        if (editImageAsset?.file) {
+          avatarData.append('avatar', editImageAsset.file, fileName);
         } else {
-          avatarData.append('avatar', {
-            uri: editImageUri,
-            type: imageType,
-            name: fileName,
-          });
+          const imageResponse = await fetch(editImageUri);
+          const imageBlob = await imageResponse.blob();
+          avatarData.append('avatar', imageBlob, fileName);
         }
-
-        const avatarResponse = await updateProfileAvatarAPI(avatarData);
-        updatedUser = normalizeProfileUser(avatarResponse.data.user || updatedUser);
+      } else {
+        avatarData.append('avatar', {
+          uri: editImageUri,
+          type: imageType,
+          name: fileName,
+        });
       }
+
+      const avatarResponse = await updateProfileAvatarAPI(avatarData);
+      const updatedUser = normalizeProfileUser(avatarResponse.data.user || profile || user || {});
 
       setProfile(updatedUser);
       dispatch(updateUser(updatedUser));
@@ -379,11 +358,11 @@ export default function ProfileScreen({ navigation }) {
       setEditMode(false);
       setEditImageUri(null);
       setEditImageAsset(null);
-      Toast.show({ type: 'success', text1: 'Profile updated successfully' });
+      Toast.show({ type: 'success', text1: 'Profile photo updated successfully' });
     } catch (error) {
       Toast.show({
         type: 'error',
-        text1: 'Profile update failed',
+        text1: 'Profile photo update failed',
         text2: error.response?.data?.message || error.message || 'Please try again.',
       });
     } finally {
@@ -495,10 +474,10 @@ export default function ProfileScreen({ navigation }) {
                   <View style={st.avatarOnlineDot} />
                   <TouchableOpacity
                     style={st.avatarEditButton}
-                    onPress={openEditProfile}
+                    onPress={openPhotoEditor}
                     activeOpacity={0.85}
                     accessibilityRole="button"
-                    accessibilityLabel="Edit profile"
+                    accessibilityLabel="Change profile photo"
                   >
                     <Ionicons name="pencil" size={14} color={T.white} />
                   </TouchableOpacity>
@@ -534,15 +513,6 @@ export default function ProfileScreen({ navigation }) {
               <Ionicons name="person-circle" size={22} color={T.pink} />
             </View>
             <Text style={st.cardTitle}>Contact Info</Text>
-            <TouchableOpacity
-              style={st.cardEditButton}
-              onPress={openEditProfile}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Edit profile"
-            >
-              <Ionicons name="create-outline" size={18} color={T.pink} />
-            </TouchableOpacity>
           </View>
           <InfoRow icon="call-outline" label="Mobile" value={p?.mobile || 'Not set'} />
           <View style={st.divider} />
@@ -603,14 +573,14 @@ export default function ProfileScreen({ navigation }) {
       <View style={st.modalBackdrop}>
         <View style={st.editModal}>
           <View style={st.editHeader}>
-            <Text style={st.editTitle}>Edit Profile</Text>
+            <Text style={st.editTitle}>Change Profile Photo</Text>
             <TouchableOpacity
               style={st.modalCloseButton}
               onPress={() => !saving && setEditMode(false)}
               activeOpacity={0.85}
               disabled={saving}
               accessibilityRole="button"
-              accessibilityLabel="Close edit profile"
+              accessibilityLabel="Close photo editor"
             >
               <Ionicons name="close" size={22} color={T.title} />
             </TouchableOpacity>
@@ -629,31 +599,6 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          <View style={st.inputGroup}>
-            <Text style={st.inputLabel}>Name</Text>
-            <TextInput
-              value={editName}
-              onChangeText={setEditName}
-              style={st.textInput}
-              placeholder="Enter name"
-              placeholderTextColor={T.subtitle}
-              editable={!saving}
-            />
-          </View>
-
-          <View style={st.inputGroup}>
-            <Text style={st.inputLabel}>Mobile</Text>
-            <TextInput
-              value={editMobile}
-              onChangeText={setEditMobile}
-              style={st.textInput}
-              placeholder="Enter mobile number"
-              placeholderTextColor={T.subtitle}
-              keyboardType="phone-pad"
-              editable={!saving}
-            />
-          </View>
-
           <View style={st.editActions}>
             <TouchableOpacity
               style={[st.editActionButton, st.cancelButton]}
@@ -665,11 +610,11 @@ export default function ProfileScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.editActionButton, st.saveButton, saving && st.disabledButton]}
-              onPress={saveProfileChanges}
+              onPress={saveProfilePhoto}
               activeOpacity={0.85}
               disabled={saving}
             >
-              {saving ? <ActivityIndicator color={T.white} /> : <Text style={st.saveButtonText}>Save</Text>}
+              {saving ? <ActivityIndicator color={T.white} /> : <Text style={st.saveButtonText}>Save Photo</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -787,11 +732,6 @@ const st = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   cardTitle: { flex: 1, fontSize: 17, fontWeight: '900', color: T.title },
-  cardEditButton: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: 'rgba(255,77,141,0.10)',
-    justifyContent: 'center', alignItems: 'center',
-  },
   infoRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 16, gap: 14,
@@ -945,25 +885,6 @@ const st = StyleSheet.create({
     borderColor: T.white,
   },
   changePhotoText: { color: T.white, fontSize: 12, fontWeight: '800' },
-  inputGroup: { marginBottom: 14 },
-  inputLabel: {
-    fontSize: 12,
-    color: T.subtitle,
-    fontWeight: '800',
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  textInput: {
-    minHeight: 52,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FAFAFA',
-    paddingHorizontal: 16,
-    fontSize: 15,
-    fontWeight: '700',
-    color: T.title,
-  },
   editActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
   editActionButton: {
     flex: 1,
