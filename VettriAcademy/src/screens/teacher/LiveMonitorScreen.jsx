@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Modal, Animated, Alert, Linking, ScrollView, Platform,
+  AppState,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,10 +40,16 @@ export default function LiveMonitorScreen({ navigation, route }) {
   const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [showEndSummary, setShowEndSummary] = useState(false);
+  const [showEndedSuccess, setShowEndedSuccess] = useState(false);
+  const [attendanceSummary, setAttendanceSummary] = useState(null);
+  const [showDisconnectPrompt, setShowDisconnectPrompt] = useState(false);
+  const [showReturnBanner, setShowReturnBanner] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const pollRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
 
   const insets = useSafeAreaInsets();
   const bottomPadding = useBottomTabBarPadding();
@@ -118,6 +125,7 @@ export default function LiveMonitorScreen({ navigation, route }) {
     const link = meetLink || monitor.meetLink;
     if (link) {
       Linking.openURL(link);
+      setShowReturnBanner(true);
       Toast.show({ type: 'info', text1: '📱 Opening Meet', text2: 'Keep your phone mic MUTED to avoid echo' });
     } else {
       Toast.show({ type: 'error', text1: 'No Link', text2: 'Meeting link not available' });
@@ -143,38 +151,43 @@ export default function LiveMonitorScreen({ navigation, route }) {
     }
   };
 
-  const handleEndClass = () => {
-    Alert.alert(
-      '⏹️ End Class',
-      `End this class? ${joinedCount} students will be marked present based on join time.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Class',
-          style: 'destructive',
-          onPress: async () => {
-            setIsEnding(true);
-            try {
-              const result = await dispatch(endLiveClass(classId));
-              if (endLiveClass.fulfilled.match(result)) {
-                if (pollRef.current) clearInterval(pollRef.current);
-                Toast.show({ type: 'success', text1: '✅ Class Ended', text2: `${joinedCount} students marked present` });
-                dispatch(clearLiveMonitor());
-                dispatch(fetchTodayClasses());
-                navigation.goBack();
-              } else {
-                Toast.show({ type: 'error', text1: 'Failed', text2: result.payload || 'Could not end class' });
-              }
-            } catch (e) {
-              Toast.show({ type: 'error', text1: 'Error', text2: 'Network error' });
-            } finally {
-              setIsEnding(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleEndClass = () => setShowEndSummary(true);
+
+  const confirmEndClass = async () => {
+    setIsEnding(true);
+    try {
+      const result = await dispatch(endLiveClass(classId));
+      if (endLiveClass.fulfilled.match(result)) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        const summary = result.payload?.attendanceSummary || {
+          present: joinedCount, late: 0, absent: Math.max(totalStudents - joinedCount, 0), total: totalStudents,
+        };
+        setAttendanceSummary(summary);
+        setShowEndSummary(false);
+        setShowDisconnectPrompt(false);
+        setShowEndedSuccess(true);
+        dispatch(clearLiveMonitor());
+        dispatch(fetchTodayClasses());
+      } else {
+        Toast.show({ type: 'error', text1: 'Failed', text2: result.payload || 'Could not end class' });
+      }
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Network error' });
+    } finally {
+      setIsEnding(false);
+    }
   };
+
+  // Returning after backgrounding commonly means the teacher closed or left
+  // their Meet tab. Ask explicitly instead of leaving the session live.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const returning = /inactive|background/.test(appStateRef.current) && nextState === 'active';
+      appStateRef.current = nextState;
+      if (returning && !showEndedSuccess) setShowDisconnectPrompt(true);
+    });
+    return () => subscription.remove();
+  }, [showEndedSuccess]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -236,6 +249,13 @@ export default function LiveMonitorScreen({ navigation, route }) {
           {joinedCount} out of {totalStudents} students have joined
         </Text>
       </Animated.View>
+
+      {showReturnBanner && (
+        <View style={styles.returnBanner}>
+          <Text style={styles.returnBannerText}>Back from Meet? Attendance is still being monitored.</Text>
+          <TouchableOpacity onPress={() => setShowReturnBanner(false)}><Text style={styles.returnBannerAction}>I'M BACK</Text></TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView 
         contentContainerStyle={{ paddingBottom: (bottomPadding || 20) + insets.bottom + 90 }} 
@@ -370,6 +390,36 @@ export default function LiveMonitorScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showEndSummary} transparent animationType="fade" onRequestClose={() => setShowEndSummary(false)}>
+        <View style={styles.confirmOverlay}><View style={[styles.confirmCard, { backgroundColor: cardBg }]}>
+          <Ionicons name="stop-circle" size={44} color={Colors.error} />
+          <Text style={[styles.confirmTitle, { color: textColor }]}>End this class?</Text>
+          <Text style={[styles.confirmCopy, { color: textSec }]}>{joinedCount} of {totalStudents} students joined. Students who did not join will be marked absent.</Text>
+          <View style={styles.confirmActions}>
+            <TouchableOpacity style={styles.confirmCancel} onPress={() => setShowEndSummary(false)}><Text style={styles.confirmCancelText}>Continue Class</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.confirmEnd} onPress={confirmEndClass} disabled={isEnding}>{isEnding ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.confirmEndText}>Yes, End Class</Text>}</TouchableOpacity>
+          </View>
+        </View></View>
+      </Modal>
+
+      <Modal visible={showDisconnectPrompt} transparent animationType="slide" onRequestClose={() => setShowDisconnectPrompt(false)}>
+        <View style={styles.confirmOverlay}><View style={[styles.confirmCard, { backgroundColor: cardBg }]}>
+          <Text style={[styles.confirmTitle, { color: textColor }]}>Did your class end?</Text>
+          <Text style={[styles.confirmCopy, { color: textSec }]}>If you finished in Meet or Zoom, end the class here to save attendance.</Text>
+          <TouchableOpacity style={styles.confirmEnd} onPress={() => { setShowEndSummary(true); setShowDisconnectPrompt(false); }}><Text style={styles.confirmEndText}>Yes, End Class</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.continueBtn} onPress={() => setShowDisconnectPrompt(false)}><Text style={styles.confirmCancelText}>No, Continue</Text></TouchableOpacity>
+        </View></View>
+      </Modal>
+
+      <Modal visible={showEndedSuccess} transparent animationType="fade" onRequestClose={() => { setShowEndedSuccess(false); navigation.goBack(); }}>
+        <View style={styles.confirmOverlay}><View style={[styles.confirmCard, { backgroundColor: cardBg }]}>
+          <Ionicons name="checkmark-circle" size={52} color={Colors.success} />
+          <Text style={[styles.confirmTitle, { color: textColor }]}>Class Ended</Text>
+          <Text style={[styles.confirmCopy, { color: textSec }]}>{attendanceSummary?.present || 0} present · {attendanceSummary?.late || 0} late · {attendanceSummary?.absent || 0} absent</Text>
+          <TouchableOpacity style={styles.confirmEnd} onPress={() => { setShowEndedSuccess(false); navigation.goBack(); }}><Text style={styles.confirmEndText}>Done</Text></TouchableOpacity>
+        </View></View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -385,6 +435,9 @@ const styles = StyleSheet.create({
   liveDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.white },
   liveBannerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.white, letterSpacing: 1 },
   liveBannerSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
+  returnBanner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF7ED', paddingHorizontal: 16, paddingVertical: 10 },
+  returnBannerText: { color: Colors.warning, fontSize: 12, fontWeight: '600', flex: 1 },
+  returnBannerAction: { color: Colors.primary, fontSize: 12, fontWeight: '800', marginLeft: 12 },
 
   // Stats card
   statsCard: { margin: 16, borderRadius: 16, padding: 18, ...Shadows.medium },
@@ -440,4 +493,15 @@ const styles = StyleSheet.create({
   msgCancelText: { fontSize: 15, fontWeight: '600', color: Colors.mediumGray },
   msgSendBtn: { flex: 2, justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 12, backgroundColor: Colors.pink },
   msgSendText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'center', padding: 24 },
+  confirmCard: { borderRadius: 24, padding: 24, alignItems: 'center' },
+  confirmTitle: { fontSize: 21, fontWeight: '800', marginTop: 12, textAlign: 'center' },
+  confirmCopy: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 10, marginBottom: 20 },
+  confirmActions: { flexDirection: 'row', gap: 10, width: '100%' },
+  confirmCancel: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 12, backgroundColor: 'rgba(158,158,158,0.15)' },
+  confirmCancelText: { color: Colors.mediumGray, fontWeight: '700', fontSize: 14 },
+  confirmEnd: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 12, backgroundColor: Colors.error, paddingHorizontal: 14 },
+  confirmEndText: { color: Colors.white, fontWeight: '800', fontSize: 14 },
+  continueBtn: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
 });

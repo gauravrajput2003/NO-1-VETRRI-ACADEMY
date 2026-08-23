@@ -102,6 +102,20 @@ const isPastDate = (dateStr) => {
   return d < now;
 };
 
+const getScheduledStart = (item) => {
+  const [hours = 0, minutes = 0] = String(item.scheduledTime || '00:00').split(':').map(Number);
+  const start = new Date(item.scheduledDate);
+  start.setHours(hours, minutes, 0, 0);
+  return start;
+};
+
+const formatCountdown = (milliseconds) => {
+  const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours ? `Starts in ${hours}h ${minutes}m` : `Starts in ${minutes}m`;
+};
+
 export default function ClassesScreen({ navigation }) {
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
@@ -109,6 +123,7 @@ export default function ClassesScreen({ navigation }) {
   const { unreadCount } = useSelector((s) => s.notifications);
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const [summaryStats, setSummaryStats] = useState({ total: 0, live: 0, completed: 0, upcoming: 0 });
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
@@ -124,6 +139,10 @@ export default function ClassesScreen({ navigation }) {
 
   useEffect(() => { loadClasses(); }, [filter]);
   useEffect(() => { dispatch(fetchUnreadNotificationCount()); }, [dispatch]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Clean / sanitize classes list so past abandoned live classes are treated as completed
   const sanitizedSchedules = useMemo(() => {
@@ -189,8 +208,12 @@ export default function ClassesScreen({ navigation }) {
     const teacherAvatar = teacher?.profilePicture || teacher?.profilePic || getDiceBearUrl(teacher?._id);
     const emoji = getSubjectEmoji(item.subject, item.title);
     const duration = item.durationMinutes || 60;
-    const status = item.status;
+    const scheduledStart = getScheduledStart(item);
+    const scheduledEnd = new Date(scheduledStart.getTime() + duration * 60 * 1000);
+    const isMissed = item.status === 'scheduled' && now > scheduledEnd;
+    const status = isMissed ? 'missed' : item.status;
     const isToday = isClassToday(item.scheduledDate);
+    const canJoinScheduled = item.status === 'scheduled' && isToday && now >= scheduledStart && now <= scheduledEnd;
 
     if (status === 'cancelled') {
       return (
@@ -262,6 +285,9 @@ export default function ClassesScreen({ navigation }) {
                   </Text>
                 </View>
               )}
+              {status === 'missed' && (
+                <View style={st.missedBadge}><Text style={st.missedBadgeText}>MISSED</Text></View>
+              )}
               {status === 'completed' && (
                 <View style={st.doneBadge}>
                   <Text style={st.doneBadgeText}>✅ Completed</Text>
@@ -279,7 +305,7 @@ export default function ClassesScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {status === 'scheduled' && isToday && (
+          {status === 'scheduled' && isToday && canJoinScheduled && (
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
               <TouchableOpacity
                 style={{ flex: 2 }}
@@ -304,7 +330,23 @@ export default function ClassesScreen({ navigation }) {
             </View>
           )}
 
+          {status === 'scheduled' && isToday && !canJoinScheduled && now < scheduledStart && (
+            <View style={st.countdownWrap}>
+              <Ionicons name="time-outline" size={18} color={T.teal} />
+              <Text style={st.countdownText}>{formatCountdown(scheduledStart - now)}</Text>
+            </View>
+          )}
+
           {status === 'scheduled' && !isToday && (
+            <TouchableOpacity onPress={() => navigation.navigate('ClassDetail', { classId: item._id })} activeOpacity={0.9}>
+              <LinearGradient colors={[T.teal, T.tealLight]} style={st.actionBtn}>
+                <Text style={st.actionBtnText}>View Details</Text>
+                <Ionicons name="arrow-forward" size={16} color={T.white} />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {status === 'missed' && (
             <TouchableOpacity onPress={() => navigation.navigate('ClassDetail', { classId: item._id })} activeOpacity={0.9}>
               <LinearGradient colors={[T.teal, T.tealLight]} style={st.actionBtn}>
                 <Text style={st.actionBtnText}>View Details</Text>
@@ -519,6 +561,10 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14,
   },
   doneBadgeText: { fontSize: 10, fontWeight: '800', color: T.green },
+  missedBadge: { backgroundColor: 'rgba(107,114,128,0.16)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
+  missedBadgeText: { fontSize: 10, fontWeight: '900', color: T.subtitle, letterSpacing: 0.4 },
+  countdownWrap: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, marginTop: 14, paddingVertical: 13, borderRadius: 22, backgroundColor: 'rgba(20,200,196,0.12)' },
+  countdownText: { color: T.teal, fontSize: 14, fontWeight: '800' },
 
   joinBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

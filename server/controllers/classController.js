@@ -58,7 +58,7 @@ const notifyStudentsClassScheduled = async ({ req, schedule }) => {
 
 const cleanupStaleLiveClasses = async () => {
   try {
-    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
@@ -66,7 +66,7 @@ const cleanupStaleLiveClasses = async () => {
       status: 'live',
       $or: [
         { scheduledDate: { $lt: startOfToday } },
-        { updatedAt: { $lt: fourHoursAgo } },
+        { updatedAt: { $lt: twoHoursAgo } },
       ],
     });
 
@@ -79,6 +79,35 @@ const cleanupStaleLiveClasses = async () => {
       await LiveSession.updateMany(
         { classId: { $in: staleIds }, isLive: true },
         { $set: { isLive: false, endedAt: new Date() } }
+      );
+    }
+
+    // A scheduled class should not remain actionable indefinitely when the
+    // teacher never starts it. Only close sessions that are at least four
+    // hours past their scheduled start and have no live-session or attendance
+    // activity; future classes are never affected.
+    const scheduledCandidates = await ClassSchedule.find({
+      status: 'scheduled',
+      scheduledDate: { $lte: new Date() },
+    });
+    const abandonedScheduledIds = [];
+    for (const cls of scheduledCandidates) {
+      const [hours = 0, minutes = 0] = String(cls.scheduledTime || '00:00').split(':').map(Number);
+      const scheduledStart = new Date(cls.scheduledDate);
+      scheduledStart.setHours(hours, minutes, 0, 0);
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+      if (scheduledStart > fourHoursAgo) continue;
+
+      const [session, attendance] = await Promise.all([
+        LiveSession.exists({ classId: cls._id }),
+        ClassAttendance.exists({ classId: cls._id }),
+      ]);
+      if (!session && !attendance) abandonedScheduledIds.push(cls._id);
+    }
+    if (abandonedScheduledIds.length) {
+      await ClassSchedule.updateMany(
+        { _id: { $in: abandonedScheduledIds } },
+        { $set: { status: 'completed' } }
       );
     }
   } catch (err) {
@@ -354,6 +383,18 @@ const goLive = async (req, res) => {
       course: cls.course,
       sessionId: session._id,
     });
+    // Students may not be subscribed to a course room yet (for example after
+    // reopening the app), so also deliver the status event to their user room.
+    cls.studentIds.forEach((studentId) => {
+      io.to(`user_${studentId}`).emit('class:started', {
+        classId,
+        subject: cls.subject,
+        teacherName: req.user.displayName || req.user.name,
+        grade: cls.grade,
+        course: cls.course,
+        sessionId: session._id,
+      });
+    });
 
     // Notify admin room
     io.to('admin_room').emit('class:started', { classId, subject: cls.subject, teacherId: req.user._id });
@@ -399,6 +440,8 @@ const joinClass = async (req, res) => {
         message: 'Teacher has not started the live session or provided a meeting link yet.',
       });
     }
+
+    const usedPreScheduledLink = cls.status === 'scheduled' && Boolean(resolvedMeetLink);
 
     // If teacher provided a meeting link during scheduling but hasn't explicitly tapped Go Live, activate session
     if (!session && resolvedMeetLink) {
@@ -470,7 +513,9 @@ const joinClass = async (req, res) => {
       success: true,
       meetLink: resolvedMeetLink,
       status,
-      message: status === 'late' ? 'You joined late. Attendance marked as LATE.' : 'Attendance recorded!',
+      message: usedPreScheduledLink
+        ? 'Your teacher has pre-set the meeting link. Attendance recorded!'
+        : status === 'late' ? 'You joined late. Attendance marked as LATE.' : 'Attendance recorded!',
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -511,12 +556,21 @@ const endClass = async (req, res) => {
 
     if (absentOps.length > 0) await ClassAttendance.bulkWrite(absentOps);
 
+    const attendanceSummary = {
+      present: await ClassAttendance.countDocuments({ classId, status: 'present' }),
+      late: await ClassAttendance.countDocuments({ classId, status: 'late' }),
+      absent: await ClassAttendance.countDocuments({ classId, status: 'absent' }),
+      total: cls.studentIds.length,
+    };
+
     // Emit
     const room = `course_${cls.course}_${cls.grade}`;
-    io.to(room).emit('class:ended', { classId });
-    io.to('admin_room').emit('class:ended', { classId });
+    const endPayload = { classId, attendanceSummary };
+    io.to(room).emit('class:ended', endPayload);
+    io.to(`teacher_${req.user._id}`).emit('class:ended', endPayload);
+    io.to('admin_room').emit('class:ended', endPayload);
 
-    res.json({ success: true, message: 'Class ended.' });
+    res.json({ success: true, message: 'Class ended.', attendanceSummary });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -49,6 +49,15 @@ export default function ClassDetailScreen({ route, navigation }) {
       if (joinResult.meetLink) {
         Toast.show({ type: 'success', text1: 'Joining class...', text2: joinResult.message });
         Linking.openURL(joinResult.meetLink);
+      } else if (joinResult.message) {
+        const teacherHasNotStarted = /teacher has not started/i.test(joinResult.message);
+        Toast.show({
+          type: 'error',
+          text1: teacherHasNotStarted ? "Teacher hasn't started the class yet" : 'Unable to join class',
+          text2: teacherHasNotStarted
+            ? 'Try again closer to class time.'
+            : joinResult.message,
+        });
       }
       dispatch(clearJoinResult());
     }
@@ -61,6 +70,19 @@ export default function ClassDetailScreen({ route, navigation }) {
     } catch {}
   };
 
+  const handleJoin = async () => {
+    const result = await dispatch(joinClass(classId));
+    if (joinClass.rejected.match(result)) {
+      const message = result.payload || 'Could not join class.';
+      const teacherHasNotStarted = /teacher has not started/i.test(message);
+      Toast.show({
+        type: 'error',
+        text1: teacherHasNotStarted ? "Teacher hasn't started the class yet" : 'Unable to join class',
+        text2: teacherHasNotStarted ? 'Try again closer to class time.' : message,
+      });
+    }
+  };
+
   if (loading || !currentClass) {
     return <View style={[styles.centered, { backgroundColor: bgColor }]}><ActivityIndicator size="large" color={Colors.primary} /></View>;
   }
@@ -68,6 +90,17 @@ export default function ClassDetailScreen({ route, navigation }) {
   const cls = currentClass;
   const isLive = cls.status === 'live';
   const isCompleted = cls.status === 'completed';
+  const scheduledStart = (() => {
+    const [hours = 0, minutes = 0] = String(cls.scheduledTime || '00:00').split(':').map(Number);
+    const start = new Date(cls.scheduledDate);
+    start.setHours(hours, minutes, 0, 0);
+    return start;
+  })();
+  const isToday = new Date(cls.scheduledDate).toDateString() === new Date().toDateString();
+  const canJoin = isLive || (
+    cls.status === 'scheduled' && isToday &&
+    Math.abs(new Date() - scheduledStart) <= 15 * 60 * 1000
+  );
   const statusColor = classStatusColors[cls.status] || Colors.mediumGray;
 
   return (
@@ -121,8 +154,8 @@ export default function ClassDetailScreen({ route, navigation }) {
         )}
 
         {/* Join button for live or scheduled classes */}
-        {(isLive || cls.status === 'scheduled') && !isCompleted && (
-          <TouchableOpacity style={styles.joinBtn} onPress={() => dispatch(joinClass(classId))}>
+        {canJoin && !isCompleted && (
+          <TouchableOpacity style={styles.joinBtn} onPress={handleJoin}>
             <Ionicons name="videocam" size={22} color={Colors.white} />
             <Text style={styles.joinText}>{isLive ? 'JOIN LIVE CLASS' : 'JOIN CLASS NOW'}</Text>
           </TouchableOpacity>

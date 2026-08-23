@@ -14,6 +14,7 @@ import { addIncomingMessage } from '../redux/slices/chatSlice';
 import { updateClassStatus } from '../redux/slices/classesSlice';
 import {
   registerForPushNotifications,
+  isClassNotification,
 } from '../services/pushNotifications';
 import { savePushTokenAPI } from '../services/api';
 import { resolveNotificationTarget } from '../utils/notificationNavigation';
@@ -99,16 +100,18 @@ export default function RootNavigator() {
             console.warn('[Push] Could not open downloaded file:', e.message);
           }
         } else {
-          const { screen, params } = resolveNotificationTarget({ data });
+          const target = isClassNotification(data)
+            ? { screen: 'ClassDetail', params: { classId: data.classId } }
+            : resolveNotificationTarget({ data }, user?.role);
           setTimeout(() => {
-            navigationRef.current?.navigate(screen, params);
+            navigationRef.current?.navigate(target.screen, target.params);
           }, 500);
         }
       }
     );
 
     return () => subscription.remove();
-  }, []);
+  }, [user?.role]);
 
   // Global socket event listeners (active when authenticated)
   useEffect(() => {

@@ -76,35 +76,40 @@ const ADMIN_ROUTES = {
 };
 
 const getParams = (notification) => {
-  if (!notification.referenceId) return {};
+  const data = notification.data || {};
+  const referenceId = notification.referenceId || data.referenceId || data.classId;
+  if (!referenceId) return {};
   const type = notification.type || '';
 
   if (type.startsWith('doubt') || type === 'chat') {
-    return { doubtId: notification.referenceId };
+    return { doubtId: referenceId };
   }
   if (type.includes('material')) {
-    return { materialId: notification.referenceId };
+    return { materialId: referenceId };
   }
   if (type.includes('class') || type.includes('recording')) {
-    return { classId: notification.referenceId };
+    return { classId: referenceId };
   }
   // Add other param mappings as needed
-  return { id: notification.referenceId };
+  return { id: referenceId };
 };
 
 export const resolveNotificationTarget = (notification, role) => {
+  // Push payloads put their fields inside `data`, while in-app notifications
+  // keep them at the top level. Normalize both formats before routing.
+  const normalized = { ...notification, ...(notification.data || {}) };
   const routeMap = {
     student: STUDENT_ROUTES,
     teacher: TEACHER_ROUTES,
     admin: ADMIN_ROUTES,
   }[role || 'student'];
 
-  const target = routeMap[notification.type] || routeMap.default;
-  const params = getParams(notification);
+  const target = routeMap[normalized.type] || routeMap.default;
+  const params = getParams(normalized);
 
-  if (__DEV__ && !routeMap[notification.type]) {
+  if (__DEV__ && !routeMap[normalized.type]) {
     console.warn(
-      `[Notification Navigation] No route found for role:'${role}' and type:'${notification.type}'. Falling back to ${target.screen}.`
+      `[Notification Navigation] No route found for role:'${role}' and type:'${normalized.type}'. Falling back to ${target.screen}.`
     );
   }
 

@@ -31,7 +31,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
- export const NOTIFICATION_CHANNEL_ID = 'vettri-default';
+export const NOTIFICATION_CHANNEL_ID = 'vettri-default';
+
+// Class notifications always carry their target class id in Expo's `data`
+// object. RootNavigator uses this to route taps to ClassDetail.
+export const isClassNotification = (data = {}) =>
+  ['class_reminder', 'class_starting'].includes(data.type) && Boolean(data.classId);
 
 /**
  * Create/update the Android notification channel.
