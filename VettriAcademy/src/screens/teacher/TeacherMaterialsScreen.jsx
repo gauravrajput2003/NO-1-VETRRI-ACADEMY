@@ -5,24 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import { formatDate, formatFileSize } from '../../utils/formatters';
 import { detectFileType, normalizeMaterialFileUrl } from '../../utils/fileUtils';
 import {
   fetchTeacherMaterials, toggleLock, uploadMaterial, deleteMaterial, editMaterial,
-  uploadMaterialDraft, confirmMaterialUpload, deleteMaterialDraft,
 } from '../../redux/slices/teacherSlice';
 import { getCoursesMetaAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
-
-let WebView;
-try { WebView = require('react-native-webview').WebView; } catch (e) { WebView = null; }
-
-const isWeb = Platform.OS === 'web';
 
 const ScaleBtn = ({ onPress, children, activeScale = 0.96, style, disabled }) => {
   const scale = useRef(new Animated.Value(1)).current;
@@ -61,6 +56,12 @@ const getTypeConfig = (type) => {
   if (type === 'ppt' || type?.includes('presentation')) return { color: '#F97316', bg: '#FFEDD5', icon: 'document-text' };
   return { color: '#3B82F6', bg: '#DBEAFE', icon: 'document-text' };
 };
+
+const getPickedFileConfig = (pickedFile) => getTypeConfig(detectFileType({
+  mimeType: pickedFile?.mimeType,
+  extension: pickedFile?.name?.split('.').pop()?.toLowerCase() || '',
+  filename: pickedFile?.name,
+}).type);
 
 const FILTER_ICONS = {
   'All': '📚',
@@ -105,7 +106,6 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
   // Modal state
   const [isUploadModalVisible, setUploadModalVisible] = useState(false);
-  const [isPreviewVisible, setPreviewVisible] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
 
@@ -117,9 +117,6 @@ export default function TeacherMaterialsScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [isLocked, setIsLocked] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [pdfDraft, setPdfDraft] = useState(null);
-  const [draftUploading, setDraftUploading] = useState(false);
-  const [previewPublishing, setPreviewPublishing] = useState(false);
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
   const insets = useSafeAreaInsets();
@@ -143,14 +140,6 @@ export default function TeacherMaterialsScreen({ navigation }) {
     } catch (e) {
       console.log('Error loading courses meta', e);
     }
-  };
-
-  const resetPreviewState = () => {
-    setPreviewVisible(false);
-    setPreviewFile(null);
-    setPdfDraft(null);
-    setDraftUploading(false);
-    setPreviewPublishing(false);
   };
 
   const handlePickFile = async () => {
@@ -177,81 +166,27 @@ export default function TeacherMaterialsScreen({ navigation }) {
 
         setPreviewFile(pickedFile);
         setFile(pickedFile);
-        setPdfDraft(null);
-
-        if (!editingMaterial) {
-          setPreviewVisible(true);
-
-          if (pickedFile.mimeType === 'application/pdf') {
-            setDraftUploading(true);
-            const resultAction = await dispatch(uploadMaterialDraft(pickedFile));
-            setDraftUploading(false);
-            if (uploadMaterialDraft.fulfilled.match(resultAction)) {
-              setPdfDraft(resultAction.payload);
-            } else {
-              Toast.show({ type: 'error', text1: 'Preview upload failed', text2: resultAction.payload });
-            }
-          }
-        }
       }
     } catch (err) {
-      setDraftUploading(false);
       console.log('Error picking file', err);
     }
   };
 
-  const handlePreviewCancel = async () => {
-    if (pdfDraft) {
-      await dispatch(deleteMaterialDraft(pdfDraft));
-    }
-    resetPreviewState();
-    setFile(null);
-    setTitle('');
-    setSubject('');
-    setGrade('');
-    setDescription('');
-  };
-
-  const handlePdfPreviewPublish = async () => {
-    if (!pdfDraft) return;
-    if (!title.trim()) return Toast.show({ type: 'error', text1: 'Please enter a title' });
-    if (!subject) return Toast.show({ type: 'error', text1: 'Please select a subject' });
-    if (!grade) return Toast.show({ type: 'error', text1: 'Please select a grade' });
-
-    setPreviewPublishing(true);
+  const handleDownloadPreview = async () => {
+    if (!previewFile?.uri) return;
     try {
-      const resultAction = await dispatch(confirmMaterialUpload({
-        title,
-        subject,
-        grade,
-        description,
-        lockedForAll: isLocked,
-        fileUrl: pdfDraft.url,
-        publicId: pdfDraft.publicId,
-        storageType: pdfDraft.storageType,
-        originalFilename: pdfDraft.originalFilename,
-        extension: pdfDraft.extension,
-        resourceType: pdfDraft.resourceType,
-        fileSize: pdfDraft.fileSize,
-        mimeType: pdfDraft.mimeType,
-      }));
-
-      if (confirmMaterialUpload.fulfilled.match(resultAction)) {
-        Toast.show({ type: 'success', text1: 'Uploaded successfully!' });
-        resetPreviewState();
-        setFile(null);
-        setTitle('');
-        setSubject('');
-        setGrade('');
-        setDescription('');
-        setIsLocked(true);
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(previewFile.uri, {
+          mimeType: previewFile.mimeType || 'application/octet-stream',
+          dialogTitle: `Open ${previewFile.name}`,
+        });
       } else {
-        Toast.show({ type: 'error', text1: 'Upload failed', text2: resultAction.payload });
+        Toast.show({ type: 'error', text1: 'Sharing not available on this device' });
       }
-    } catch (err) {
-      Toast.show({ type: 'error', text1: 'Upload failed', text2: 'Network error' });
-    } finally {
-      setPreviewPublishing(false);
+    } catch (error) {
+      console.log('Error opening file for inspection', error);
+      Toast.show({ type: 'error', text1: 'Could not open file' });
     }
   };
 
@@ -354,6 +289,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
     setUploadModalVisible(false);
     setEditingMaterial(null);
     setFile(null);
+    setPreviewFile(null);
     setTitle('');
     setSubject('');
     setGrade('');
@@ -381,6 +317,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
     // Ensure lockedForAll is a boolean - default to true if undefined
     setIsLocked(Boolean(material.lockedForAll));
     setFile(null);
+    setPreviewFile(null);
     setUploadModalVisible(true);
   };
 
@@ -606,181 +543,28 @@ export default function TeacherMaterialsScreen({ navigation }) {
         )}
       </View>
 
-      {/* PREVIEW MODAL - Shows before upload form */}
-      <Modal visible={isPreviewVisible} animationType="slide" transparent={true} onRequestClose={handlePreviewCancel}>
-        <View style={styles.modalBackdrop}>
-          <LinearGradient colors={['#EC4899', '#F472B6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.previewModalCard}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Preview Material</Text>
-            
-            {/* File Preview */}
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              <View style={styles.previewContainer}>
-                {previewFile && previewFile.mimeType?.startsWith('image/') && (
-                  <Image source={{ uri: previewFile.uri }} style={styles.previewImage} resizeMode="contain" />
-                )}
-                {previewFile && previewFile.mimeType?.startsWith('video/') && !isWeb && WebView && (
-                  <View style={styles.previewVideoPlayer}>
-                    <WebView
-                      source={{ uri: previewFile.uri }}
-                      style={{ flex: 1, minHeight: 220, borderRadius: 16, backgroundColor: '#000' }}
-                      allowsInlineMediaPlayback
-                      mediaPlaybackRequiresUserAction={false}
-                    />
-                  </View>
-                )}
-                {previewFile && previewFile.mimeType?.startsWith('video/') && (isWeb || !WebView) && (
-                  <View style={styles.previewVideoPlayer}>
-                    <video
-                      src={previewFile.uri}
-                      style={{ flex: 1, minHeight: 220, borderRadius: 16, backgroundColor: '#000' }}
-                      controls
-                      playsInline
-                    />
-                  </View>
-                )}
-                {previewFile && previewFile.mimeType === 'application/pdf' && (
-                  <View style={styles.previewPdfWebViewWrap}>
-                    {draftUploading && (
-                      <View style={styles.draftUploadOverlay}>
-                        <ActivityIndicator size="large" color="#FFFFFF" />
-                        <Text style={styles.draftUploadText}>Uploading for preview...</Text>
-                      </View>
-                    )}
-                    {!draftUploading && pdfDraft && !isWeb && WebView && (
-                      <WebView
-                        source={{ uri: pdfDraft.url }}
-                        style={styles.previewPdfWebView}
-                        javaScriptEnabled
-                        domStorageEnabled
-                        scalesPageToFit
-                      />
-                    )}
-                    {!draftUploading && pdfDraft && (isWeb || !WebView) && (
-                      <iframe
-                        src={pdfDraft.url}
-                        style={styles.previewPdfWebView}
-                        title="PDF Preview"
-                      />
-                    )}
-                    {!draftUploading && !pdfDraft && (
-                      <View style={styles.previewPdfContainer}>
-                        <Ionicons name="document-text" size={48} color="#EF4444" />
-                        <Text style={styles.previewPdfText}>PDF: {previewFile.name}</Text>
-                        <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
-                        <Text style={styles.previewPdfNote}>Could not load preview. Try picking the file again.</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-                {previewFile && (previewFile.mimeType?.includes('presentation') || previewFile.mimeType?.includes('powerpoint')) && (
-                  <View style={styles.previewPdfContainer}>
-                    <Ionicons name="easel" size={48} color="#F97316" />
-                    <Text style={styles.previewPdfText}>Presentation: {previewFile.name}</Text>
-                    <Text style={styles.previewPdfSize}>{formatFileSize(previewFile.size)}</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* PDF publish fields — shown once draft is ready */}
-              {previewFile?.mimeType === 'application/pdf' && pdfDraft && (
-                <View style={styles.previewFormSection}>
-                  <Text style={styles.previewFormLabel}>Title *</Text>
-                  <TextInput
-                    style={styles.previewFormInput}
-                    placeholder="e.g. Chapter 5 - Quadratic Equations"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={title}
-                    onChangeText={setTitle}
-                    maxLength={100}
-                  />
-                  <Text style={styles.previewFormLabel}>Subject *</Text>
-                  <TextInput
-                    style={styles.previewFormInput}
-                    placeholder="Enter subject"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={subject}
-                    onChangeText={setSubject}
-                    maxLength={60}
-                  />
-                  <Text style={styles.previewFormLabel}>Grade / Class *</Text>
-                  <TextInput
-                    style={styles.previewFormInput}
-                    placeholder="Enter grade or class"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={grade}
-                    onChangeText={setGrade}
-                    maxLength={30}
-                  />
-                </View>
-              )}
-
-              {/* File Info */}
-              <View style={styles.previewInfoCard}>
-                <Text style={styles.previewInfoLabel}>File Details</Text>
-                <View style={styles.previewInfoRow}>
-                  <Text style={styles.previewInfoKey}>Name:</Text>
-                  <Text style={styles.previewInfoValue}>{previewFile?.name}</Text>
-                </View>
-                <View style={styles.previewInfoRow}>
-                  <Text style={styles.previewInfoKey}>Type:</Text>
-                  <Text style={styles.previewInfoValue}>{previewFile?.mimeType || 'Unknown'}</Text>
-                </View>
-                <View style={styles.previewInfoRow}>
-                  <Text style={styles.previewInfoKey}>Size:</Text>
-                  <Text style={styles.previewInfoValue}>{formatFileSize(previewFile?.size || 0)}</Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            {/* Actions */}
-            <View style={styles.previewActions}>
-              <TouchableOpacity style={styles.previewCancelBtn} onPress={handlePreviewCancel} disabled={previewPublishing || draftUploading}>
-                <Text style={styles.previewCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              {previewFile?.mimeType === 'application/pdf' ? (
-                <TouchableOpacity
-                  style={[styles.previewPublishBtn, (!pdfDraft || draftUploading) && { opacity: 0.5 }]}
-                  onPress={handlePdfPreviewPublish}
-                  disabled={!pdfDraft || draftUploading || previewPublishing}
-                >
-                  {previewPublishing ? (
-                    <ActivityIndicator color="#EC4899" size="small" />
-                  ) : (
-                    <Text style={styles.previewPublishText}>Publish</Text>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.previewPublishBtn} onPress={() => { setPreviewVisible(false); setUploadModalVisible(true); }}>
-                  <Text style={styles.previewPublishText}>Publish</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </LinearGradient>
-        </View>
-      </Modal>
-
       {/* FULL SCREEN UPLOAD MODAL */}
       <Modal visible={isUploadModalVisible} animationType="slide" transparent={false} onRequestClose={closeUploadModal}>
         <View style={styles.fullScreenModal}>
           <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
           
-          <LinearGradient 
-            colors={['#EC4899', '#F472B6']} 
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={[styles.fullScreenHeader, { paddingTop: insets.top + 20 }]}
-          >
-            <View style={styles.fsHeaderTop}>
-              <ScaleBtn style={styles.fsBackBtn} onPress={closeUploadModal}>
-                <Ionicons name="arrow-back" size={24} color="#1E293B" />
-              </ScaleBtn>
-            </View>
-            <Text style={styles.fsHeaderTitle}>{editingMaterial ? 'Edit Material' : 'Upload Material'}</Text>
-            <Text style={styles.fsHeaderSubtitle}>Upload PDFs, videos, images and study materials.</Text>
-          </LinearGradient>
-
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <ScrollView contentContainerStyle={styles.fsScrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.fullScreenScrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <LinearGradient
+                colors={['#EC4899', '#F472B6']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={[styles.fullScreenHeader, { paddingTop: insets.top + 20 }]}
+              >
+                <View style={styles.fsHeaderTop}>
+                  <ScaleBtn style={styles.fsBackBtn} onPress={closeUploadModal}>
+                    <Ionicons name="arrow-back" size={24} color="#1E293B" />
+                  </ScaleBtn>
+                </View>
+                <Text style={styles.fsHeaderTitle}>{editingMaterial ? 'Edit Material' : 'Upload Material'}</Text>
+                <Text style={styles.fsHeaderSubtitle}>Upload PDFs, videos, images and study materials.</Text>
+              </LinearGradient>
+
+              <View style={styles.fsScrollContent}>
               
               {/* UPLOAD CARD */}
               <ScaleBtn activeScale={0.98} onPress={handlePickFile}>
@@ -826,54 +610,30 @@ export default function TeacherMaterialsScreen({ navigation }) {
                     />
                   )}
                   {!file.mimeType?.startsWith('image/') && (
-                    <View style={[styles.attachmentIconWrap, { backgroundColor: getTypeConfig(detectFileType({
-                      type: detectFileType({
-                        mimeType: file.mimeType,
-                        extension: file.name?.split('.').pop()?.toLowerCase() || '',
-                        filename: file.name
-                      }).type,
-                      mimeType: file.mimeType,
-                      extension: file.name?.split('.').pop()?.toLowerCase() || '',
-                      filename: file.name
-                    })).bg }]}>
+                    <View style={[styles.attachmentIconWrap, { backgroundColor: getPickedFileConfig(file).bg }]}>
                       <Ionicons 
-                        name={getTypeConfig(detectFileType({
-                          type: detectFileType({
-                            mimeType: file.mimeType,
-                            extension: file.name?.split('.').pop()?.toLowerCase() || '',
-                            filename: file.name
-                          }).type,
-                          mimeType: file.mimeType,
-                          extension: file.name?.split('.').pop()?.toLowerCase() || '',
-                          filename: file.name
-                        })).icon} 
+                        name={getPickedFileConfig(file).icon}
                         size={24} 
-                        color={getTypeConfig(detectFileType({
-                          type: detectFileType({
-                            mimeType: file.mimeType,
-                            extension: file.name?.split('.').pop()?.toLowerCase() || '',
-                            filename: file.name
-                          }).type,
-                          mimeType: file.mimeType,
-                          extension: file.name?.split('.').pop()?.toLowerCase() || '',
-                          filename: file.name
-                        })).color} 
+                        color={getPickedFileConfig(file).color}
                       />
                     </View>
                   )}
-<View style={[styles.attachmentInfo, { flex: 1 }]}>                    <Text style={styles.attachmentName} numberOfLines={1}>
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentName} numberOfLines={1}>
                       {file.name}
                     </Text>
                     <Text style={styles.attachmentSize}>
                       {formatFileSize(file.size)}
                     </Text>
                   </View>
+                  <TouchableOpacity style={styles.attachmentPreviewBtn} onPress={handleDownloadPreview} activeOpacity={0.7} accessibilityLabel="Download selected file to inspect">
+                    <Ionicons name="download-outline" size={20} color="#14B8A6" />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.attachmentRemoveBtn}
                     onPress={() => {
                       setFile(null);
                       setPreviewFile(null);
-                      setPdfDraft(null);
                     }}
                     activeOpacity={0.7}
                   >
@@ -951,10 +711,12 @@ export default function TeacherMaterialsScreen({ navigation }) {
                 </LinearGradient>
               </ScaleBtn>
               
+              </View>
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -1035,6 +797,7 @@ chipTextModernHeader: {
   fsHeaderTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
   fsHeaderSubtitle: { fontSize: 14, fontWeight: '500', color: 'rgba(255,255,255,0.9)', lineHeight: 20 },
   
+  fullScreenScrollContent: { flexGrow: 1 },
   fsScrollContent: { padding: 24, paddingBottom: 80 },
   
   uploadCard: { backgroundColor: '#F0FDF4', borderRadius: 18, borderWidth: 2, borderColor: '#5EEAD4', borderStyle: 'dashed', padding: 24, alignItems: 'center', marginBottom: 30 },
@@ -1065,40 +828,6 @@ chipTextModernHeader: {
   fsSubmitBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#14B8A6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
   fsSubmitBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 
-  // Preview Modal Styles
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  previewModalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '85%' },
-  modalHandle: { width: 48, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
-
-  previewContainer: { alignItems: 'center', marginBottom: 20 },
-  previewImage: { width: '100%', maxHeight: 300, borderRadius: 16 },
-  previewVideoContainer: { alignItems: 'center', padding: 40, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, width: '100%' },
-  previewVideoText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 12, marginBottom: 4 },
-  previewVideoSize: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
-  previewPdfContainer: { alignItems: 'center', padding: 40, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, width: '100%' },
-  previewPdfText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 12, marginBottom: 4 },
-  previewPdfSize: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
-  previewPdfNote: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontStyle: 'italic' },
-
-  previewInfoCard: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, padding: 16, marginBottom: 24, width: '100%' },
-  previewInfoLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  previewInfoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 8 },
-  previewInfoKey: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
-  previewInfoValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', textAlign: 'right' },
-
-  previewActions: { flexDirection: 'row', gap: 12, width: '100%' },
-  previewCancelBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  previewCancelText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  previewPublishBtn: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 16, alignItems: 'center', shadowColor: '#EC4899', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  previewPublishText: { color: '#EC4899', fontSize: 16, fontWeight: '800' },
-
-  previewVideoPlayer: { width: '100%', height: 240, borderRadius: 16, overflow: 'hidden', backgroundColor: '#000' },
-  previewPdfWebViewWrap: { width: '100%', height: 320, borderRadius: 16, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.1)', position: 'relative' },
-  previewPdfWebView: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16 },
-  draftUploadOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 2, borderRadius: 16 },
-  draftUploadText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginTop: 12 },
-  
   // Attachment Chip Styles
   attachmentChip: { 
     flexDirection: 'row', 
@@ -1123,7 +852,5 @@ chipTextModernHeader: {
   attachmentName: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 2 },
   attachmentSize: { fontSize: 12, color: '#64748B' },
   attachmentRemoveBtn: { padding: 4, marginLeft: 8 },
-  previewFormSection: { marginBottom: 16, width: '100%' },
-  previewFormLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginBottom: 6, marginLeft: 4 },
-  previewFormInput: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#FFFFFF', fontSize: 15, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  attachmentPreviewBtn: { padding: 6, marginLeft: 8 },
 });
