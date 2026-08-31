@@ -14,6 +14,16 @@ const MaterialFolder = require('../models/MaterialFolder');
 const storageService = require('../services/storageService');
 const notificationService = require('../services/notificationService');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
+const cache = require('../utils/cache');
+const { getAdminUserIds } = require('../utils/adminCache');
+
+const invalidateMaterialCaches = (teacherId) => {
+  cache.del('teacher_folders');
+  if (teacherId) {
+    cache.del(`teacher_dashboard_${teacherId}`);
+  }
+  cache.delPrefix('student_dashboard_');
+};
 
 const getMaterialTypeFromMime = (mimeType = '') => {
   if (mimeType.startsWith('video/')) return 'video';
@@ -105,7 +115,7 @@ const getTeacherStudentFilter = async (teacherId) => {
     role: 'student',
     isActive: true,
     assignedTeachers: teacherId, // Mongo matches a scalar against array fields automatically
-  }).select('_id');
+  }).select('_id').lean();
 
   return students.map((student) => student._id.toString());
 };
@@ -115,7 +125,13 @@ const getTeacherStudentFilter = async (teacherId) => {
 // @access  Teacher
 const getTeacherDashboard = async (req, res) => {
   try {
-    const teacherId = req.user._id;
+    const teacherId = req.user._id.toString();
+    const cacheKey = `teacher_dashboard_${teacherId}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -125,7 +141,7 @@ const getTeacherDashboard = async (req, res) => {
       ClassSchedule.find({
         teacherId,
         scheduledDate: { $gte: today, $lt: tomorrow },
-      }).select('-meetLink').populate('studentIds', 'name grade'),
+      }).select('-meetLink').populate('studentIds', 'name grade').lean(),
       getTeacherStudentFilter(teacherId),
       LeaveApplication.countDocuments({ applicant: teacherId, status: 'pending' }),
       StudyMaterial.countDocuments({ teacher: teacherId }),
@@ -133,10 +149,10 @@ const getTeacherDashboard = async (req, res) => {
         applicant: teacherId,
         compensationClassDate: { $exists: true, $ne: null },
         compensationStatus: { $in: ['pending', 'completed_by_teacher'] },
-      }).select('leaveType compensationClassDate compensationStatus'),
+      }).select('leaveType compensationClassDate compensationStatus').lean(),
     ]);
 
-    res.status(200).json({
+    const responsePayload = {
       success: true,
       dashboard: {
         todayClasses,
@@ -146,7 +162,12 @@ const getTeacherDashboard = async (req, res) => {
         pendingCompensationCount: pendingCompensationLeaves.length,
         pendingCompensationLeaves,
       },
-    });
+    };
+
+    // Cache dashboard result for 20 seconds
+    cache.set(cacheKey, responsePayload, 20);
+
+    res.status(200).json(responsePayload);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -165,7 +186,8 @@ const getMyStudents = async (req, res) => {
       isActive: true,
     })
       .select('name displayName grade board course assignedTeachers createdAt isActive')
-      .populate('course', 'title category');
+      .populate('course', 'title category')
+      .lean();
 
     res.status(200).json({ success: true, students });
   } catch (error) {
@@ -347,63 +369,64 @@ const uploadMaterial = async (req, res) => {
       materialPayload.s3Bucket = process.env.AWS_S3_BUCKET;
     }
 
+    // Generate PDF thumbnail URL directly in initial payload if file is PDF (offload extra save roundtrip)
+    if (req.file.mimetype === 'application/pdf' && uploadResult.publicId) {
+      try {
+        materialPayload.thumbnailUrl = storageService.getPdfThumbnailUrl
+          ? storageService.getPdfThumbnailUrl(uploadResult.publicId)
+          : '';
+      } catch (thumbErr) {
+        warnDev('[Teacher Upload] Thumbnail generation failed:', thumbErr.message);
+      }
+    }
+
     // Save to database
     const material = await StudyMaterial.create(materialPayload);
 
-    // Generate PDF thumbnail if file is PDF
-    if (req.file.mimetype === 'application/pdf' && uploadResult.publicId) {
-      try {
-        const thumbnailUrl = storageService.getPdfThumbnailUrl
-          ? storageService.getPdfThumbnailUrl(uploadResult.publicId)
-          : '';
-        if (thumbnailUrl) {
-          material.thumbnailUrl = thumbnailUrl;
-          await material.save();
-        }
-      } catch (thumbErr) {
-        warnDev('[Teacher Upload] Thumbnail generation failed:', thumbErr.message);
-        // Non-critical, don't fail the upload
-      }
-    }
+    // Invalidate cached folders & dashboards
+    invalidateMaterialCaches(req.user._id);
 
-    // Notify admins of new pending upload
-    try {
-      const admins = await User.find({ role: 'admin' }).select('_id');
-      const teacherName = req.user.name || req.user.displayName || 'A teacher';
-      if (admins.length > 0) {
-        const payload = {
-          senderId: req.user._id,
-          type: 'study_material',
-          title: 'New Material Pending Review',
-          message: `${teacherName} uploaded "${material.title}" which needs your approval.`,
-          link: '/admin/materials/pending',
-          referenceId: material._id,
-          referenceType: 'StudyMaterial',
-          io: req.app.get('io'),
-        };
-        if (admins.length > 1) {
-          await notificationService.sendBulkNotifications({
-            ...payload,
-            recipientIds: admins.map((a) => a._id),
-          });
-        } else {
-          await notificationService.sendNotification({
-            ...payload,
-            recipientId: admins[0]._id,
-          });
-        }
-      }
-    } catch (notifErr) {
-      errorCrit('[Teacher Upload] Admin notification failed:', notifErr.message);
-    }
-
-    logDev('[Teacher Upload] Complete');
-
+    // Respond immediately to teacher without blocking on admin notifications
     res.status(201).json({
       success: true,
       material,
       message: `Material uploaded successfully: ${uploadResult.originalFilename}`,
     });
+
+    // Fire-and-forget admin notification in background
+    (async () => {
+      try {
+        const adminIds = await getAdminUserIds();
+        const teacherName = req.user.name || req.user.displayName || 'A teacher';
+        if (adminIds && adminIds.length > 0) {
+          const payload = {
+            senderId: req.user._id,
+            type: 'study_material',
+            title: 'New Material Pending Review',
+            message: `${teacherName} uploaded "${material.title}" which needs your approval.`,
+            link: '/admin/materials/pending',
+            referenceId: material._id,
+            referenceType: 'StudyMaterial',
+            io: req.app.get('io'),
+          };
+          if (adminIds.length > 1) {
+            await notificationService.sendBulkNotifications({
+              ...payload,
+              recipientIds: adminIds,
+            });
+          } else {
+            await notificationService.sendNotification({
+              ...payload,
+              recipientId: adminIds[0],
+            });
+          }
+        }
+      } catch (notifErr) {
+        errorCrit('[Teacher Upload] Admin notification failed:', notifErr.message);
+      }
+    })();
+
+    logDev('[Teacher Upload] Complete');
   } catch (error) {
     errorCrit('[Teacher Upload] Error:', error.message);
     
@@ -417,10 +440,12 @@ const uploadMaterial = async (req, res) => {
       }
     }
 
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to upload material. Please try again.',
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to upload material. Please try again.',
+      });
+    }
   }
 };
 
@@ -455,11 +480,14 @@ const editMaterial = async (req, res) => {
     material.requestedAt = new Date();
     await material.save();
 
-    // Notify admins
+    // Invalidate cached folders & dashboards
+    invalidateMaterialCaches(req.user._id);
+
+    // Notify admins using cached admin IDs
     try {
-      const admins = await User.find({ role: 'admin' }).select('_id');
+      const adminIds = await getAdminUserIds();
       const teacherName = req.user.name || req.user.displayName || 'A teacher';
-      if (admins.length > 0) {
+      if (adminIds && adminIds.length > 0) {
         const payload = {
           senderId: req.user._id,
           type: 'study_material',
@@ -470,10 +498,10 @@ const editMaterial = async (req, res) => {
           referenceType: 'StudyMaterial',
           io: req.app.get('io'),
         };
-        if (admins.length > 1) {
-          await notificationService.sendBulkNotifications({ ...payload, recipientIds: admins.map((a) => a._id) });
+        if (adminIds.length > 1) {
+          await notificationService.sendBulkNotifications({ ...payload, recipientIds: adminIds });
         } else {
-          await notificationService.sendNotification({ ...payload, recipientId: admins[0]._id });
+          await notificationService.sendNotification({ ...payload, recipientId: adminIds[0] });
         }
       }
     } catch (notifErr) {
@@ -511,11 +539,14 @@ const deleteMaterial = async (req, res) => {
     material.requestedAt = new Date();
     await material.save();
 
-    // Notify admins
+    // Invalidate cached folders & dashboards
+    invalidateMaterialCaches(req.user._id);
+
+    // Notify admins using cached admin IDs
     try {
-      const admins = await User.find({ role: 'admin' }).select('_id');
+      const adminIds = await getAdminUserIds();
       const teacherName = req.user.name || req.user.displayName || 'A teacher';
-      if (admins.length > 0) {
+      if (adminIds && adminIds.length > 0) {
         const payload = {
           senderId: req.user._id,
           type: 'study_material',
@@ -526,10 +557,10 @@ const deleteMaterial = async (req, res) => {
           referenceType: 'StudyMaterial',
           io: req.app.get('io'),
         };
-        if (admins.length > 1) {
-          await notificationService.sendBulkNotifications({ ...payload, recipientIds: admins.map((a) => a._id) });
+        if (adminIds.length > 1) {
+          await notificationService.sendBulkNotifications({ ...payload, recipientIds: adminIds });
         } else {
-          await notificationService.sendNotification({ ...payload, recipientId: admins[0]._id });
+          await notificationService.sendNotification({ ...payload, recipientId: adminIds[0] });
         }
       }
     } catch (notifErr) {
@@ -561,6 +592,7 @@ const toggleMaterialLock = async (req, res) => {
         material.unlockedFor = [];
       }
       await material.save();
+      invalidateMaterialCaches(req.user._id);
       return res.status(200).json({ success: true, material });
     }
 
@@ -585,6 +617,8 @@ const toggleMaterialLock = async (req, res) => {
     // Log action
     material.reviewNotes = (material.reviewNotes ? material.reviewNotes + '\n' : '') + `[${new Date().toISOString()}] Lock toggled by teacher (unlock: ${unlock})`;
     await material.save();
+
+    invalidateMaterialCaches(req.user._id);
 
     if (unlock) {
       await notificationService.sendNotification({
@@ -611,7 +645,9 @@ const toggleMaterialLock = async (req, res) => {
 // @access  Teacher
 const getTeacherMaterials = async (req, res) => {
   try {
-    const materials = await StudyMaterial.find({ teacher: req.user._id }).sort({ createdAt: -1 });
+    const materials = await StudyMaterial.find({ teacher: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean();
     res.status(200).json({ success: true, materials });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -641,6 +677,10 @@ const enterExamScore = async (req, res) => {
       isPublished: true,
     });
 
+    // Invalidate dashboard caches
+    cache.del(`teacher_dashboard_${req.user._id}`);
+    cache.del(`student_dashboard_${student}`);
+
     await notificationService.sendNotification({
       recipientId: student,
       senderId: req.user._id,
@@ -668,7 +708,8 @@ const getRecentScores = async (req, res) => {
     const scores = await ExamScore.find({ teacher: req.user._id })
       .populate('student', 'name displayName grade')
       .sort({ examDate: -1, createdAt: -1 })
-      .limit(parseInt(limit, 10));
+      .limit(parseInt(limit, 10))
+      .lean();
 
     res.status(200).json({ success: true, scores });
   } catch (error) {
@@ -701,6 +742,11 @@ const markAttendance = async (req, res) => {
     }));
 
     await Attendance.bulkWrite(operations);
+
+    // Invalidate dashboard caches
+    cache.del(`teacher_dashboard_${req.user._id}`);
+    cache.delPrefix('student_dashboard_');
+
     res.status(200).json({ success: true, message: 'Attendance marked successfully.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -717,7 +763,7 @@ const getMonthlyGrading = async (req, res) => {
       teacher: req.user._id,
       monthNumber: parseInt(month),
       year: parseInt(year),
-    });
+    }).lean();
 
     res.status(200).json({ success: true, grading });
   } catch (error) {
@@ -740,14 +786,17 @@ const applyLeave = async (req, res) => {
       reason,
     });
 
+    // Invalidate teacher dashboard cache
+    cache.del(`teacher_dashboard_${req.user._id}`);
+
     try {
-      const admins = await User.find({ role: 'admin' }).select('_id');
+      const adminIds = await getAdminUserIds();
       const applicantName = req.user.name || req.user.displayName || 'A user';
       const leaveMessage = `${applicantName} applied for leave from ${new Date(fromDate).toDateString()} to ${new Date(toDate).toDateString()}`;
 
-      if (admins.length > 1) {
+      if (adminIds && adminIds.length > 1) {
         await notificationService.sendBulkNotifications({
-          recipientIds: admins.map((admin) => admin._id),
+          recipientIds: adminIds,
           senderId: req.user._id,
           type: 'leave_applied',
           title: 'New Leave Application',
@@ -757,9 +806,9 @@ const applyLeave = async (req, res) => {
           link: '/admin/leaves',
           io: req.app.get('io'),
         });
-      } else if (admins.length === 1) {
+      } else if (adminIds && adminIds.length === 1) {
         await notificationService.sendNotification({
-          recipientId: admins[0]._id,
+          recipientId: adminIds[0],
           senderId: req.user._id,
           type: 'leave_applied',
           title: 'New Leave Application',
@@ -785,7 +834,9 @@ const applyLeave = async (req, res) => {
 // @access  Teacher
 const getTeacherLeaves = async (req, res) => {
   try {
-    const leaves = await LeaveApplication.find({ applicant: req.user._id }).sort({ createdAt: -1 });
+    const leaves = await LeaveApplication.find({ applicant: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean();
     res.status(200).json({ success: true, leaves });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -796,6 +847,12 @@ const getTeacherLeaves = async (req, res) => {
 
 const getTeacherFolders = async (req, res) => {
   try {
+    const cacheKey = 'teacher_folders';
+    const cachedFolders = cache.get(cacheKey);
+    if (cachedFolders) {
+      return res.status(200).json({ success: true, folders: cachedFolders });
+    }
+
     const folders = await MaterialFolder.aggregate([
       {
         $lookup: {
@@ -817,6 +874,10 @@ const getTeacherFolders = async (req, res) => {
       },
       { $sort: { order: 1, grade: 1 } }
     ]);
+
+    // Cache folders aggregation for 45 seconds
+    cache.set(cacheKey, folders, 45);
+
     res.status(200).json({ success: true, folders });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -828,7 +889,8 @@ const getTeacherFolderMaterials = async (req, res) => {
     const { id } = req.params;
     const materials = await StudyMaterial.find({ folder: id, teacher: req.user._id })
       .populate('course', 'title')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     res.status(200).json({ success: true, materials });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

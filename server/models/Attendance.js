@@ -28,5 +28,7 @@ const attendanceSchema = new mongoose.Schema(
 
 // Compound index: one attendance record per student per date
 attendanceSchema.index({ student: 1, date: 1, liveClass: 1 }, { unique: true });
+// Index for fast student attendance history and dashboard aggregation
+attendanceSchema.index({ student: 1, date: -1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

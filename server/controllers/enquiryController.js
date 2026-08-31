@@ -22,12 +22,12 @@ const submitEnquiry = async (req, res) => {
     sendEnquiryEmail(enquiry);
 
     const notificationService = require('../services/notificationService');
-    const User = require('../models/User');
+    const { getAdminUserIds } = require('../utils/adminCache');
     try {
-      const admins = await User.find({ role: 'admin' }).select('_id');
-      if (admins.length) {
+      const adminIds = await getAdminUserIds();
+      if (adminIds && adminIds.length) {
         await notificationService.sendBulkNotifications({
-          recipientIds: admins.map((a) => a._id),
+          recipientIds: adminIds,
           type: 'new_enquiry',
           title: 'New Enquiry Received',
           message: `${enquiry.name} enquired about ${enquiry.course || 'a course'}.`,
@@ -62,7 +62,8 @@ const getEnquiries = async (req, res) => {
     const enquiries = await Enquiry.find(filter)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit));
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
 
     const total = await Enquiry.countDocuments(filter);
 

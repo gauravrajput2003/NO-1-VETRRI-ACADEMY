@@ -41,4 +41,8 @@ chatMessageSchema.statics.getConversationId = function (id1, id2) {
 // Legacy compat
 chatMessageSchema.statics.getRoomId = chatMessageSchema.statics.getConversationId;
 
+// Indexes for fast chronological chat history loading
+chatMessageSchema.index({ roomId: 1, createdAt: 1 });
+chatMessageSchema.index({ conversationId: 1, createdAt: 1 });
+
 module.exports = mongoose.model('ChatMessage', chatMessageSchema);

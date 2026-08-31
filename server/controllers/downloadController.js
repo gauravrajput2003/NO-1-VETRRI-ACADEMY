@@ -145,12 +145,45 @@ const getDownloadableResources = async (req, res) => {
   }
 };
 
+const cache = require('../utils/cache');
+
+// Precompute static filter list once
+const STATIC_NCERT_CLASSES = [...new Set(NCERT_BOOKS.map((b) => b.class))].sort((a, b) => Number(a) - Number(b));
+const STATIC_NCERT_SUBJECTS = [...new Set(NCERT_BOOKS.map((b) => b.subject))].sort();
+
+// Precompute full static grouping once
+const STATIC_NCERT_GROUPED = {};
+NCERT_BOOKS.forEach((b) => {
+  if (!STATIC_NCERT_GROUPED[b.class]) STATIC_NCERT_GROUPED[b.class] = [];
+  STATIC_NCERT_GROUPED[b.class].push(b);
+});
+
+// Cache default NCERT response indefinitely (static dataset)
+const STATIC_NCERT_RESPONSE = {
+  success: true,
+  books: NCERT_BOOKS,
+  grouped: STATIC_NCERT_GROUPED,
+  filters: { classes: STATIC_NCERT_CLASSES, subjects: STATIC_NCERT_SUBJECTS },
+  total: NCERT_BOOKS.length,
+};
+
 // ─── Get NCERT Book Links ──────────────────────────────────────────────────────
 const getNcertResources = async (req, res) => {
   try {
     const { classNum, subject } = req.query;
-    let books = NCERT_BOOKS;
 
+    // Fast return cached static response if no filters applied
+    if (!classNum && !subject) {
+      return res.json(STATIC_NCERT_RESPONSE);
+    }
+
+    const cacheKey = `ncert_${classNum || 'all'}_${(subject || 'all').toLowerCase()}`;
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
+    let books = NCERT_BOOKS;
     if (classNum) books = books.filter((b) => b.class === classNum);
     if (subject) books = books.filter((b) => b.subject.toLowerCase().includes(subject.toLowerCase()));
 
@@ -161,17 +194,18 @@ const getNcertResources = async (req, res) => {
       grouped[b.class].push(b);
     });
 
-    // Get unique classes and subjects for filters
-    const classes = [...new Set(NCERT_BOOKS.map((b) => b.class))].sort((a, b) => Number(a) - Number(b));
-    const subjects = [...new Set(NCERT_BOOKS.map((b) => b.subject))].sort();
-
-    res.json({
+    const responsePayload = {
       success: true,
       books,
       grouped,
-      filters: { classes, subjects },
+      filters: { classes: STATIC_NCERT_CLASSES, subjects: STATIC_NCERT_SUBJECTS },
       total: books.length,
-    });
+    };
+
+    // Cache indefinitely (static catalog)
+    cache.set(cacheKey, responsePayload, 0);
+
+    res.json(responsePayload);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

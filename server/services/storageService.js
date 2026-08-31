@@ -1,6 +1,40 @@
 const cloudinaryService = require('./cloudinaryService');
 const s3Service = require('./s3Service');
 const fs = require('fs');
+
+/**
+ * Concurrency Limiter (Pure JS Semaphore)
+ * Caps simultaneous outbound uploads to cloud providers (max 6 by default)
+ * preventing CPU/bandwidth saturation on Render free tier under concurrent teacher uploads.
+ * Excess requests queue in memory and resolve in order.
+ */
+class ConcurrencyLimiter {
+  constructor(concurrency = 6) {
+    this.concurrency = concurrency;
+    this.running = 0;
+    this.queue = [];
+  }
+
+  async run(fn) {
+    if (this.running >= this.concurrency) {
+      await new Promise((resolve) => this.queue.push(resolve));
+    }
+    this.running++;
+    try {
+      return await fn();
+    } finally {
+      this.running--;
+      if (this.queue.length > 0) {
+        const next = this.queue.shift();
+        next();
+      }
+    }
+  }
+}
+
+const uploadLimiter = new ConcurrencyLimiter(
+  process.env.MAX_CONCURRENT_UPLOADS ? parseInt(process.env.MAX_CONCURRENT_UPLOADS, 10) : 6
+);
    
 /**
  * PRODUCTION-READY StorageService
@@ -10,7 +44,7 @@ const fs = require('fs');
  * 
  * Usage:
  * - For memory storage: uploadFileFromBuffer()
- * - For disk storage: uploadFileFromDisk() (auto-cleanup)
+ * - For disk storage: uploadFileFromDisk() (auto-cleanup, streaming)
  * - For downloads: getDownloadUrl()
  */
 class StorageService {
@@ -25,6 +59,7 @@ class StorageService {
 
   /**
    * Upload file from buffer (for memory storage uploads)
+   * Protected by concurrency limiter
    * @param {Buffer} buffer - File buffer from multer
    * @param {string} mimetype - MIME type
    * @param {string} originalname - Original filename
@@ -33,26 +68,29 @@ class StorageService {
    * @returns {Promise<Object>} Upload result with metadata
    */
   async uploadFileFromBuffer(buffer, mimetype, originalname, folder = 'materials', options = {}) {
-    const service = this.getService();
-    
-    if (service === cloudinaryService) {
-      // Use new Cloudinary method for buffer uploads
-      return await cloudinaryService.uploadFileFromBuffer(
-        buffer,
-        mimetype,
-        originalname,
-        folder,
-        options
-      );
-    }
-    
-    // Fallback for other storage services
-    return await service.uploadFile(buffer, mimetype, folder, options);
+    return uploadLimiter.run(async () => {
+      const service = this.getService();
+      
+      if (service === cloudinaryService) {
+        return await cloudinaryService.uploadFileFromBuffer(
+          buffer,
+          mimetype,
+          originalname,
+          folder,
+          options
+        );
+      }
+      
+      // Fallback for S3 or other storage services
+      return await service.uploadFile(buffer, mimetype, folder, { ...options, originalName: originalname });
+    });
   }
 
   /**
    * Upload file from disk (for disk storage uploads)
-   * Automatically cleans up temp file after upload
+   * Streams directly to storage provider with zero full-buffer RAM retention.
+   * Protected by concurrency limiter.
+   * Automatically cleans up temp file after upload.
    * @param {string} filePath - Path to temp file on disk
    * @param {string} mimetype - MIME type
    * @param {string} originalname - Original filename
@@ -61,41 +99,52 @@ class StorageService {
    * @returns {Promise<Object>} Upload result with metadata
    */
   async uploadFileFromDisk(filePath, mimetype, originalname, folder = 'materials', options = {}) {
-    const service = this.getService();
-    
-    if (service === cloudinaryService) {
-      // Use new Cloudinary method for disk uploads (streaming)
-      return await cloudinaryService.uploadFileFromDisk(
-        filePath,
-        mimetype,
-        originalname,
-        folder,
-        options
-      );
-    }
-    
-    // For S3 or other services, read file and upload as buffer
-    try {
-      const buffer = fs.readFileSync(filePath);
-      const result = await service.uploadFile(buffer, mimetype, folder, options);
+    return uploadLimiter.run(async () => {
+      const service = this.getService();
       
-      // Clean up temp file
-      if (fs.existsSync(filePath)) {
-        fs.unlink(filePath, (err) => {
-          if (err) console.error(`[Storage] Failed to clean up: ${filePath}`, err.message);
-        });
+      if (service === cloudinaryService) {
+        // Stream directly from disk to Cloudinary
+        return await cloudinaryService.uploadFileFromDisk(
+          filePath,
+          mimetype,
+          originalname,
+          folder,
+          options
+        );
       }
       
-      return result;
-    } catch (error) {
-      // Clean up on error
-      if (fs.existsSync(filePath)) {
-        fs.unlink(filePath, (err) => {
-          if (err) console.error(`[Storage] Failed to clean up on error: ${filePath}`, err.message);
-        });
+      // For S3, stream directly from disk (no readFileSync)
+      if (typeof service.uploadFileFromDisk === 'function') {
+        return await service.uploadFileFromDisk(
+          filePath,
+          mimetype,
+          originalname,
+          folder,
+          options
+        );
       }
-      throw error;
-    }
+
+      // Safe fallback if provider doesn't have uploadFileFromDisk
+      try {
+        const buffer = fs.readFileSync(filePath);
+        const result = await service.uploadFile(buffer, mimetype, folder, { ...options, originalName: originalname });
+        
+        if (fs.existsSync(filePath)) {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error(`[Storage] Failed to clean up: ${filePath}`, err.message);
+          });
+        }
+        
+        return result;
+      } catch (error) {
+        if (fs.existsSync(filePath)) {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error(`[Storage] Failed to clean up on error: ${filePath}`, err.message);
+          });
+        }
+        throw error;
+      }
+    });
   }
 
   /**

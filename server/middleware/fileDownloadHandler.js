@@ -37,8 +37,8 @@ function fetchFollowingRedirects(url, maxRedirects = 5) {
 }
 
 /**
- * Download file from URL and serve to client with proper headers.
- * Follows redirects automatically.
+ * Download file from URL and serve to client with proper headers via streaming pipe.
+ * Follows redirects automatically without buffering the file in memory.
  * @param {string} fileUrl   - Source URL (Cloudinary / S3 / signed URL)
  * @param {string} filename  - Filename to present to the client
  * @param {string} mimeType  - MIME type
@@ -69,11 +69,21 @@ async function proxyDownload(fileUrl, filename, mimeType, res) {
     res.set('Content-Length', remoteResponse.headers['content-length']);
   }
 
-  console.log(`[Download] Serving: ${filename} (${mimeType})`);
+  console.log(`[Download] Serving (streamed): ${filename} (${mimeType})`);
 
   return new Promise((resolve, reject) => {
+    // If client disconnects early, abort upstream socket to save server bandwidth & RAM
+    res.on('close', () => {
+      if (!remoteResponse.destroyed) {
+        remoteResponse.destroy();
+      }
+    });
+
     remoteResponse.pipe(res);
-    remoteResponse.on('error', reject);
+    remoteResponse.on('error', (err) => {
+      console.error('[Download] Upstream stream error:', err.message);
+      reject(err);
+    });
     res.on('finish', resolve);
     res.on('error', reject);
   });

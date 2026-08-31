@@ -33,6 +33,7 @@ const LibraryAccess = require('../models/LibraryAccess');
 const MaterialFolder = require('../models/MaterialFolder');
 const notificationService = require('../services/notificationService');
 const storageService = require('../services/storageService');
+const cache = require('../utils/cache');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
 const { proxyDownload } = require('../middleware/fileDownloadHandler');
 
@@ -790,6 +791,11 @@ const approveMaterial = async (req, res) => {
       }
     }
 
+    // Invalidate cached material folders and dashboards
+    cache.del('teacher_folders');
+    if (material.teacher) cache.del(`teacher_dashboard_${material.teacher}`);
+    cache.delPrefix('student_dashboard_');
+
     // Notify teacher
     if (material.requestedBy) {
       await notificationService.sendNotification({
@@ -824,6 +830,11 @@ const rejectMaterial = async (req, res) => {
     material.reviewedAt = new Date();
     material.reviewNotes = (material.reviewNotes ? material.reviewNotes + '\\n' : '') + `[Admin] ${reviewNotes}`;
     await material.save();
+
+    // Invalidate cached material folders and dashboards
+    cache.del('teacher_folders');
+    if (material.teacher) cache.del(`teacher_dashboard_${material.teacher}`);
+    cache.delPrefix('student_dashboard_');
 
     if (stagedReplacement?.publicId) {
       storageService.deleteFile(

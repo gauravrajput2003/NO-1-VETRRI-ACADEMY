@@ -30,4 +30,8 @@ examScoreSchema.virtual('percentage').get(function () {
   return ((this.marksObtained / this.maxMarks) * 100).toFixed(1);
 });
 
+// Indexes for faster student score and teacher dashboard lookups
+examScoreSchema.index({ student: 1, examDate: -1 });
+examScoreSchema.index({ teacher: 1 });
+
 module.exports = mongoose.model('ExamScore', examScoreSchema);

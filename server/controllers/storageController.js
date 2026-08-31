@@ -7,6 +7,8 @@ const MaterialFolder = require('../models/MaterialFolder');
 const User = require('../models/User');
 const storageService = require('../services/storageService');
 const notificationService = require('../services/notificationService');
+const cache = require('../utils/cache');
+const { getAdminUserIds } = require('../utils/adminCache');
 const crypto = require('crypto');
 const path = require('path');
 
@@ -182,66 +184,73 @@ const confirmUpload = async (req, res) => {
       materialPayload.folder = folder._id;
     }
 
-    const material = await StudyMaterial.create(materialPayload);
-
-    if (isTeacher) {
-      try {
-        const admins = await User.find({ role: 'admin' }).select('_id');
-        const teacherName = req.user.name || req.user.displayName || 'A teacher';
-        if (admins.length > 0) {
-          const payload = {
-            senderId: req.user._id,
-            type: 'study_material',
-            title: 'New Material Pending Review',
-            message: `${teacherName} uploaded "${material.title}" which needs your approval.`,
-            link: '/admin/materials/pending',
-            referenceId: material._id,
-            referenceType: 'StudyMaterial',
-            io: req.app.get('io'),
-          };
-          if (admins.length > 1) {
-            await notificationService.sendBulkNotifications({
-              ...payload,
-              recipientIds: admins.map((a) => a._id),
-            });
-          } else {
-            await notificationService.sendNotification({
-              ...payload,
-              recipientId: admins[0]._id,
-            });
-          }
-        }
-      } catch (notifErr) {
-        console.warn('[Storage confirm] Admin notification failed:', notifErr.message);
-      }
-    }
-
-    // Generate PDF thumbnail if file is PDF
+    // Generate PDF thumbnail URL directly in initial create payload (avoiding blocking second DB save)
     if (mimeType === 'application/pdf' && publicId) {
       try {
-        const thumbnailUrl = storageService.getPdfThumbnailUrl
+        materialPayload.thumbnailUrl = storageService.getPdfThumbnailUrl
           ? storageService.getPdfThumbnailUrl(publicId)
           : '';
-        if (thumbnailUrl) {
-          material.thumbnailUrl = thumbnailUrl;
-          await material.save();
-        }
       } catch (thumbErr) {
         console.warn('[Storage confirm] Thumbnail generation failed:', thumbErr.message);
       }
     }
 
+    const material = await StudyMaterial.create(materialPayload);
+
+    // Invalidate cached material folders and dashboards
+    cache.del('teacher_folders');
+    cache.del(`teacher_dashboard_${req.user._id}`);
+    cache.delPrefix('student_dashboard_');
+
+    // Respond immediately to the client
     res.status(201).json({
       success: true,
       material,
       message: 'Upload confirmed and saved to database.',
     });
+
+    // Fire-and-forget admin notification in background
+    if (isTeacher) {
+      (async () => {
+        try {
+          const adminIds = await getAdminUserIds();
+          const teacherName = req.user.name || req.user.displayName || 'A teacher';
+          if (adminIds && adminIds.length > 0) {
+            const payload = {
+              senderId: req.user._id,
+              type: 'study_material',
+              title: 'New Material Pending Review',
+              message: `${teacherName} uploaded "${material.title}" which needs your approval.`,
+              link: '/admin/materials/pending',
+              referenceId: material._id,
+              referenceType: 'StudyMaterial',
+              io: req.app.get('io'),
+            };
+            if (adminIds.length > 1) {
+              await notificationService.sendBulkNotifications({
+                ...payload,
+                recipientIds: adminIds,
+              });
+            } else {
+              await notificationService.sendNotification({
+                ...payload,
+                recipientId: adminIds[0],
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.warn('[Storage confirm] Admin notification failed:', notifErr.message);
+        }
+      })();
+    }
   } catch (error) {
     console.error('[Storage confirm] Error:', error.message);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to confirm upload.',
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to confirm upload.',
+      });
+    }
   }
 };
 
@@ -251,7 +260,7 @@ const confirmUpload = async (req, res) => {
 const getDownloadUrl = async (req, res) => {
   try {
     const materialId = req.params.materialId;
-    const material = await StudyMaterial.findById(materialId);
+    const material = await StudyMaterial.findById(materialId).lean();
     if (!material) {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }

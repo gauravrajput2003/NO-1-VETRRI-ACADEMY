@@ -56,7 +56,11 @@ const studyMaterialSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster queries
+// Indexes for faster queries and aggregation
+studyMaterialSchema.index({ teacher: 1 });
+studyMaterialSchema.index({ approvalStatus: 1, grade: 1 });
+studyMaterialSchema.index({ folder: 1 });
+studyMaterialSchema.index({ course: 1 });
 studyMaterialSchema.index({ teacher: 1, course: 1, subject: 1 });
 studyMaterialSchema.index({ course: 1, lockedForAll: 1 });
 

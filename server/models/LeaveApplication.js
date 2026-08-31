@@ -34,4 +34,7 @@ leaveApplicationSchema.pre('save', function (next) {
   next();
 });
 
+// Index for applicant leave queries and status filtering
+leaveApplicationSchema.index({ applicant: 1, status: 1 });
+
 module.exports = mongoose.model('LeaveApplication', leaveApplicationSchema);

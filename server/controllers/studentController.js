@@ -18,6 +18,8 @@ const notificationService = require('../services/notificationService');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
 const { proxyDownload } = require('../middleware/fileDownloadHandler');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
+const cache = require('../utils/cache');
+const { getAdminUserIds } = require('../utils/adminCache');
 
 const { isMaterialAccessibleForStudent } = require('../utils/materialAccess');
 
@@ -62,7 +64,13 @@ const resolveMaterialAccessUrl = async (material, forceDownload = false) => {
 // @access  Student
 const getStudentDashboard = async (req, res) => {
   try {
-    const studentId = req.user._id;
+    const studentId = req.user._id.toString();
+    const cacheKey = `student_dashboard_${studentId}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -76,18 +84,20 @@ const getStudentDashboard = async (req, res) => {
         status: { $in: ['scheduled', 'live'] },
       })
         .populate('teacher', 'name qualification') // Only name — NO mobile/email
-        .select('-studentsJoined'),
+        .select('-studentsJoined')
+        .lean(),
 
       // Recent 5 exam scores
       ExamScore.find({ student: studentId, isPublished: true })
         .sort({ createdAt: -1 })
-        .limit(5),
+        .limit(5)
+        .lean(),
 
       // Attendance this month
       Attendance.aggregate([
         {
           $match: {
-            student: studentId,
+            student: req.user._id,
             date: { $gte: new Date(today.getFullYear(), today.getMonth(), 1) },
           },
         },
@@ -98,7 +108,10 @@ const getStudentDashboard = async (req, res) => {
       Notification.countDocuments({ recipient: studentId, isRead: false }),
 
       // Assigned Teacher profile
-     User.findById(studentId).select('assignedTeachers').populate('assignedTeachers', 'name displayName qualification subjects'),
+      User.findById(studentId)
+        .select('assignedTeachers')
+        .populate('assignedTeachers', 'name displayName qualification subjects')
+        .lean(),
     ]);
 
     // Weekly leaderboard (top 3 by total score this week)
@@ -128,17 +141,22 @@ const getStudentDashboard = async (req, res) => {
       select: 'name grade',
     });
 
-   res.status(200).json({
-  success: true,
-  dashboard: {
-    todayClass,
-    recentScores,
-    attendanceSummary,
-    unreadNotifications,
-    leaderboard,
-    assignedTeachers: studentData?.assignedTeachers || [],
-  },
-});
+    const responsePayload = {
+      success: true,
+      dashboard: {
+        todayClass,
+        recentScores,
+        attendanceSummary,
+        unreadNotifications,
+        leaderboard,
+        assignedTeachers: studentData?.assignedTeachers || [],
+      },
+    };
+
+    // Cache student dashboard for 20 seconds
+    cache.set(cacheKey, responsePayload, 20);
+
+    res.status(200).json(responsePayload);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -152,27 +170,31 @@ const getStudentMaterials = async (req, res) => {
     const studentId = req.user._id;
 
     // Get materials for student's course and grade
-   const student = await User.findById(studentId).select('course grade assignedTeachers');
+    const student = await User.findById(studentId).select('course grade assignedTeachers').lean();
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
 
-
-   const materials = await StudyMaterial.find({
-  approvalStatus: 'approved',
-  $and: [
-    {
-      $or: [
-        { teacher: { $in: student.assignedTeachers || [] } },
-        { course: student.course },
-      ]
-    },
+    const materials = await StudyMaterial.find({
+      approvalStatus: 'approved',
+      $and: [
+        {
+          $or: [
+            { teacher: { $in: student.assignedTeachers || [] } },
+            { course: student.course },
+          ],
+        },
         {
           $or: [
             { grade: student.grade },
             { grade: { $in: [null, '', 'all'] } },
-            { grade: { $exists: false } }
-          ]
-        }
-      ]
-    }).select('-s3Key -s3Bucket'); // Don't expose S3 keys directly
+            { grade: { $exists: false } },
+          ],
+        },
+      ],
+    })
+      .select('-s3Key -s3Bucket')
+      .lean(); // Don't expose S3 keys directly
 
     // Mark which ones are accessible
     const materialsWithAccess = materials.map((m) => {
@@ -209,12 +231,12 @@ const getStudentMaterials = async (req, res) => {
 // @access  Student
 const getStudentFolder = async (req, res) => {
   try {
-   const student = await User.findById(req.user._id).select('course grade assignedTeachers');
-    if (!student.grade) {
+    const student = await User.findById(req.user._id).select('course grade assignedTeachers').lean();
+    if (!student || !student.grade) {
       return res.status(404).json({ success: false, message: 'Student grade is not set.' });
     }
 
-    const folder = await MaterialFolder.findOne({ grade: student.grade });
+    const folder = await MaterialFolder.findOne({ grade: student.grade }).lean();
     if (!folder) {
       return res.status(200).json({ success: true, folder: null, materials: [] });
     }
@@ -222,7 +244,9 @@ const getStudentFolder = async (req, res) => {
     const materials = await StudyMaterial.find({
       folder: folder._id,
       approvalStatus: 'approved',
-    }).select('-s3Key -s3Bucket');
+    })
+      .select('-s3Key -s3Bucket')
+      .lean();
 
     const materialsWithAccess = materials.map((m) => {
       const access = isMaterialAccessibleForStudent(m, student);
@@ -252,6 +276,7 @@ const getStudentFolder = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 // @desc    Get the list of teachers assigned to this student (for chat picker)
 // @route   GET /api/student/my-teachers
 // @access  Student
@@ -259,7 +284,8 @@ const getMyTeachers = async (req, res) => {
   try {
     const student = await User.findById(req.user._id)
       .select('assignedTeachers')
-      .populate('assignedTeachers', 'name displayName qualification subjects profilePic');
+      .populate('assignedTeachers', 'name displayName qualification subjects profilePic')
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -276,13 +302,13 @@ const getMyTeachers = async (req, res) => {
 const getMaterialPreviewUrl = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const material = await StudyMaterial.findById(req.params.id);
+    const material = await StudyMaterial.findById(req.params.id).lean();
 
     if (!material) {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
 
-    const student = await User.findById(studentId);
+    const student = await User.findById(studentId).lean();
     const access = isMaterialAccessibleForStudent(material, student);
 
     if (!access.allowed) {
@@ -331,7 +357,7 @@ const getMaterialPreviewUrl = async (req, res) => {
 const getMaterialDownloadUrl = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const material = await StudyMaterial.findById(req.params.id);
+    const material = await StudyMaterial.findById(req.params.id).lean();
 
     if (!material) {
       return res.status(404).json({
@@ -341,7 +367,7 @@ const getMaterialDownloadUrl = async (req, res) => {
     }
 
     // Check if material is accessible for this student
-    const student = await User.findById(studentId);
+    const student = await User.findById(studentId).lean();
     const access = isMaterialAccessibleForStudent(material, student);
 
     if (!access.allowed) {
@@ -398,7 +424,7 @@ const getMaterialDownloadUrl = async (req, res) => {
 const downloadMaterialDirect = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const material = await StudyMaterial.findById(req.params.id);
+    const material = await StudyMaterial.findById(req.params.id).lean();
 
     if (!material) {
       return res.status(404).json({
@@ -408,7 +434,7 @@ const downloadMaterialDirect = async (req, res) => {
     }
 
     // Check if material is accessible for this student
-    const student = await User.findById(studentId);
+    const student = await User.findById(studentId).lean();
     const access = isMaterialAccessibleForStudent(material, student);
 
     if (!access.allowed) {
@@ -483,7 +509,8 @@ const downloadMaterialDirect = async (req, res) => {
 const getStudentScores = async (req, res) => {
   try {
     const scores = await ExamScore.find({ student: req.user._id, isPublished: true })
-      .sort({ examDate: -1 });
+      .sort({ examDate: -1 })
+      .lean();
 
     // Group by subject for chart data
     const bySubject = {};
@@ -511,7 +538,8 @@ const getStudentAttendance = async (req, res) => {
   try {
     const attendance = await Attendance.find({ student: req.user._id })
       .populate('liveClass', 'title subject scheduledDate scheduledTime')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
 
     const totalClasses = attendance.length;
     const presentClasses = attendance.filter((a) => a.status === 'present').length;
@@ -535,7 +563,8 @@ const getStudentSchedule = async (req, res) => {
     const schedules = await ClassSchedule.find({ student: req.user._id })
       .populate('teacher', 'name') // Only name
       .populate('course', 'title')
-      .sort({ scheduledDate: 1 });
+      .sort({ scheduledDate: 1 })
+      .lean();
 
     res.status(200).json({ success: true, schedules });
   } catch (error) {
@@ -558,14 +587,17 @@ const applyStudentLeave = async (req, res) => {
       reason,
     });
 
+    // Invalidate student dashboard cache
+    cache.del(`student_dashboard_${req.user._id}`);
+
     try {
-      const admins = await User.find({ role: 'admin' }).select('_id');
+      const adminIds = await getAdminUserIds();
       const applicantName = req.user.name || req.user.displayName || 'A user';
       const leaveMessage = `${applicantName} applied for leave from ${new Date(fromDate).toDateString()} to ${new Date(toDate).toDateString()}`;
 
-      if (admins.length > 1) {
+      if (adminIds && adminIds.length > 1) {
         await notificationService.sendBulkNotifications({
-          recipientIds: admins.map((admin) => admin._id),
+          recipientIds: adminIds,
           senderId: req.user._id,
           type: 'leave_applied',
           title: 'New Leave Application',
@@ -575,9 +607,9 @@ const applyStudentLeave = async (req, res) => {
           link: '/admin/leaves',
           io: req.app.get('io'),
         });
-      } else if (admins.length === 1) {
+      } else if (adminIds && adminIds.length === 1) {
         await notificationService.sendNotification({
-          recipientId: admins[0]._id,
+          recipientId: adminIds[0],
           senderId: req.user._id,
           type: 'leave_applied',
           title: 'New Leave Application',
@@ -603,7 +635,9 @@ const applyStudentLeave = async (req, res) => {
 // @access  Student
 const getStudentLeaves = async (req, res) => {
   try {
-    const leaves = await LeaveApplication.find({ applicant: req.user._id }).sort({ createdAt: -1 });
+    const leaves = await LeaveApplication.find({ applicant: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean();
     res.status(200).json({ success: true, leaves });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -617,7 +651,8 @@ const getStudentFees = async (req, res) => {
   try {
     const fees = await FeesRecord.find({ student: req.user._id })
       .populate('course', 'title')
-      .sort({ year: -1, monthNumber: -1 });
+      .sort({ year: -1, monthNumber: -1 })
+      .lean();
 
     res.status(200).json({ success: true, fees });
   } catch (error) {
@@ -632,7 +667,8 @@ const getNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })
-      .limit(30);
+      .limit(30)
+      .lean();
 
     // Mark all as read
     await Notification.updateMany({ recipient: req.user._id, isRead: false }, { isRead: true, readAt: new Date() });
@@ -686,7 +722,8 @@ const getChatMessages = async (req, res) => {
     const messages = await ChatMessage.find({ roomId })
       .sort({ createdAt: 1 })
       .limit(100)
-      .populate('sender', 'name role profileImage'); // Only name — no contact info
+      .populate('sender', 'name role profileImage') // Only name — no contact info
+      .lean();
 
     res.status(200).json({ success: true, messages });
   } catch (error) {

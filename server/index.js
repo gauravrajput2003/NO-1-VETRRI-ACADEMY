@@ -62,6 +62,8 @@ const io = new Server(server, {
   },
 });
 
+const compression = require('compression');
+
 // ─── Middleware ────────────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
@@ -77,6 +79,21 @@ app.use(cors({
     }
   },
   credentials: true,
+}));
+
+// Response compression for JSON API responses (skip binary download/stream routes)
+app.use(compression({
+  filter: (req, res) => {
+    if (
+      req.path.includes('/download') ||
+      req.path.includes('/stream') ||
+      req.path.includes('/direct-download') ||
+      req.path.includes('/preview')
+    ) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -110,7 +127,7 @@ app.use('/api/doubts', doubtRoutes);
 app.get('/api/courses', async (req, res) => {
   try {
     const Course = require('./models/Course');
-    const courses = await Course.find({ isActive: true }).sort({ createdAt: 1 });
+    const courses = await Course.find({ isActive: true }).sort({ createdAt: 1 }).lean();
     res.json({ success: true, courses });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
