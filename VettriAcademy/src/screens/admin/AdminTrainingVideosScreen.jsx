@@ -51,7 +51,7 @@ const CAT_COLORS = {
 const getCatColor = (c) => CAT_COLORS[c] || '#6C5CE7';
 const getCatLabel = (k) => CATEGORIES.find(c => c.key === k)?.label || k;
 const formatDur = (s) => { if (!s) return '0:00'; return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`; };
-const EMPTY_FORM = { title:'', description:'', category:'getting-started', videoUrl:'', thumbnailUrl:'', duration:'', isMandatory:false };
+const EMPTY_FORM = { title:'', description:'', category:'getting-started', videoUrl:'', thumbnailUrl:'', duration:'', isMandatory:false, targetAudience:'both' };
 
 function Toast({ msg, type }) {
   if (!msg) return null;
@@ -117,8 +117,8 @@ export default function AdminTrainingVideosScreen({ navigation }) {
     setUploadProgress(0);
     setShowModal(true);
   };
-  const EMPTY_FORM = { title:'', description:'', category:'getting-started', videoUrl:'', thumbnailUrl:'', duration:'', isMandatory:false, targetAudience:'both' };
- const openEdit = (v) => {
+
+  const openEdit = (v) => {
     setEditingId(v._id);
     setSelectedFile(null);
     setUploadMode(v.videoUrl ? 'url' : 'file');
@@ -283,10 +283,6 @@ export default function AdminTrainingVideosScreen({ navigation }) {
           </View>
         </View>
         <View style={{ flex:1, paddingLeft:12 }}>
-          <View style={{ flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-            <View style={[styles.catChip, { backgroundColor:cc+'18' }]}><Text style={[styles.catTxt,{color:cc}]}>{getCatLabel(item.category)}</Text></View>
-            {item.isMandatory && <View style={styles.mandChip}><Text style={styles.mandTxt}>★ Mandatory</Text></View>}
-          </View>
           <View style={{ flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' }}>
             <View style={[styles.catChip, { backgroundColor:cc+'18' }]}><Text style={[styles.catTxt,{color:cc}]}>{getCatLabel(item.category)}</Text></View>
             {item.isMandatory && <View style={styles.mandChip}><Text style={styles.mandTxt}>★ Mandatory</Text></View>}
