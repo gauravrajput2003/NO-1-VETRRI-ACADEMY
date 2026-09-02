@@ -139,9 +139,22 @@ const login = async (req, res) => {
 
     const isEmail = rawId.includes('@');
     const normalizedEmail = rawId.toLowerCase();
+    const digitsOnly = rawId.replace(/\D/g, '');
+    const tenDigitMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+
+    const queryConditions = [
+      { email: normalizedEmail },
+      { mobile: rawId },
+    ];
+    if (tenDigitMobile) {
+      queryConditions.push({ mobile: tenDigitMobile });
+      queryConditions.push({ mobile: `+91${tenDigitMobile}` });
+      queryConditions.push({ mobile: `+91 ${tenDigitMobile}` });
+    }
+
     const baseQuery = isEmail
       ? { email: normalizedEmail }
-      : { $or: [{ mobile: rawId }, { email: normalizedEmail }] };
+      : { $or: queryConditions };
 
     const user = role
       ? await User.findOne({ ...baseQuery, role })
