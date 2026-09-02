@@ -132,7 +132,17 @@ const login = async (req, res) => {
     const role = req.params.role || req.body.role;
     const { identifier, password } = req.body;
 
-    const baseQuery = { $or: [{ mobile: identifier }, { email: identifier }] };
+    const rawId = String(identifier || '').trim();
+    if (!rawId || !password) {
+      return res.status(400).json({ success: false, message: 'Identifier and password are required.' });
+    }
+
+    const isEmail = rawId.includes('@');
+    const normalizedEmail = rawId.toLowerCase();
+    const baseQuery = isEmail
+      ? { email: normalizedEmail }
+      : { $or: [{ mobile: rawId }, { email: normalizedEmail }] };
+
     const user = role
       ? await User.findOne({ ...baseQuery, role })
       : await User.findOne(baseQuery);
@@ -145,7 +155,7 @@ const login = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Account deactivated. Contact admin.' });
     }
 
-    if (!user.isApproved && role === 'teacher') {
+    if (user.role === 'teacher' && user.isApproved === false) {
       return res.status(403).json({ success: false, message: 'Your account is pending admin approval.' });
     }
 

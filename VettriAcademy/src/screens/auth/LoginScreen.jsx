@@ -54,7 +54,8 @@ export default function LoginScreen({ navigation, route }) {
       return;
     }
     dispatch(clearError());
-    const result = await dispatch(loginUser({ identifier: identifier.trim(), password }));
+    const cleanId = identifier.trim().includes('@') ? identifier.trim().toLowerCase() : identifier.trim();
+    const result = await dispatch(loginUser({ identifier: cleanId, password }));
     if (loginUser.fulfilled.match(result)) {
       Toast.show({ type: 'success', text1: 'Welcome! 🎉', text2: 'Logged in successfully' });
     } else {
