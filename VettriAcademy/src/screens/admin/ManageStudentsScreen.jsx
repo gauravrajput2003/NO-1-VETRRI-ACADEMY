@@ -105,6 +105,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
   const [showCreateGradeSuggestions, setShowCreateGradeSuggestions] = useState(false);
   const [createBoardQuery, setCreateBoardQuery] = useState('');
   const [showCreateBoardSuggestions, setShowCreateBoardSuggestions] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
 
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
 
@@ -588,8 +589,21 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={createData.mobile} onChangeText={(v) => setCreateData({ ...createData, mobile: v })} placeholder="Mobile number" placeholderTextColor={Colors.mediumGray} keyboardType="phone-pad" />
             <Text style={[styles.label, { color: textColor }]}>Email</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={createData.email} onChangeText={(v) => setCreateData({ ...createData, email: v })} placeholder="Email (optional)" placeholderTextColor={Colors.mediumGray} autoCapitalize="none" />
-            <Text style={[styles.label, { color: textColor }]}>Password *</Text>
-            <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={createData.password} onChangeText={(v) => setCreateData({ ...createData, password: v })} placeholder="Set login password" placeholderTextColor={Colors.mediumGray} secureTextEntry />
+           <Text style={[styles.label, { color: textColor }]}>Password *</Text>
+<View style={[styles.input, styles.passwordRow, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}>
+  <TextInput
+    style={[styles.passwordInput, { color: textColor }]}
+    value={createData.password}
+    onChangeText={(v) => setCreateData({ ...createData, password: v })}
+    placeholder="Set login password"
+    placeholderTextColor={Colors.mediumGray}
+    secureTextEntry={!showCreatePassword}
+    autoCapitalize="none"
+  />
+  <TouchableOpacity onPress={() => setShowCreatePassword(!showCreatePassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+    <Ionicons name={showCreatePassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={B.sec} />
+  </TouchableOpacity>
+</View>
             <Text style={[styles.label, { color: textColor }]}>Grade</Text>
             <View style={styles.boardAutocompleteWrap}>
               <TextInput
@@ -881,5 +895,7 @@ function createStyles(r) {
     teacherChipActive: { backgroundColor: B.pink, borderColor: B.pink },
     teacherChipText: { fontSize: 13, fontWeight: '600', color: B.sec },
     teacherChipTextActive: { color: B.white },
+    passwordRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+passwordInput: { flex: 1, fontSize: 15, fontFamily: 'Inter', paddingVertical: 6 },
   });
 }

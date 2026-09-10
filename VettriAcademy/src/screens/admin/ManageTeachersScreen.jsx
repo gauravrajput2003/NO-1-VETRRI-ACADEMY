@@ -82,6 +82,7 @@ export default function ManageTeachersScreen({ navigation }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewModal, setViewModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [editData, setEditData] = useState({ name: '', mobile: '', email: '', qualification: '', subjects: '', experience: '', teacherBio: '' });
   const [createData, setCreateData] = useState({
     name: '',
@@ -486,8 +487,21 @@ export default function ManageTeachersScreen({ navigation }) {
             <Text style={[styles.label, { color: textColor }]}>Email *</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={createData.email} onChangeText={(v) => setCreateData({ ...createData, email: v })} placeholder="Email" placeholderTextColor={Colors.mediumGray} autoCapitalize="none" />
 
-            <Text style={[styles.label, { color: textColor }]}>Password *</Text>
-            <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={createData.password} onChangeText={(v) => setCreateData({ ...createData, password: v })} placeholder="Set login password" placeholderTextColor={Colors.mediumGray} secureTextEntry />
+          <Text style={[styles.label, { color: textColor }]}>Password *</Text>
+<View style={[styles.input, styles.passwordRow, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}>
+  <TextInput
+    style={[styles.passwordInput, { color: textColor }]}
+    value={createData.password}
+    onChangeText={(v) => setCreateData({ ...createData, password: v })}
+    placeholder="Set login password"
+    placeholderTextColor={Colors.mediumGray}
+    secureTextEntry={!showCreatePassword}
+    autoCapitalize="none"
+  />
+  <TouchableOpacity onPress={() => setShowCreatePassword(!showCreatePassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+    <Ionicons name={showCreatePassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={B.sec} />
+  </TouchableOpacity>
+</View>
 
             <Text style={[styles.label, { color: textColor }]}>Qualification</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={createData.qualification} onChangeText={(v) => setCreateData({ ...createData, qualification: v })} placeholder="e.g. M.Sc Mathematics" placeholderTextColor={Colors.mediumGray} />
@@ -655,5 +669,7 @@ function createStyles(r) {
     confirmText: { fontSize: 15, fontWeight: '700', color: B.white },
     deleteModalBtn: { flex: 1.2, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
     deleteModalBtnText: { fontSize: 15, fontWeight: '700', color: '#DC2626' },
+    passwordRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+passwordInput: { flex: 1, fontSize: 15, fontFamily: 'Inter', paddingVertical: 6 },
   });
 }
