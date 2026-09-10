@@ -4,7 +4,7 @@ const { verifyToken } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/roleCheck');
 const { uploadAvatar } = require('../middleware/upload');
 const {
-  getProfile, updateProfile, updateAvatar, changePassword,
+  getProfile, updateProfile, updateAvatar, changePassword,forgotPassword,
   updateTeacherPermissions, getTeacherPermissions, getAllTeacherPermissions,
 } = require('../controllers/profileController');
 
@@ -14,7 +14,7 @@ router.put('/', verifyToken, uploadAvatar.single('profilePicture'), updateProfil
 router.patch('/avatar', verifyToken, uploadAvatar.single('avatar'), updateAvatar);
 router.patch('/password', verifyToken, changePassword);
 
-
+router.patch('/forgot-password', verifyToken, forgotPassword);   // ← add this
 router.get('/permissions/teachers', verifyToken, adminOnly, getAllTeacherPermissions);
 router.get('/permissions/teacher/:teacherId', verifyToken, getTeacherPermissions);
 router.patch('/permissions/teacher/:teacherId', verifyToken, adminOnly, updateTeacherPermissions);

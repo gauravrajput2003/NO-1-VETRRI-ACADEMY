@@ -146,6 +146,27 @@ const changePassword = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// ─── Forgot Password (no current password required) ──────────────────────────
+const forgotPassword = async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    user.password = newPassword; // pre-save hook in User model hashes this
+    user.refreshToken = ''; // invalidate old sessions on other devices
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 // ─── Admin: Update Teacher Permissions ───────────────────────────────────────
 const TeacherPermissions = require('../models/TeacherPermissions');
@@ -213,6 +234,7 @@ module.exports = {
   updateProfile,
   updateAvatar,
   changePassword,
+  forgotPassword,  
   updateTeacherPermissions,
   getTeacherPermissions,
   getAllTeacherPermissions,

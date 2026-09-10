@@ -30,6 +30,7 @@ import BookmarkScreen        from '../screens/student/BookmarkScreen';
 import NotesScreen           from '../screens/student/NotesScreen';
 import TopPerformersScreen  from '../screens/student/TopPerformersScreen';
 import DoubtThreadScreen     from '../screens/common/DoubtThreadScreen';
+import ForgotPasswordScreen  from '../screens/common/ForgotPasswordScreen';
 import HeaderActions         from '../components/HeaderActions';
 import StudentTrainingVideosScreen from '../screens/student/StudentTrainingVideosScreen';
 import StudentVideoPlayerScreen    from '../screens/student/StudentVideoPlayerScreen';
@@ -139,6 +140,7 @@ function ProfileStack() {
       <Stack.Screen name="Attendance"    component={AttendanceScreen}   options={{ ...HEADER_OPTS, title: 'Attendance' }} />
       <Stack.Screen name="Leave"         component={StudentLeaveScreen} options={{ ...HEADER_OPTS, title: 'Leave Application' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ ...HEADER_OPTS, title: 'Notifications' }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ ...HEADER_OPTS, title: 'Forgot Password' }} />
       <Stack.Screen name="Settings"      component={SettingsScreen}     options={{ ...HEADER_OPTS, title: 'Settings' }} />
       <Stack.Screen name="DoubtCenter"   component={DiscussScenarioScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DoubtDetail"   component={DoubtThreadScreen} options={{ headerShown: false }} />

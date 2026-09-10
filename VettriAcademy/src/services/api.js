@@ -253,7 +253,8 @@ export const updateProfileAvatarAPI = async (formData) => {
 
 export const changePasswordAPI = (currentPassword, newPassword) =>
   api.patch('/profile/password', { currentPassword, newPassword });
-
+export const forgotPasswordAPI = (newPassword) =>
+  api.patch('/profile/forgot-password', { newPassword });
 // Announcements
 export const getAnnouncementsAPI = (params) =>
   api.get('/announcements', { params });

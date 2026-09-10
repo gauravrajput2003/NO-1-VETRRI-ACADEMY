@@ -25,6 +25,7 @@ import TrainingVideosScreen from '../screens/teacher/TrainingVideosScreen';
 import VideoPlayerScreen from '../screens/teacher/VideoPlayerScreen';
 
 import NotificationsScreen from '../screens/common/NotificationsScreen';
+import ForgotPasswordScreen from '../screens/common/ForgotPasswordScreen';
 import SettingsScreen from '../screens/common/SettingsScreen';
 import ProfileScreen from '../screens/student/ProfileScreen';
 import DownloadCenterScreen from '../screens/common/DownloadCenterScreen';
@@ -118,6 +119,7 @@ function ProfileStack() {
       <Stack.Screen name="TeacherMaterials" component={TeacherMaterialsScreen} options={{ title: 'Manage Materials' }} />
       <Stack.Screen name="MonthlyReport" component={MonthlyReportScreen} options={{ title: 'Monthly Report' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Forgot Password' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />

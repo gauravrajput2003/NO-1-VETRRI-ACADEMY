@@ -20,6 +20,7 @@ import EnquiriesScreen from '../screens/admin/EnquiriesScreen';
 import AdminMaterialsScreen from '../screens/admin/AdminMaterialsScreen';
 import AdminPendingApprovalsScreen from '../screens/admin/AdminPendingApprovalsScreen';
 import LibraryAccessScreen from '../screens/admin/LibraryAccessScreen';
+import ForgotPasswordScreen from '../screens/common/ForgotPasswordScreen';
 import AdminTrainingVideosScreen from '../screens/admin/AdminTrainingVideosScreen';
 import StudentMarksScreen from '../screens/admin/StudentMarksScreen';
 import MonthlyTopRankersScreen from '../screens/admin/MonthlyTopRankersScreen';
@@ -98,6 +99,7 @@ function ProfileStack() {
     <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Forgot Password' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />

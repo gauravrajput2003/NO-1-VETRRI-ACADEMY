@@ -397,22 +397,25 @@ export default function ProfileScreen({ navigation }) {
   const avatarUrl = (avatarSource || getDiceBearUrl(p?._id)).replace('/svg?', '/png?');
   const role = p?.role;
 
-  const menuByRole = {
-    student: [
-      { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
-      { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
-    ],
-    teacher: [
-      { icon: 'document-text-outline', label: 'Manage Materials', screen: 'TeacherMaterials', color: T.purple, description: 'Upload and manage study files', gradient: [T.purple, '#A78BFA'], illustration: 'folder-open' },
-      { icon: 'bar-chart-outline', label: 'Monthly Report', screen: 'MonthlyReport', color: T.teal, description: 'View class performance reports', gradient: [T.teal, T.tealLight], illustration: 'analytics' },
-      { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
-      { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
-    ],
-    admin: [
-      { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
-      { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
-    ],
-  };
+ const menuByRole = {
+  student: [
+    { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
+    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },   // ← new
+    { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
+  ],
+  teacher: [
+    { icon: 'document-text-outline', label: 'Manage Materials', screen: 'TeacherMaterials', color: T.purple, description: 'Upload and manage study files', gradient: [T.purple, '#A78BFA'], illustration: 'folder-open' },
+    { icon: 'bar-chart-outline', label: 'Monthly Report', screen: 'MonthlyReport', color: T.teal, description: 'View class performance reports', gradient: [T.teal, T.tealLight], illustration: 'analytics' },
+    { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
+    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },   // ← new
+    { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
+  ],
+  admin: [
+    { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
+    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },   // ← new
+    { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
+  ],
+};
 
   const secondaryItems = menuByRole[role] || menuByRole.student;
   const featureItems = role === 'student'
