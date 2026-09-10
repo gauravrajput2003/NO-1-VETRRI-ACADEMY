@@ -214,7 +214,50 @@ const login = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// ─── Forgot Password (public — no OTP, identifies by mobile/email) ───────────
+const forgotPasswordPublic = async (req, res) => {
+  try {
+    const { identifier, newPassword } = req.body;
+    const rawId = String(identifier || '').trim();
 
+    if (!rawId || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Mobile/Email and new password are required.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
+    }
+
+    const isEmail = rawId.includes('@');
+    const normalizedEmail = rawId.toLowerCase();
+    const digitsOnly = rawId.replace(/\D/g, '');
+    const tenDigitMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+
+    const queryConditions = [
+      { email: normalizedEmail },
+      { mobile: rawId },
+    ];
+    if (tenDigitMobile) {
+      queryConditions.push({ mobile: tenDigitMobile });
+      queryConditions.push({ mobile: `+91${tenDigitMobile}` });
+      queryConditions.push({ mobile: `+91 ${tenDigitMobile}` });
+    }
+
+    const baseQuery = isEmail ? { email: normalizedEmail } : { $or: queryConditions };
+    const user = await User.findOne(baseQuery);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with this mobile or email.' });
+    }
+
+    user.password = newPassword; // pre-save hook hashes it
+    user.refreshToken = '';      // logs out other sessions
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login with your new password.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 // ─── Logout ───────────────────────────────────────────────────────────────────
 const logout = async (req, res) => {
   try {
@@ -331,4 +374,6 @@ module.exports = {
   refreshAccessToken,
   getCoursesMeta,
   savePushToken,
+    forgotPasswordPublic,   // ← add this
+
 };

@@ -255,6 +255,9 @@ export const changePasswordAPI = (currentPassword, newPassword) =>
   api.patch('/profile/password', { currentPassword, newPassword });
 export const forgotPasswordAPI = (newPassword) =>
   api.patch('/profile/forgot-password', { newPassword });
+// Public (from Login screen, user not authenticated)
+export const forgotPasswordPublicAPI = (identifier, newPassword) =>
+  api.post('/auth/forgot-password', { identifier, newPassword});
 // Announcements
 export const getAnnouncementsAPI = (params) =>
   api.get('/announcements', { params });

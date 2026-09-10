@@ -165,6 +165,12 @@ export default function LoginScreen({ navigation, route }) {
                   <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={C.textMuted} />
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity
+  onPress={() => navigation.navigate('ForgotPassword', { standalone: true })}
+  style={{ alignSelf: 'flex-end', marginBottom: 4 }}
+>
+  <Text style={{ color: C.pink, fontSize: 13, fontWeight: '700' }}>Forgot Password?</Text>
+</TouchableOpacity>
 
               {error ? (
                 <View style={st.errorBox}>
