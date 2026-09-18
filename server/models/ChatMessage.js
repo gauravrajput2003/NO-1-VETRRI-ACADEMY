@@ -10,13 +10,13 @@ const chatMessageSchema = new mongoose.Schema(
     message: { type: String, trim: true },
     messageType: {
       type: String,
-      enum: ['text', 'file', 'image', 'system'],
+      enum: ['text', 'file', 'image', 'video', 'audio', 'system'],
       default: 'text',
     },
     fileUrl: { type: String }, // Cloudinary URL
     fileType: {
       type: String,
-      enum: ['pdf', 'image', 'ppt', 'doc', null],
+      enum: ['pdf', 'image', 'ppt', 'doc', 'video', 'audio', null],
       default: null,
     },
     fileName: { type: String },

@@ -31,6 +31,7 @@ import NotesScreen           from '../screens/student/NotesScreen';
 import TopPerformersScreen  from '../screens/student/TopPerformersScreen';
 import DoubtThreadScreen     from '../screens/common/DoubtThreadScreen';
 import ForgotPasswordScreen  from '../screens/common/ForgotPasswordScreen';
+import ChatRoomScreen        from '../screens/student/ChatRoomScreen';
 import HeaderActions         from '../components/HeaderActions';
 import StudentTrainingVideosScreen from '../screens/student/StudentTrainingVideosScreen';
 import StudentVideoPlayerScreen    from '../screens/student/StudentVideoPlayerScreen';
@@ -79,6 +80,7 @@ function HomeStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="StudentDashboard" component={DashboardScreen}       options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom"         component={ChatRoomScreen}         options={{ headerShown: false }} />
       <Stack.Screen name="Notifications"    component={NotificationsScreen}   options={{ headerShown: false }} />
       <Stack.Screen name="ClassDetail"      component={ClassDetailScreen}     options={{ headerShown: false }} />
       <Stack.Screen name="Classes"          component={ClassesScreen}         options={{ ...HEADER_OPTS, title: 'Classes' }} />

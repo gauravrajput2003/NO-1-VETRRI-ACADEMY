@@ -16,9 +16,9 @@ import Toast from 'react-native-toast-message';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
-import { formatScheduledTime } from '../../utils/formatters';
 import { fetchTodayClasses, fetchUpcomingClasses, joinClass, clearJoinResult } from '../../redux/slices/classesSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
+import { fetchAdminContact, fetchUnreadCount as fetchChatUnreadCount } from '../../redux/slices/chatSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
 import { getStudentDashboardAPI, getActiveAnnouncementsAPI } from '../../services/api';
 import { Colors } from '../../utils/colors';
@@ -56,6 +56,7 @@ function shade(hex, amt = 28) {
 }
 
 const CATEGORIES = [
+  { id: 'admin_chat', label: 'Admin Desk', icon: 'chatbubbles', action: 'chat', tint: D.pink },
   { id: '1', label: 'Lessons',    icon: 'book',        screen: 'Materials',  tint: D.pink   },
   { id: '2', label: 'Classes',    icon: 'school',       screen: 'Classes',    tint: D.teal   },
   { id: '3', label: 'Scores',     icon: 'bar-chart',    screen: 'ExamScores', tint: D.golden },
@@ -138,6 +139,7 @@ export default function DashboardScreen({ navigation }) {
   const { user } = useSelector((s) => s.auth);
   const { todayClasses, joinResult } = useSelector((s) => s.classes);
   const { unreadCount } = useSelector((s) => s.notifications);
+  const { adminContact, unreadCount: unreadChatCount } = useSelector((s) => s.chat);
   const insets = useSafeAreaInsets();
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
@@ -147,6 +149,23 @@ export default function DashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('1');
+
+  const handleChatWithAdmin = async () => {
+    let admin = adminContact;
+    if (!admin) {
+      const res = await dispatch(fetchAdminContact()).unwrap().catch(() => null);
+      admin = res;
+    }
+    if (admin && user?._id) {
+      const conversationId = [user._id.toString(), admin._id.toString()].sort().join('_');
+      navigation.navigate('ChatRoom', {
+        conversationId,
+        otherUser: admin,
+      });
+    } else {
+      Toast.show({ type: 'info', text1: 'Admin desk not available' });
+    }
+  };
 
   useEffect(() => {
     if (joinResult) {
@@ -179,6 +198,7 @@ export default function DashboardScreen({ navigation }) {
       dispatch(fetchTodayClasses());
       dispatch(fetchUpcomingClasses());
       dispatch(fetchUnreadNotificationCount());
+      dispatch(fetchChatUnreadCount());
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {
@@ -279,6 +299,14 @@ const myTeachers = dashboard?.assignedTeachers || [];
             <View style={[st.heroTopActions, { top: insets.top + 10 }]}>
               <TouchableOpacity style={st.heroGlassBtn} onPress={() => dispatch(toggleAI())}>
                 <Ionicons name="sparkles" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={st.heroGlassBtn} onPress={handleChatWithAdmin}>
+                <Ionicons name="chatbubbles-outline" size={24} color="#FFFFFF" />
+                {unreadChatCount > 0 && (
+                  <View style={st.notifBadge}>
+                    <Text style={st.notifBadgeText}>{unreadChatCount > 9 ? '9+' : unreadChatCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <TouchableOpacity style={st.heroGlassBtn} onPress={() => navigation.navigate('Notifications')}>
                 <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
@@ -416,8 +444,13 @@ const myTeachers = dashboard?.assignedTeachers || [];
                   style={st.exploreTileWrap}
                   onPress={() => {
                     setActiveCategory(cat.id);
-                    if (cat.screen === 'ExamScores') navigation.navigate('ExamScores');
-                    else navigation.navigate(cat.screen);
+                    if (cat.action === 'chat') {
+                      handleChatWithAdmin();
+                    } else if (cat.screen === 'ExamScores') {
+                      navigation.navigate('ExamScores');
+                    } else if (cat.screen) {
+                      navigation.navigate(cat.screen);
+                    }
                   }}
                 >
                   {active ? (

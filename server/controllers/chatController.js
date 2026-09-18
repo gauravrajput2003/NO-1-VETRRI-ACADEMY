@@ -1,15 +1,98 @@
 const ChatMessage = require('../models/ChatMessage');
 const Conversation = require('../models/Conversation');
+const User = require('../models/User');
 const TeacherPermissions = require('../models/TeacherPermissions');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
 
+// ─── Get Admin Contact Info ───────────────────────────────────────────────────
+// For Students and Teachers to initiate their private chat with Admin
+const getAdminContact = async (req, res) => {
+  try {
+    const admin = await User.findOne({ role: 'admin', isActive: true })
+      .select('name displayName profilePic role isOnline lastSeen')
+      .lean();
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin contact not found' });
+    }
+
+    res.json({ success: true, admin });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── Admin Only: Get Directory of Users (Teachers & Students) for Chat ───────
+const getChatUsers = async (req, res) => {
+  try {
+    const { role = 'all', search = '', page = 1, limit = 50 } = req.query;
+    const filter = { isActive: true };
+
+    if (role === 'teacher') {
+      filter.role = 'teacher';
+    } else if (role === 'student') {
+      filter.role = 'student';
+    } else {
+      filter.role = { $in: ['teacher', 'student'] };
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { displayName: { $regex: q, $options: 'i' } },
+        { mobile: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+        { grade: { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const users = await User.find(filter)
+      .select('name displayName profilePic role grade board mobile subjects isOnline lastSeen')
+      .sort({ name: 1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
+
+    const total = await User.countDocuments(filter);
+
+    // Attach conversation snippet and unread counts for Admin if available
+    const adminId = req.user._id.toString();
+    const userIds = users.map(u => u._id.toString());
+    const convIds = userIds.map(id => [adminId, id].sort().join('_'));
+
+    const conversations = await Conversation.find({ conversationId: { $in: convIds } }).lean();
+    const convMap = {};
+    conversations.forEach(c => {
+      convMap[c.conversationId] = c;
+    });
+
+    const enrichedUsers = users.map(u => {
+      const cId = [adminId, u._id.toString()].sort().join('_');
+      const conv = convMap[cId];
+      return {
+        ...u,
+        conversationId: cId,
+        lastMessage: conv?.lastMessage || '',
+        lastMessageAt: conv?.lastMessageAt || null,
+        unreadCount: (conv?.unreadCount && conv.unreadCount[adminId]) || 0,
+      };
+    });
+
+    res.json({ success: true, users: enrichedUsers, total, page: parseInt(page) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─── Get Conversations ────────────────────────────────────────────────────────
+// Strictly returns conversations where the current user is a participant.
 const getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
     const conversations = await Conversation.find({ participants: userId })
       .sort({ lastMessageAt: -1 })
-      .populate('participants', 'name displayName profilePic role isOnline lastSeen');
+      .populate('participants', 'name displayName profilePic role isOnline lastSeen grade board subjects');
 
     res.json({ success: true, conversations });
   } catch (error) {
@@ -21,7 +104,14 @@ const getConversations = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 30 } = req.query;
+    const userId = req.user._id.toString();
+
+    // Authorization check: User must be part of this conversationId or an Admin
+    const isParticipant = conversationId.split('_').includes(userId);
+    if (!isParticipant && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied to this conversation.' });
+    }
 
     const messages = await ChatMessage.find({ conversationId, isDeleted: false })
       .sort({ createdAt: -1 })
@@ -51,17 +141,32 @@ const sendMessage = async (req, res) => {
     const senderId = req.user._id;
     const io = req.app.get('io');
 
-    // Validate permissions for teachers
+    if (!receiverId || !message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'receiverId and message are required.' });
+    }
+
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ success: false, message: 'Recipient user not found.' });
+    }
+
+    // Role-based Authorization:
+    // Teachers and Students can ONLY chat directly with Admin
+    if (req.user.role === 'student' || req.user.role === 'teacher') {
+      if (receiver.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Direct messaging is only available between students/teachers and the Admin desk.',
+        });
+      }
+    }
+
+    // Validate permissions for teachers if communicating with admin
     if (req.user.role === 'teacher') {
       const canSend = await checkPermission(senderId, 'canSendMessages');
       if (!canSend) {
         return res.status(403).json({ success: false, message: 'Message permission disabled by admin.' });
       }
-    }
-
-    // Students cannot initiate to non-teachers
-    if (req.user.role === 'student') {
-      // Students can only reply/message their assigned teacher — validated in route
     }
 
     const conversationId = ChatMessage.getConversationId(senderId, receiverId);
@@ -72,7 +177,7 @@ const sendMessage = async (req, res) => {
       senderDisplayName: req.user.displayName || req.user.name,
       receiverId,
       conversationId,
-      message,
+      message: message.trim(),
       messageType: 'text',
       // Legacy compat
       sender: senderId,
@@ -80,12 +185,12 @@ const sendMessage = async (req, res) => {
       roomId: conversationId,
     });
 
-    // Update conversation
+    // Update or insert conversation record
     await Conversation.findOneAndUpdate(
       { conversationId },
       {
         $setOnInsert: { conversationId, participants: [senderId, receiverId] },
-        lastMessage: message.substring(0, 100),
+        lastMessage: message.trim().substring(0, 100),
         lastMessageAt: new Date(),
         lastMessageBy: senderId,
         $inc: { [`unreadCount.${receiverId}`]: 1 },
@@ -96,8 +201,10 @@ const sendMessage = async (req, res) => {
     const populated = await ChatMessage.findById(msg._id)
       .populate('senderId', 'name displayName profilePic role');
 
-    // Emit to both parties
-    io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:message', populated);
+    // Real-time notification to both parties via Socket.io
+    if (io) {
+      io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:message', populated);
+    }
 
     res.status(201).json({ success: true, message: populated });
   } catch (error) {
@@ -105,7 +212,7 @@ const sendMessage = async (req, res) => {
   }
 };
 
-// ─── Send File ────────────────────────────────────────────────────────────────
+// ─── Send File / Media (Image, PDF, Audio, Video, Document) ──────────────────
 const sendFile = async (req, res) => {
   try {
     const { receiverId } = req.body;
@@ -113,10 +220,22 @@ const sendFile = async (req, res) => {
     const io = req.app.get('io');
 
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    if (!receiverId) return res.status(400).json({ success: false, message: 'receiverId is required.' });
 
-    // Students cannot send files
-    if (req.user.role === 'student') {
-      return res.status(403).json({ success: false, message: 'Students cannot send files.' });
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ success: false, message: 'Recipient user not found.' });
+    }
+
+    // Role-based Authorization:
+    // Teachers and Students can only send media directly to Admin
+    if (req.user.role === 'student' || req.user.role === 'teacher') {
+      if (receiver.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Direct media messaging is only allowed with Admin.',
+        });
+      }
     }
 
     // Check teacher file sharing permission
@@ -127,21 +246,44 @@ const sendFile = async (req, res) => {
       }
     }
 
+    // Detect media types
+    const mime = (req.file.mimetype || '').toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const isVideo = mime.startsWith('video/');
+    const isAudio = mime.startsWith('audio/');
+    const isPdf = mime === 'application/pdf';
+    const isPpt = mime.includes('presentation') || mime.includes('powerpoint');
+
+    let messageType = 'file';
+    let fileType = 'doc';
+
+    if (isImage) {
+      messageType = 'image';
+      fileType = 'image';
+    } else if (isVideo) {
+      messageType = 'video';
+      fileType = 'video';
+    } else if (isAudio) {
+      messageType = 'audio';
+      fileType = 'audio';
+    } else if (isPdf) {
+      messageType = 'file';
+      fileType = 'pdf';
+    } else if (isPpt) {
+      messageType = 'file';
+      fileType = 'ppt';
+    }
+
+    const cloudinaryResourceType = getResourceType(mime);
+
     // Upload to Cloudinary
-    const isImage = req.file.mimetype.startsWith('image/');
     const result = await uploadToCloudinary(req.file.buffer, {
       folder: 'vettri-academy/chat-files',
-      resource_type: isImage ? 'image' : 'raw',
+      resource_type: cloudinaryResourceType,
       public_id: `chat_${Date.now()}`,
     });
 
     const conversationId = ChatMessage.getConversationId(senderId, receiverId);
-
-    // Detect fileType
-    let fileType = 'doc';
-    if (isImage) fileType = 'image';
-    else if (req.file.mimetype === 'application/pdf') fileType = 'pdf';
-    else if (req.file.mimetype.includes('presentation')) fileType = 'ppt';
 
     const msg = await ChatMessage.create({
       senderId,
@@ -149,7 +291,7 @@ const sendFile = async (req, res) => {
       senderDisplayName: req.user.displayName || req.user.name,
       receiverId,
       conversationId,
-      messageType: isImage ? 'image' : 'file',
+      messageType,
       fileUrl: result.secure_url,
       fileType,
       fileName: req.file.originalname,
@@ -160,11 +302,17 @@ const sendFile = async (req, res) => {
       roomId: conversationId,
     });
 
+    let previewLabel = `📎 ${req.file.originalname}`;
+    if (isImage) previewLabel = '📷 Photo';
+    else if (isVideo) previewLabel = '🎥 Video';
+    else if (isAudio) previewLabel = '🎙️ Audio';
+    else if (isPdf) previewLabel = '📄 PDF Document';
+
     await Conversation.findOneAndUpdate(
       { conversationId },
       {
         $setOnInsert: { conversationId, participants: [senderId, receiverId] },
-        lastMessage: `📎 ${req.file.originalname}`,
+        lastMessage: previewLabel,
         lastMessageAt: new Date(),
         lastMessageBy: senderId,
         $inc: { [`unreadCount.${receiverId}`]: 1 },
@@ -175,7 +323,9 @@ const sendFile = async (req, res) => {
     const populated = await ChatMessage.findById(msg._id)
       .populate('senderId', 'name displayName profilePic role');
 
-    io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:file', populated);
+    if (io) {
+      io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:file', populated);
+    }
 
     res.status(201).json({ success: true, message: populated });
   } catch (error) {
@@ -201,7 +351,9 @@ const markAsRead = async (req, res) => {
     );
 
     const io = req.app.get('io');
-    io.to(`user:${userId}`).emit('chat:read', { conversationId, readBy: userId });
+    if (io) {
+      io.to(`user:${userId}`).emit('chat:read', { conversationId, readBy: userId });
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -269,6 +421,8 @@ const getChatLogs = async (req, res) => {
 };
 
 module.exports = {
+  getAdminContact,
+  getChatUsers,
   getConversations,
   getMessages,
   sendMessage,

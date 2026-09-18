@@ -1,5 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getConversationsAPI, getMessagesAPI, sendMessageAPI, markAsReadAPI, getUnreadCountAPI } from '../../services/api';
+import {
+  getConversationsAPI,
+  getMessagesAPI,
+  sendMessageAPI,
+  markAsReadAPI,
+  getUnreadCountAPI,
+  getAdminContactAPI,
+  getChatUsersAPI,
+} from '../../services/api';
+
+export const fetchAdminContact = createAsyncThunk('chat/fetchAdminContact', async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await getAdminContactAPI();
+    return data.admin;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to load admin contact');
+  }
+});
+
+export const fetchChatUsers = createAsyncThunk('chat/fetchChatUsers', async (params = {}, { rejectWithValue }) => {
+  try {
+    const { data } = await getChatUsersAPI(params);
+    return data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to load users');
+  }
+});
 
 export const fetchConversations = createAsyncThunk('chat/fetchConversations', async (_, { rejectWithValue }) => {
   try {
@@ -50,7 +76,11 @@ const chatSlice = createSlice({
     currentConversationId: null,
     totalMessages: 0,
     unreadCount: 0,
+    adminContact: null,
+    chatUsers: [],
+    chatUsersTotal: 0,
     loading: false,
+    usersLoading: false,
     error: null,
     typingUsers: {},
   },
@@ -65,12 +95,19 @@ const chatSlice = createSlice({
         if (!exists) state.messages.push(msg);
       }
       // Update conversation list
+      let found = false;
       state.conversations = state.conversations.map((conv) => {
         if (conv.conversationId === msg.conversationId) {
-          return { ...conv, lastMessage: msg.message || `📎 File`, lastMessageAt: msg.createdAt };
+          found = true;
+          return {
+            ...conv,
+            lastMessage: msg.message || (msg.messageType === 'image' ? '📷 Photo' : msg.messageType === 'video' ? '🎥 Video' : msg.messageType === 'audio' ? '🎙️ Audio' : `📎 ${msg.fileName || 'File'}`),
+            lastMessageAt: msg.createdAt,
+          };
         }
         return conv;
       });
+      // If not found in list, trigger re-fetch or add stub
     },
     setTyping: (state, action) => {
       const { conversationId, userId, isTyping } = action.payload;
@@ -84,9 +121,32 @@ const chatSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Admin contact
+      .addCase(fetchAdminContact.fulfilled, (state, action) => {
+        state.adminContact = action.payload;
+      })
+      // Chat users directory
+      .addCase(fetchChatUsers.pending, (state) => { state.usersLoading = true; })
+      .addCase(fetchChatUsers.fulfilled, (state, action) => {
+        state.usersLoading = false;
+        state.chatUsers = action.payload.users;
+        state.chatUsersTotal = action.payload.total;
+      })
+      .addCase(fetchChatUsers.rejected, (state, action) => {
+        state.usersLoading = false;
+        state.error = action.payload;
+      })
+      // Conversations
       .addCase(fetchConversations.pending, (state) => { state.loading = true; })
-      .addCase(fetchConversations.fulfilled, (state, action) => { state.loading = false; state.conversations = action.payload; })
-      .addCase(fetchConversations.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(fetchConversations.fulfilled, (state, action) => {
+        state.loading = false;
+        state.conversations = action.payload;
+      })
+      .addCase(fetchConversations.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Messages
       .addCase(fetchMessages.pending, (state) => { state.loading = true; })
       .addCase(fetchMessages.fulfilled, (state, action) => {
         state.loading = false;
@@ -98,18 +158,26 @@ const chatSlice = createSlice({
         state.totalMessages = action.payload.total;
         state.currentConversationId = action.payload.conversationId;
       })
-      .addCase(fetchMessages.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(fetchMessages.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Send message
       .addCase(sendMessage.fulfilled, (state, action) => {
         const msg = action.payload;
         const exists = state.messages.find((m) => m._id === msg._id);
         if (!exists) state.messages.push(msg);
       })
+      // Mark read
       .addCase(markConversationRead.fulfilled, (state, action) => {
         state.conversations = state.conversations.map((c) =>
           c.conversationId === action.payload ? { ...c, unreadCount: { ...c.unreadCount } } : c
         );
       })
-      .addCase(fetchUnreadCount.fulfilled, (state, action) => { state.unreadCount = action.payload; });
+      // Unread count
+      .addCase(fetchUnreadCount.fulfilled, (state, action) => {
+        state.unreadCount = action.payload;
+      });
   },
 });
 

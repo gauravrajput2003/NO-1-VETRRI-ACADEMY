@@ -21,6 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchTeacherDashboard, fetchTeacherMaterials, fetchTeacherStudents } from '../../redux/slices/teacherSlice';
 import { fetchTodayClasses } from '../../redux/slices/classesSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
+import { fetchAdminContact, fetchUnreadCount as fetchChatUnreadCount } from '../../redux/slices/chatSlice';
 import { fetchDoubtMetrics } from '../../redux/slices/doubtsSlice';
 import { getActiveAnnouncementsAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
@@ -272,13 +273,31 @@ export default function TeacherDashboard({ navigation }) {
     { value: overview.pendingLeaves || 0, label: 'Pending Leaves', tint: T.pink, glow: 'rgba(255,77,141,0.14)', image: ASSETS.study, trend: 'Awaiting', trendIcon: 'time-outline', screen: 'Leave' },
   ];
 
+  const { adminContact, unreadCount: unreadChatCount } = useSelector((s) => s.chat);
+
+  const handleChatWithAdmin = async () => {
+    let admin = adminContact;
+    if (!admin) {
+      const res = await dispatch(fetchAdminContact()).unwrap().catch(() => null);
+      admin = res;
+    }
+    if (admin && user?._id) {
+      const conversationId = [user._id.toString(), admin._id.toString()].sort().join('_');
+      navigation.navigate('ChatRoom', {
+        conversationId,
+        otherUser: admin,
+      });
+    }
+  };
+
   const quickActions = useMemo(() => ([
+    { id: 'admin_chat', title: 'Admin Desk', subtitle: 'Direct 1-on-1 Chat', onPress: handleChatWithAdmin, gradient: ['#FF4D8D', '#FF8A00'], icon: 'chatbubbles-outline' },
     { id: 'live', title: 'Live Class', subtitle: 'Go Live Now', screen: 'LiveClass', gradient: ['#2563EB', '#60A5FA'], image: ASSETS.camera },
     { id: 'doubts', title: 'Doubts', subtitle: 'View & Reply', screen: 'DoubtCenter', gradient: [T.orange, '#FFB347'], image: ASSETS.question },
     { id: 'materials', title: 'Materials', subtitle: 'Upload & Manage', screen: 'TeacherMaterials', gradient: [T.teal, T.tealLight], image: ASSETS.book },
     { id: 'students', title: 'Students', subtitle: 'View All', screen: 'Students', gradient: [T.pink, '#FF7EB3'], image: ASSETS.studentGroup },
     { id: 'salary', title: 'Salary', subtitle: 'View & Download', screen: 'Salary', gradient: ['#F59E0B', T.gold], icon: 'cash-outline' },
-  ]), []);
+  ]), [adminContact, user?._id]);
 
   const openMenu = () => navigation.getParent()?.navigate('Profile');
   const openSchedule = () => navigation.getParent()?.navigate('Schedule');
@@ -337,6 +356,16 @@ export default function TeacherDashboard({ navigation }) {
           <ParticleWrapper>
             <TouchableOpacity style={st.glassBtn} onPress={openMenu} activeOpacity={0.8}>
               <Ionicons name="grid" size={24} color={T.white} />
+            </TouchableOpacity>
+          </ParticleWrapper>
+          <ParticleWrapper>
+            <TouchableOpacity style={st.whiteIconBtn} onPress={handleChatWithAdmin} activeOpacity={0.8}>
+              <Ionicons name="chatbubbles" size={24} color="#E83E8C" />
+              {unreadChatCount > 0 && (
+                <View style={st.notifBadge}>
+                  <Text style={st.notifBadgeText}>{unreadChatCount > 9 ? '9+' : unreadChatCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </ParticleWrapper>
           <ParticleWrapper>

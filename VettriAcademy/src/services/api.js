@@ -195,11 +195,17 @@ export const joinClassAPI = (id) =>
   api.post(`/classes/${id}/join`);
 
 // Chat
+export const getAdminContactAPI = () =>
+  api.get('/chat/admin-contact');
+
+export const getChatUsersAPI = (params) =>
+  api.get('/chat/users', { params });
+
 export const getConversationsAPI = () =>
   api.get('/chat/conversations');
 
 export const getMessagesAPI = (conversationId, page = 1) =>
-  api.get(`/chat/messages/${conversationId}`, { params: { page, limit: 20 } });
+  api.get(`/chat/messages/${conversationId}`, { params: { page, limit: 30 } });
 
 export const sendMessageAPI = (receiverId, message) =>
   api.post('/chat/send', { receiverId, message });

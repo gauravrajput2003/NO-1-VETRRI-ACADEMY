@@ -99,6 +99,18 @@ const ALLOWED_MIMETYPES = {
     'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
     'text/plain', // .txt
   ],
+  audio: [
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/webm',
+    'audio/mp4',
+    'audio/aac',
+    'audio/ogg',
+    'audio/m4a',
+    'audio/x-m4a',
+  ],
   archive: [
     'application/zip',
     'application/x-rar-compressed',
@@ -207,20 +219,23 @@ const uploadVideo = multer({
 
 /**
  * CHAT FILE UPLOAD
- * - Memory storage (chat files usually small)
- * - Max 25MB
- * - Images, PDFs, documents
+ * - Memory storage (chat files buffer to Cloudinary)
+ * - Max 100MB
+ * - Images, Videos, Audio, PDFs, documents
  */
 const uploadChatFile = multer({
   storage: memStorage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
   fileFilter: (req, file, cb) => {
     const allowed = [
       ...ALLOWED_MIMETYPES.image,
+      ...ALLOWED_MIMETYPES.video,
+      ...ALLOWED_MIMETYPES.audio,
       ...ALLOWED_MIMETYPES.document,
+      'application/octet-stream',
     ];
     if (!isMimetypeAllowed(file.mimetype, allowed)) {
-      return cb(new Error('Only images and documents allowed for chat'));
+      return cb(new Error('File type not supported for chat. Allowed: Images, Videos, Audio, PDFs, and Documents.'));
     }
     cb(null, true);
   },
@@ -313,7 +328,7 @@ const uploadToCloudinary = (buffer, options = {}) => {
 // ────────────────────────────────────────────────────────────────────────────
 
 const getResourceType = (mimetype) => {
-  if (mimetype.startsWith('video/')) return 'video';
+  if (mimetype.startsWith('video/') || mimetype.startsWith('audio/')) return 'video';
   if (mimetype.startsWith('image/')) return 'image';
   return 'raw';
 };
