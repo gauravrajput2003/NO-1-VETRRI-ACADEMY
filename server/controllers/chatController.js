@@ -3,12 +3,13 @@ const Conversation = require('../models/Conversation');
 const User = require('../models/User');
 const TeacherPermissions = require('../models/TeacherPermissions');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
+const { sendPushNotifications } = require('../services/pushService');
 
 // ─── Get Admin Contact Info ───────────────────────────────────────────────────
 // For Students and Teachers to initiate their private chat with Admin
 const getAdminContact = async (req, res) => {
   try {
-    const admin = await User.findOne({ role: 'admin', isActive: true })
+    const admin = await User.findOne({ role: 'admin' })
       .select('name displayName profilePic role isOnline lastSeen')
       .lean();
 
@@ -25,8 +26,8 @@ const getAdminContact = async (req, res) => {
 // ─── Admin Only: Get Directory of Users (Teachers & Students) for Chat ───────
 const getChatUsers = async (req, res) => {
   try {
-    const { role = 'all', search = '', page = 1, limit = 50 } = req.query;
-    const filter = { isActive: true };
+    const { role = 'all', search = '', page = 1, limit = 200 } = req.query;
+    const filter = {};
 
     if (role === 'teacher') {
       filter.role = 'teacher';
@@ -206,6 +207,22 @@ const sendMessage = async (req, res) => {
       io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:message', populated);
     }
 
+    // Send Expo push notification to receiver if offline/backgrounded
+    if (receiver && receiver.expoPushToken) {
+      const senderName = req.user.displayName || req.user.name || 'New Message';
+      sendPushNotifications([receiver.expoPushToken], {
+        title: senderName,
+        body: message.trim().substring(0, 150),
+        data: {
+          type: 'chat_message',
+          conversationId,
+          senderId: senderId.toString(),
+          senderName,
+          senderRole: req.user.role,
+        },
+      }).catch((pushErr) => console.error('[Chat Push] Notification failed:', pushErr.message));
+    }
+
     res.status(201).json({ success: true, message: populated });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -325,6 +342,22 @@ const sendFile = async (req, res) => {
 
     if (io) {
       io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:file', populated);
+    }
+
+    // Send Expo push notification for file/media attachment
+    if (receiver && receiver.expoPushToken) {
+      const senderName = req.user.displayName || req.user.name || 'New Attachment';
+      sendPushNotifications([receiver.expoPushToken], {
+        title: senderName,
+        body: previewLabel,
+        data: {
+          type: 'chat_message',
+          conversationId,
+          senderId: senderId.toString(),
+          senderName,
+          senderRole: req.user.role,
+        },
+      }).catch((pushErr) => console.error('[Chat File Push] Notification failed:', pushErr.message));
     }
 
     res.status(201).json({ success: true, message: populated });

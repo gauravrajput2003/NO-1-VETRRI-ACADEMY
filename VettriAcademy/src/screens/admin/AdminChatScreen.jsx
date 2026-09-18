@@ -44,10 +44,19 @@ export default function AdminChatScreen({ navigation }) {
   const textColor = isDark ? Colors.text.dark : '#1E293B';
   const textSec = isDark ? Colors.textSecondary.dark : '#64748B';
 
+  const teacherCount = useMemo(
+    () => (chatUsers || []).filter((u) => u.role?.toLowerCase() === 'teacher').length,
+    [chatUsers]
+  );
+  const studentCount = useMemo(
+    () => (chatUsers || []).filter((u) => u.role?.toLowerCase() === 'student').length,
+    [chatUsers]
+  );
+
   const loadData = useCallback(() => {
     dispatch(fetchConversations());
-    dispatch(fetchChatUsers({ role: activeTab, search: searchQuery }));
-  }, [dispatch, activeTab, searchQuery]);
+    dispatch(fetchChatUsers({ role: 'all', limit: 500 }));
+  }, [dispatch]);
 
   useEffect(() => {
     loadData();
@@ -57,10 +66,10 @@ export default function AdminChatScreen({ navigation }) {
     setRefreshing(true);
     await Promise.all([
       dispatch(fetchConversations()),
-      dispatch(fetchChatUsers({ role: activeTab, search: searchQuery })),
+      dispatch(fetchChatUsers({ role: 'all', limit: 500 })),
     ]);
     setRefreshing(false);
-  }, [dispatch, activeTab, searchQuery]);
+  }, [dispatch]);
 
   const handleSelectUser = (targetUser) => {
     const adminId = currentUser?._id?.toString() || '';
@@ -74,16 +83,17 @@ export default function AdminChatScreen({ navigation }) {
   };
 
   const filteredUsers = useMemo(() => {
-    if (!chatUsers) return [];
+    if (!chatUsers || !Array.isArray(chatUsers)) return [];
     return chatUsers.filter((u) => {
-      if (activeTab === 'teacher' && u.role !== 'teacher') return false;
-      if (activeTab === 'student' && u.role !== 'student') return false;
+      if (activeTab === 'teacher' && u.role?.toLowerCase() !== 'teacher') return false;
+      if (activeTab === 'student' && u.role?.toLowerCase() !== 'student') return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = (u.name || '').toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q);
         const matchGrade = (u.grade || '').toLowerCase().includes(q);
         const matchMobile = (u.mobile || '').includes(q);
-        return matchName || matchGrade || matchMobile;
+        const matchEmail = (u.email || '').toLowerCase().includes(q);
+        return matchName || matchGrade || matchMobile || matchEmail;
       }
       return true;
     });
@@ -184,9 +194,9 @@ export default function AdminChatScreen({ navigation }) {
         {/* Tab Filters */}
         <View style={styles.tabBar}>
           {[
-            { id: 'all', label: 'All Users', icon: 'people' },
-            { id: 'teacher', label: 'Teachers', icon: 'school' },
-            { id: 'student', label: 'Students', icon: 'person' },
+            { id: 'all', label: `All (${(chatUsers || []).length})`, icon: 'people' },
+            { id: 'teacher', label: `Teachers (${teacherCount})`, icon: 'school' },
+            { id: 'student', label: `Students (${studentCount})`, icon: 'person' },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (

@@ -361,17 +361,21 @@ const goLive = async (req, res) => {
       startedAt: new Date(),
     });
 
-    // Notify enrolled students
-    const notifications = cls.studentIds.map((sid) => ({
-      recipient: sid,
-      sender: req.user._id,
-      type: 'class_starting',
-      title: `Class is Live: ${cls.subject}`,
-      message: `${req.user.displayName || req.user.name}'s ${cls.subject} class is now live. Join now!`,
-      link: '/student/classes',
-      data: { classId },
-    }));
-    await Notification.insertMany(notifications);
+    // Notify enrolled students via in-app & Expo Push
+    if (cls.studentIds && cls.studentIds.length > 0) {
+      notificationService.sendBulkNotifications({
+        recipientIds: cls.studentIds,
+        senderId: req.user._id,
+        type: 'class_starting',
+        title: `Class is Live: ${cls.subject}`,
+        message: `${req.user.displayName || req.user.name}'s ${cls.subject} class is now live. Join now!`,
+        link: '/student/classes',
+        referenceId: classId,
+        referenceType: 'ClassSchedule',
+        data: { classId: classId.toString(), type: 'class_starting' },
+        io,
+      }).catch((notifErr) => console.error('[Class Start] Push notification failed:', notifErr.message));
+    }
 
     // Emit to course room — NO meetLink in socket event
     const room = `course_${cls.course}_${cls.grade}`;
@@ -596,17 +600,21 @@ const uploadRecording = async (req, res) => {
 
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
 
-    // Notify students
-    const notifications = cls.studentIds.map((sid) => ({
-      recipient: sid,
-      sender: req.user._id,
-      type: 'recording_available',
-      title: `Recording Available: ${cls.subject}`,
-      message: `The recording for ${cls.subject} class is now available.`,
-      link: '/student/classes',
-      data: { classId },
-    }));
-    await Notification.insertMany(notifications);
+    // Notify students via in-app & Expo Push
+    if (cls.studentIds && cls.studentIds.length > 0) {
+      notificationService.sendBulkNotifications({
+        recipientIds: cls.studentIds,
+        senderId: req.user._id,
+        type: 'recording_available',
+        title: `Recording Available: ${cls.subject}`,
+        message: `The recording for ${cls.subject} class is now available.`,
+        link: '/student/classes',
+        referenceId: classId,
+        referenceType: 'ClassSchedule',
+        data: { classId: classId.toString(), type: 'recording_available' },
+        io,
+      }).catch((notifErr) => console.error('[Class Recording] Push notification failed:', notifErr.message));
+    }
 
     // Emit to course room
     const room = `course_${cls.course}_${cls.grade}`;
@@ -941,18 +949,19 @@ const sendClassMessage = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to send messages to this class.' });
     }
 
-    const notifications = (cls.studentIds || []).map((sid) => ({
-      recipient: sid,
-      sender: req.user._id,
-      type: 'live_class',
-      title: `Message from Teacher (${cls.subject || 'Class'})`,
-      message: message.trim(),
-      link: '/student/classes',
-      data: { classId },
-    }));
-
-    if (notifications.length > 0) {
-      await Notification.insertMany(notifications);
+    if (cls.studentIds && cls.studentIds.length > 0) {
+      notificationService.sendBulkNotifications({
+        recipientIds: cls.studentIds,
+        senderId: req.user._id,
+        type: 'live_class',
+        title: `Message from Teacher (${cls.subject || 'Class'})`,
+        message: message.trim(),
+        link: '/student/classes',
+        referenceId: classId,
+        referenceType: 'ClassSchedule',
+        data: { classId: classId.toString(), type: 'live_class' },
+        io,
+      }).catch((notifErr) => console.error('[Class Message] Push notification failed:', notifErr.message));
     }
 
     if (io) {

@@ -129,12 +129,13 @@ const chatSlice = createSlice({
       .addCase(fetchChatUsers.pending, (state) => { state.usersLoading = true; })
       .addCase(fetchChatUsers.fulfilled, (state, action) => {
         state.usersLoading = false;
-        state.chatUsers = action.payload.users;
-        state.chatUsersTotal = action.payload.total;
+        state.chatUsers = action.payload?.users || [];
+        state.chatUsersTotal = action.payload?.total || 0;
       })
       .addCase(fetchChatUsers.rejected, (state, action) => {
         state.usersLoading = false;
         state.error = action.payload;
+        state.chatUsers = state.chatUsers || [];
       })
       // Conversations
       .addCase(fetchConversations.pending, (state) => { state.loading = true; })

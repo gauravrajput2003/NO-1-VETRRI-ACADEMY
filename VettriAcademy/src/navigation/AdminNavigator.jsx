@@ -33,6 +33,7 @@ import NcertViewerScreen from '../screens/common/NcertViewerScreen';
 import DocumentViewerScreen from '../screens/common/DocumentViewerScreen';
 import PdfViewerScreen from '../screens/common/PdfViewerScreen';
 import DiscussScenarioScreen from '../screens/student/DiscussScenarioScreen';
+import DoubtThreadScreen from '../screens/common/DoubtThreadScreen';
 import AdminChatScreen from '../screens/admin/AdminChatScreen';
 import ChatRoomScreen from '../screens/student/ChatRoomScreen';
 import HeaderActions from '../components/HeaderActions';

@@ -2,6 +2,7 @@ const PDFDocument = require('pdfkit');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const SalaryTransaction = require('../models/SalaryTransaction');
+const notificationService = require('../services/notificationService');
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -350,21 +351,24 @@ const processSalary = async (req, res) => {
     });
 
     const io = req.app.get('io');
-    const notification = await Notification.create({
-      recipient: teacher._id,
-      sender: req.user?._id,
+    await notificationService.sendNotification({
+      recipientId: teacher._id,
+      senderId: req.user?._id,
       type: 'salary_paid',
       title: 'Salary Processed',
       message: `Your salary payment for ${context.monthYear} of ₹${newlyPaying} has been processed. Total Paid: ₹${totalPaid}/${breakdown.netSalary}.`,
       link: '/teacher/salary',
+      referenceId: transaction._id,
+      referenceType: 'SalaryTransaction',
       data: {
         monthYear: context.monthYear,
         netSalary: breakdown.netSalary,
-        salaryTransactionId: transaction._id,
+        salaryTransactionId: transaction._id.toString(),
+        type: 'salary_paid',
       },
-    });
+      io,
+    }).catch((notifErr) => console.error('[Salary] Notification failed:', notifErr.message));
 
-    io?.to(`user:${teacher._id}`).emit('notification:new', notification);
     io?.to(`user:${teacher._id}`).emit('salary:processed', { salaryTransactionId: transaction._id, monthYear: context.monthYear, netSalary: breakdown.netSalary });
 
     res.status(201).json({ success: true, message: 'Salary processed', transaction, salarySlipUrl: slipUrl });

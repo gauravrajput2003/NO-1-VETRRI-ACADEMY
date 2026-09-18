@@ -11,6 +11,10 @@ const STUDENT_ROUTES = {
   new_score: { screen: 'ExamScores' },
   general: { screen: 'ExamScores' }, // 'general' is used for new scores
 
+  // Direct Chat
+  chat_message: { screen: 'ChatRoom' },
+  direct_message: { screen: 'ChatRoom' },
+
   // Doubts
   doubt_created: { screen: 'DoubtDetail' },
   doubt_assigned: { screen: 'DoubtDetail' },
@@ -33,6 +37,10 @@ const STUDENT_ROUTES = {
 };
 
 const TEACHER_ROUTES = {
+  // Direct Chat
+  chat_message: { screen: 'ChatRoom' },
+  direct_message: { screen: 'ChatRoom' },
+
   // Core Teaching
   doubt_assigned: { screen: 'DoubtDetail' },
   doubt_reply: { screen: 'DoubtDetail' },
@@ -52,6 +60,10 @@ const TEACHER_ROUTES = {
 };
 
 const ADMIN_ROUTES = {
+  // Direct Chat
+  chat_message: { screen: 'AdminChat' },
+  direct_message: { screen: 'AdminChat' },
+
   // Approvals & Management
   study_material: { screen: 'AdminPendingApprovals' }, // Teacher uploaded/edited/deleted material
   leave_applied: { screen: 'AdminLeaves' },
@@ -78,8 +90,16 @@ const ADMIN_ROUTES = {
 const getParams = (notification) => {
   const data = notification.data || {};
   const referenceId = notification.referenceId || data.referenceId || data.classId;
-  if (!referenceId) return {};
   const type = notification.type || '';
+
+  if (type === 'chat_message' || type === 'direct_message') {
+    return {
+      conversationId: data.conversationId || referenceId,
+      otherUser: data.senderId ? { _id: data.senderId, name: data.senderName } : undefined,
+    };
+  }
+
+  if (!referenceId) return {};
 
   if (type.startsWith('doubt') || type === 'chat') {
     return { doubtId: referenceId };
