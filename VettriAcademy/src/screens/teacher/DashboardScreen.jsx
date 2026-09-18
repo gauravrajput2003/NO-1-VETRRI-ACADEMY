@@ -31,6 +31,7 @@ import { Sparkle, PaperPlane, DottedPath } from '../student/BadgeIcons';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { useCompensationNotifications } from '../../hooks/useCompensationNotifications';
 import AnnouncementCard from '../../components/announcements/AnnouncementCard';
+import Toast from 'react-native-toast-message';
 
 
 
@@ -287,6 +288,8 @@ export default function TeacherDashboard({ navigation }) {
         conversationId,
         otherUser: admin,
       });
+    } else {
+      Toast.show({ type: 'info', text1: 'Admin desk not available' });
     }
   };
 
@@ -656,7 +659,13 @@ export default function TeacherDashboard({ navigation }) {
       <QuickActionCard
         key={item.id}
         item={item}
-        onPress={() => navigation.navigate(item.screen)}
+        onPress={() => {
+          if (typeof item.onPress === 'function') {
+            item.onPress();
+          } else if (item.screen) {
+            navigation.navigate(item.screen);
+          }
+        }}
       />
     ))}
   </View>

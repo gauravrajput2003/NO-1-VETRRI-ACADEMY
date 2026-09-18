@@ -33,6 +33,8 @@ import {
 } from '../../redux/slices/chatSlice';
 import { onSocketEvent, sendTypingIndicator, joinChatRoom } from '../../services/socket';
 import { sendChatFileAPI } from '../../services/api';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTabBarVisibility } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const TouchableOpacity = (props) => {
@@ -51,6 +53,19 @@ export default function ChatRoomScreen({ route, navigation }) {
   const { user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
+
+  const tabVis = useTabBarVisibility();
+  const hidePermanently = tabVis?.hidePermanently;
+  const showPermanently = tabVis?.showPermanently;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (typeof hidePermanently === 'function') hidePermanently();
+      return () => {
+        if (typeof showPermanently === 'function') showPermanently();
+      };
+    }, [hidePermanently, showPermanently])
+  );
 
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);

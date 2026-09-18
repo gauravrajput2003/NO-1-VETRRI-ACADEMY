@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../utils/colors';
 import { formatRelativeTime } from '../../utils/formatters';
 import { fetchChatUsers, fetchConversations } from '../../redux/slices/chatSlice';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTabBarVisibility } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const TouchableOpacity = (props) => {
@@ -34,6 +36,19 @@ export default function AdminChatScreen({ navigation }) {
   const { user: currentUser } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
+
+  const tabVis = useTabBarVisibility();
+  const hidePermanently = tabVis?.hidePermanently;
+  const showPermanently = tabVis?.showPermanently;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (typeof hidePermanently === 'function') hidePermanently();
+      return () => {
+        if (typeof showPermanently === 'function') showPermanently();
+      };
+    }, [hidePermanently, showPermanently])
+  );
 
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'teacher' | 'student'
   const [searchQuery, setSearchQuery] = useState('');

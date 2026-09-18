@@ -93,6 +93,33 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
     return null;
   }
 
+  // Check if active tab or nested active stack screen requested hiding
+  const activeTabRoute = state?.routes?.[state?.index];
+  const activeOptions = descriptors?.[activeTabRoute?.key]?.options;
+  if (activeOptions?.tabBarStyle?.display === 'none') {
+    return null;
+  }
+
+  const stackState = activeTabRoute?.state;
+  const currentNestedScreen = stackState
+    ? stackState.routes?.[stackState.index]?.name
+    : undefined;
+
+  const HIDDEN_SCREENS = [
+    'ChatRoom',
+    'AdminChat',
+    'DoubtDetail',
+    'LiveClass',
+    'Notifications',
+    'PdfViewer',
+    'DocumentViewer',
+    'NcertViewer',
+  ];
+
+  if (currentNestedScreen && HIDDEN_SCREENS.includes(currentNestedScreen)) {
+    return null;
+  }
+
   return (
     <Animated.View
       style={[

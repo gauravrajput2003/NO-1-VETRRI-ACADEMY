@@ -73,42 +73,55 @@ const parseTeacherIds = (assignedTeachers) => {
 
 const canAccessDoubt = (doubt, user) => {
 	if (!doubt) return false;
-	if (user.role === 'admin' || user.role === 'teacher') return true;
+	if (user.role === 'admin') return true;
+
+	const userIdStr = String(user._id);
+	const studentIdStr = doubt.studentId && doubt.studentId._id ? String(doubt.studentId._id) : String(doubt.studentId);
+
 	if (user.role === 'student') {
-		const studentIdStr = doubt.studentId && doubt.studentId._id ? String(doubt.studentId._id) : String(doubt.studentId);
-		return studentIdStr === String(user._id);
+		return studentIdStr === userIdStr;
 	}
+
+	if (user.role === 'teacher') {
+		const assignedTeachers = (doubt.assignedTeachers || []).map((t) => (t && t._id ? String(t._id) : String(t)));
+		const participants = (doubt.participants || []).map((p) => (p && p._id ? String(p._id) : String(p)));
+		return (
+			assignedTeachers.includes(userIdStr) ||
+			participants.includes(userIdStr) ||
+			studentIdStr === userIdStr
+		);
+	}
+
 	return false;
 };
 
-const buildDoubtQuery = (user, query) => {
+const buildDoubtQuery = (user, query = {}) => {
 	const mongoQuery = { isDeleted: false };
 
 	if (user.role === 'student') {
+		// Students can ONLY see their own doubts
 		mongoQuery.studentId = user._id;
+	} else if (user.role === 'teacher') {
+		// Teachers can ONLY see doubts assigned to them, created by them, or where they participate
+		mongoQuery.$or = [
+			{ assignedTeachers: user._id },
+			{ participants: user._id },
+			{ studentId: user._id },
+		];
+	} else if (user.role === 'admin') {
+		// Admin can review all or filter by student / teacher
+		if (query.studentId) {
+			const sid = toObjectId(query.studentId);
+			if (sid) mongoQuery.studentId = sid;
+		}
+		if (query.teacherId) {
+			const tid = toObjectId(query.teacherId);
+			if (tid) mongoQuery.assignedTeachers = tid;
+		}
 	}
 
 	if (query.status) {
 		mongoQuery.status = query.status;
-	}
-
-
-	if (query.studentId && user.role === 'admin') {
-		const sid = toObjectId(query.studentId);
-		if (sid) mongoQuery.studentId = sid;
-	}
-
-	if (query.teacherId && user.role === 'admin') {
-		const tid = toObjectId(query.teacherId);
-		if (tid) mongoQuery.assignedTeachers = tid;
-	}
-
-	if (query.assignedToMe === 'true' && user.role === 'teacher') {
-		mongoQuery.assignedTeachers = user._id;
-	}
-
-	if (query.myDoubts === 'true' && user.role === 'student') {
-		mongoQuery.studentId = user._id;
 	}
 
 	if (query.unanswered === 'true') {
@@ -117,10 +130,16 @@ const buildDoubtQuery = (user, query) => {
 
 	if (query.keyword) {
 		const kw = trimSafe(query.keyword);
-		mongoQuery.$or = [
+		const kwFilter = [
 			{ title: { $regex: kw, $options: 'i' } },
 			{ description: { $regex: kw, $options: 'i' } },
 		];
+		if (mongoQuery.$or) {
+			mongoQuery.$and = [{ $or: mongoQuery.$or }, { $or: kwFilter }];
+			delete mongoQuery.$or;
+		} else {
+			mongoQuery.$or = kwFilter;
+		}
 	}
 
 	if (query.fromDate || query.toDate) {
@@ -693,13 +712,20 @@ const getDashboardMetrics = async (req, res) => {
 		}
 
 		if (req.user.role === 'teacher') {
-			const assignedQuery = { ...base, assignedTeachers: req.user._id };
+			const teacherQuery = {
+				...base,
+				$or: [
+					{ assignedTeachers: req.user._id },
+					{ participants: req.user._id },
+					{ studentId: req.user._id },
+				],
+			};
 			const [assigned, pending, responded, aggregates] = await Promise.all([
-				Doubt.countDocuments(assignedQuery),
-				Doubt.countDocuments({ ...assignedQuery, status: { $in: [STATUS.OPEN, STATUS.WAITING_FOR_STUDENT] } }),
-				Doubt.countDocuments({ ...assignedQuery, status: { $in: [STATUS.TEACHER_RESPONDED, STATUS.RESOLVED, STATUS.CLOSED] } }),
+				Doubt.countDocuments(teacherQuery),
+				Doubt.countDocuments({ ...teacherQuery, status: { $in: [STATUS.OPEN, STATUS.WAITING_FOR_STUDENT] } }),
+				Doubt.countDocuments({ ...teacherQuery, status: { $in: [STATUS.TEACHER_RESPONDED, STATUS.RESOLVED, STATUS.CLOSED] } }),
 				Doubt.aggregate([
-					{ $match: { ...assignedQuery, firstResponseAt: { $exists: true } } },
+					{ $match: { ...teacherQuery, firstResponseAt: { $exists: true } } },
 					{
 						$project: {
 							responseMinutes: {
