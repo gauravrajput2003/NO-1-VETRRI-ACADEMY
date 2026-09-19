@@ -295,6 +295,7 @@ export default function TeacherDashboard({ navigation }) {
 
   const quickActions = useMemo(() => ([
     { id: 'admin_chat', title: 'Admin Desk', subtitle: 'Direct 1-on-1 Chat', onPress: handleChatWithAdmin, gradient: ['#FF4D8D', '#FF8A00'], icon: 'chatbubbles-outline' },
+    { id: 'help_center', title: 'Help & Support', subtitle: 'Raise Support Query', screen: 'HelpCenter', gradient: ['#312E81', '#6366F1'], icon: 'help-buoy-outline' },
     { id: 'live', title: 'Live Class', subtitle: 'Go Live Now', screen: 'LiveClass', gradient: ['#2563EB', '#60A5FA'], image: ASSETS.camera },
     { id: 'doubts', title: 'Doubts', subtitle: 'View & Reply', screen: 'DoubtCenter', gradient: [T.orange, '#FFB347'], image: ASSETS.question },
     { id: 'materials', title: 'Materials', subtitle: 'Upload & Manage', screen: 'TeacherMaterials', gradient: [T.teal, T.tealLight], image: ASSETS.book },

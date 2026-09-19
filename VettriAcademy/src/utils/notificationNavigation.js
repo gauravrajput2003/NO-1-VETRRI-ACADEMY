@@ -11,9 +11,11 @@ const STUDENT_ROUTES = {
   new_score: { screen: 'ExamScores' },
   general: { screen: 'ExamScores' }, // 'general' is used for new scores
 
-  // Direct Chat
+  // Direct Chat & Support
   chat_message: { screen: 'ChatRoom' },
   direct_message: { screen: 'ChatRoom' },
+  support_ticket: { screen: 'HelpCenter' },
+  support_ticket_reply: { screen: 'HelpCenter' },
 
   // Doubts
   doubt_created: { screen: 'DoubtDetail' },
@@ -37,9 +39,11 @@ const STUDENT_ROUTES = {
 };
 
 const TEACHER_ROUTES = {
-  // Direct Chat
+  // Direct Chat & Support
   chat_message: { screen: 'ChatRoom' },
   direct_message: { screen: 'ChatRoom' },
+  support_ticket: { screen: 'HelpCenter' },
+  support_ticket_reply: { screen: 'HelpCenter' },
 
   // Core Teaching
   doubt_assigned: { screen: 'DoubtDetail' },
@@ -60,6 +64,10 @@ const TEACHER_ROUTES = {
 };
 
 const ADMIN_ROUTES = {
+  // Helpdesk & Support Queries
+  support_ticket: { screen: 'AdminQueries' },
+  support_ticket_reply: { screen: 'AdminQueries' },
+
   // Direct Chat
   chat_message: { screen: 'AdminChat' },
   direct_message: { screen: 'AdminChat' },

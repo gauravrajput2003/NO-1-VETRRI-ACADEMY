@@ -36,6 +36,8 @@ import DiscussScenarioScreen from '../screens/student/DiscussScenarioScreen';
 import DoubtThreadScreen from '../screens/common/DoubtThreadScreen';
 import AdminChatScreen from '../screens/admin/AdminChatScreen';
 import ChatRoomScreen from '../screens/student/ChatRoomScreen';
+import AdminQueriesScreen from '../screens/admin/AdminQueriesScreen';
+import HelpCenterScreen from '../screens/common/HelpCenterScreen';
 import HeaderActions from '../components/HeaderActions';
 import CustomTabBar from '../components/CustomTabBar';
 import { TabBarVisibilityProvider } from '../context/TabBarVisibilityContext';
@@ -52,6 +54,8 @@ function HomeStack() {
       <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
       <Stack.Screen name="AdminChat" component={AdminChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminQueries" component={AdminQueriesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: true, title: 'Notifications' }} />
       <Stack.Screen name="ManageStudents" component={ManageStudentsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ManageTeachers" component={ManageTeachersScreen} options={{ headerShown: false }} />

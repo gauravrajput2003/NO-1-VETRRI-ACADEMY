@@ -399,20 +399,23 @@ export default function ProfileScreen({ navigation }) {
 
  const menuByRole = {
   student: [
+    { icon: 'help-buoy-outline', label: 'Help & Support', screen: 'HelpCenter', color: T.teal },
     { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
-    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },   // ← new
+    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },
     { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
   ],
   teacher: [
     { icon: 'document-text-outline', label: 'Manage Materials', screen: 'TeacherMaterials', color: T.purple, description: 'Upload and manage study files', gradient: [T.purple, '#A78BFA'], illustration: 'folder-open' },
     { icon: 'bar-chart-outline', label: 'Monthly Report', screen: 'MonthlyReport', color: T.teal, description: 'View class performance reports', gradient: [T.teal, T.tealLight], illustration: 'analytics' },
+    { icon: 'help-buoy-outline', label: 'Help & Support', screen: 'HelpCenter', color: T.teal },
     { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
-    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },   // ← new
+    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },
     { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
   ],
   admin: [
+    { icon: 'help-buoy-outline', label: 'Queries Received', screen: 'AdminQueries', color: T.purple },
     { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: T.pink },
-    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },   // ← new
+    { icon: 'key-outline', label: 'Forgot Password', screen: 'ForgotPassword', color: T.gold },
     { icon: 'settings-outline', label: 'Settings', screen: 'Settings', color: T.subtitle },
   ],
 };

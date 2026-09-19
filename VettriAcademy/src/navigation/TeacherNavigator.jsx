@@ -36,6 +36,7 @@ import PdfAnalyticsScreen from '../screens/teacher/PdfAnalyticsScreen';
 import DiscussScenarioScreen from '../screens/student/DiscussScenarioScreen';
 import DoubtThreadScreen from '../screens/common/DoubtThreadScreen';
 import ChatRoomScreen from '../screens/student/ChatRoomScreen';
+import HelpCenterScreen from '../screens/common/HelpCenterScreen';
 import HeaderActions from '../components/HeaderActions';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -66,6 +67,7 @@ function HomeStack() {
     <Stack.Navigator screenOptions={HEADER_OPTS}>
       <Stack.Screen name="TeacherDashboard" component={TeacherDashboard} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="LiveClass" component={LiveClassScreen} options={{ headerShown: false, title: 'Live Class' }} />
       <Stack.Screen name="LiveMonitor" component={LiveMonitorScreen} options={{ title: 'Live Monitor' }} />

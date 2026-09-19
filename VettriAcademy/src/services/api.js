@@ -858,6 +858,43 @@ export const updateStudentWatchProgressAPI = (id, watchDuration, currentPosition
 export const getStudentIncompleteMandatoryCountAPI = () =>
   api.get('/training-videos/incomplete-mandatory');
 
+// ─── Help Center & Support Tickets (VASQ / VATQ) ─────────────────────────────
+export const createSupportTicketAPI = (data) =>
+  api.post('/support/tickets', data);
+
+export const getMySupportTicketsAPI = (params) =>
+  api.get('/support/my-tickets', { params });
+
+export const getSupportTicketDetailAPI = (id) =>
+  api.get(`/support/tickets/${id}`);
+
+export const getAdminSupportTicketsAPI = (params) =>
+  api.get('/support/admin/tickets', { params });
+
+export const updateAdminSupportTicketAPI = (id, data) =>
+  api.patch(`/support/admin/tickets/${id}`, data);
+
+export const deleteAdminSupportTicketAPI = (id) =>
+  api.delete(`/support/admin/tickets/${id}`);
+
+export const uploadSupportAttachmentAPI = async (formData) => {
+  const token = await getToken();
+  const response = await fetch(`${API_BASE_URL}/support/upload-attachment`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const err = new Error(data.message || 'Attachment upload failed');
+    err.response = { data, status: response.status };
+    throw err;
+  }
+  return { data };
+};
+
 // ─── Push Notifications ────────────────────────────────────────────────────────
 /**
  * Save or refresh the Expo push token for the current authenticated user.

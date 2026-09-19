@@ -31,6 +31,7 @@ const downloadRoutes = require('./routes/downloadRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
 const storageRoutes = require('./routes/storageRoutes');
 const doubtRoutes = require('./routes/doubtRoutes');
+const supportRoutes = require('./routes/supportRoutes');
 
 
 // ─── Models for Socket.io ──────────────────────────────────────────────────────
@@ -121,6 +122,7 @@ app.use('/api/downloads', downloadRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/doubts', doubtRoutes);
+app.use('/api/support', supportRoutes);
 
 
 // ─── Public course listing ─────────────────────────────────────────────────────

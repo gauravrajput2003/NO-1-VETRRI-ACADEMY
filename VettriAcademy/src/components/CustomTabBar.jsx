@@ -108,6 +108,8 @@ export default function CustomTabBar({ state, descriptors, navigation, iconConfi
   const HIDDEN_SCREENS = [
     'ChatRoom',
     'AdminChat',
+    'HelpCenter',
+    'AdminQueries',
     'DoubtDetail',
     'LiveClass',
     'Notifications',

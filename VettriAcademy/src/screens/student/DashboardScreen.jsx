@@ -57,6 +57,7 @@ function shade(hex, amt = 28) {
 
 const CATEGORIES = [
   { id: 'admin_chat', label: 'Admin Desk', icon: 'chatbubbles', action: 'chat', tint: D.pink },
+  { id: 'help',       label: 'Help Desk',  icon: 'help-buoy',   screen: 'HelpCenter', tint: D.pink },
   { id: '1', label: 'Lessons',    icon: 'book',        screen: 'Materials',  tint: D.pink   },
   { id: '2', label: 'Classes',    icon: 'school',       screen: 'Classes',    tint: D.teal   },
   { id: '3', label: 'Scores',     icon: 'bar-chart',    screen: 'ExamScores', tint: D.golden },

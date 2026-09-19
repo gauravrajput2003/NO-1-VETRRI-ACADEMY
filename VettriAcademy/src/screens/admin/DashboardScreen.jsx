@@ -30,6 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { fetchAdminStats } from '../../redux/slices/adminSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
 import { fetchUnreadCount as fetchChatUnreadCount } from '../../redux/slices/chatSlice';
+import { fetchAdminSupportTickets } from '../../redux/slices/supportSlice';
 import { toggleAI } from '../../redux/slices/uiSlice';
 import { getAdminStudentMarksAPI, getAdminTopRankersAPI } from '../../services/api';
 
@@ -196,10 +197,13 @@ export default function AdminDashboard({ navigation }) {
     } catch {}
   }, []);
 
+  const { adminCounts } = useSelector((s) => s.support);
+
   const loadData = useCallback(() => {
     dispatch(fetchAdminStats());
     dispatch(fetchUnreadNotificationCount());
     dispatch(fetchChatUnreadCount());
+    dispatch(fetchAdminSupportTickets());
     loadAdminInsights();
     setRefreshing(false);
   }, [dispatch, loadAdminInsights]);
@@ -220,6 +224,7 @@ export default function AdminDashboard({ navigation }) {
   ];
 
   const quickActions = [
+    { id: 'admin_queries', icon: ASSETS.chat, label: 'Queries Received', subtitle: 'VASQ / VATQ Tickets', screen: 'AdminQueries', gradient: ['#312E81', '#6366F1'], badge: adminCounts?.open || 0 },
     { id: 'chat_dm', icon: ASSETS.chat, label: 'Messages', subtitle: 'Direct 1-on-1 Chat', screen: 'AdminChat', gradient: ['#FF4FA3', '#F43F5E'], badge: unreadChatCount || 0 },
     { id: '3', icon: ASSETS.newFee, label: 'Fees', subtitle: 'Manage Payments', screen: 'FeeManagement', gradient: ['#14C8C4', '#38BDF8'] },
     { id: '4', icon: ASSETS.newNotice, label: 'Notice', subtitle: 'Create & View Notices', screen: 'Announcements', gradient: ['#FF4F8B', '#FB7185'] },
