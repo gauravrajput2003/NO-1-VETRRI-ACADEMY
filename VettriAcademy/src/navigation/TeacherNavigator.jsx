@@ -103,6 +103,8 @@ function ScheduleStack() {
       <Stack.Screen name="ClassSchedulerMain" component={ClassSchedulerScreen} options={{ title: 'Class Scheduler' }} />
       <Stack.Screen name="LiveClassMain" component={LiveClassScreen} options={{ headerShown: false, title: 'Go Live' }} />
       <Stack.Screen name="LiveMonitor" component={LiveMonitorScreen} options={{ title: 'Live Monitor' }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -112,6 +114,8 @@ function TrainingStack() {
     <Stack.Navigator screenOptions={HEADER_OPTS}>
       <Stack.Screen name="TrainingMain" component={TrainingVideosScreen} options={{ title: 'Training' }} />
       <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -120,6 +124,8 @@ function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={HEADER_OPTS}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TeacherMaterials" component={TeacherMaterialsScreen} options={{ title: 'Manage Materials' }} />
       <Stack.Screen name="MonthlyReport" component={MonthlyReportScreen} options={{ title: 'Monthly Report' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />

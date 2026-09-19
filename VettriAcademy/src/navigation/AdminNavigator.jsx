@@ -89,6 +89,9 @@ function ManageStack() {
     <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
       <Stack.Screen name="ManageStudentsMain" component={ManageStudentsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ManageTeachersMain" component={ManageTeachersScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminQueries" component={AdminQueriesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -98,6 +101,9 @@ function ScheduleStack() {
     <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
       <Stack.Screen name="ClassSchedulerMain" component={ClassSchedulerScreen} options={{ title: 'Class Scheduler' }} />
       <Stack.Screen name="LiveMonitorMain" component={LiveMonitorScreen} options={{ title: 'Live Monitor' }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminQueries" component={AdminQueriesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -106,6 +112,9 @@ function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminQueries" component={AdminQueriesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Forgot Password' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />

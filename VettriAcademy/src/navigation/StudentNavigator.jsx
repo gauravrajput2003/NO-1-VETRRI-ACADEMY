@@ -111,6 +111,8 @@ function ClassesStack() {
     <Stack.Navigator>
       <Stack.Screen name="ClassesList" component={ClassesScreen}    options={{ ...HEADER_OPTS, title: 'Classes' }} />
       <Stack.Screen name="ClassDetail" component={ClassDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter"  component={HelpCenterScreen}  options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom"    component={ChatRoomScreen}    options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -123,6 +125,8 @@ function DownloadsStack() {
       <Stack.Screen name="MaterialDetail" component={MaterialDetailScreen} options={{ ...HEADER_OPTS, title: 'Material' }} />
       <Stack.Screen name="PdfViewer"      component={PdfViewerScreen}      options={{ headerShown: false }} />
       <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter"     component={HelpCenterScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom"       component={ChatRoomScreen}       options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -132,6 +136,8 @@ function DiscussionStack() {
     <Stack.Navigator>
       <Stack.Screen name="DoubtCenterMain" component={DiscussScenarioScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter"  component={HelpCenterScreen}  options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom"    component={ChatRoomScreen}    options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -140,6 +146,8 @@ function ProfileStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="ProfileMain"   component={ProfileScreen}      options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter"    component={HelpCenterScreen}   options={{ headerShown: false }} />
+      <Stack.Screen name="ChatRoom"      component={ChatRoomScreen}     options={{ headerShown: false }} />
       <Stack.Screen name="ExamScores"    component={ExamScoresScreen}   options={{ ...HEADER_OPTS, title: 'Exam Scores' }} />
       <Stack.Screen name="Attendance"    component={AttendanceScreen}   options={{ ...HEADER_OPTS, title: 'Attendance' }} />
       <Stack.Screen name="Leave"         component={StudentLeaveScreen} options={{ ...HEADER_OPTS, title: 'Leave Application' }} />
