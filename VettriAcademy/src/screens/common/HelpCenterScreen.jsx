@@ -351,6 +351,15 @@ export default function HelpCenterScreen({ navigation }) {
       {/* ── Tab Content ── */}
       {activeTab === 'raise' ? (
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Top 3D Hero Illustration */}
+          <View style={styles.heroImageCard}>
+            <Image
+              source={require('../../../assets/query.png')}
+              style={styles.heroImage}
+              contentFit="contain"
+            />
+          </View>
+
           {/* Section 1: Categories */}
           <Text style={[styles.sectionHeading, { color: textColor }]}>Select Issue Category</Text>
           <Text style={[styles.sectionSub, { color: textSec }]}>Choose what you need help with (Flipkart / EdTech style)</Text>
@@ -699,6 +708,25 @@ const styles = StyleSheet.create({
 
   body: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
+  heroImageCard: {
+    width: '100%',
+    height: 160,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#0F172A',
+    shadowColor: '#312E81',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
   sectionHeading: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
   sectionSub: { fontSize: 12, marginBottom: 12 },
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { SOCKET_ORIGIN } from '../config/apiOrigin';
 
 let socket = null;
 
@@ -13,7 +14,7 @@ export const useSocket = () => {
 
     // Connect Socket.io
     if (!socket) {
-      socket = io(window.location.origin, {
+      socket = io(SOCKET_ORIGIN, {
         withCredentials: true,
         transports: ['websocket', 'polling'],
       });

@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/apiOrigin';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
@@ -27,7 +28,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+          const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
           if (data.success) {
             localStorage.setItem('token', data.token);
             api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
@@ -192,4 +193,3 @@ export const confirmDirectUpload = (data) => api.post('/storage/confirm-upload',
 export const getDirectDownloadUrl = (id) => api.get(`/storage/download-url/${id}`);
 
 export default api;
-

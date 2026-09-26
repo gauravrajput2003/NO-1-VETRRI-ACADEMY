@@ -8,7 +8,7 @@ const { body, validationResult } = require('express-validator');
 const validateEnquiry = [
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('phone').trim().notEmpty().withMessage('Phone number is required'),
-  body('email').optional().isEmail().withMessage('Invalid email format'),
+  body('email').optional({ values: 'falsy' }).isEmail().withMessage('Invalid email format'),
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useInView, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
+import AboutCarousel from '../components/marketing/AboutCarousel';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -78,9 +82,9 @@ const WHY_CHOOSE = [
 ];
 
 const TESTIMONIALS = [
-  { id: 1, name: 'Arun Kumar', grade: '12th CBSE', text: 'Scored 95% in Maths! The daily live classes and weekly tests made all the difference. Best coaching in Tamil Nadu!', rating: 5, avatar: 'AK', color: '#3b82f6' },
-  { id: 2, name: 'Priya Devi', grade: '10th State Board', text: 'WhatsApp doubt clearing is amazing. Got answers at midnight before my exam. Thank you Vettri Academy!', rating: 5, avatar: 'PD', color: '#0d9488' },
-  { id: 3, name: 'Mohammed Rizwan', grade: 'Engineering', text: 'Best online tuition for Engineering Maths. Very experienced teachers who explain concepts clearly.', rating: 5, avatar: 'MR', color: '#a855f7' },
+  { id: 1, name: 'Arun Kumar', grade: '12th CBSE', text: 'Scored 95% in Maths! The daily live classes and weekly tests made all the difference. Best coaching in Tamil Nadu!', rating: 5, image: '/landing-templates/assets/student-arun.jpg' },
+  { id: 2, name: 'Priya Devi', grade: '10th State Board', text: 'WhatsApp doubt clearing is amazing. Got answers at midnight before my exam. Thank you Vettri Academy!', rating: 5, image: '/landing-templates/assets/student-priya.jpg' },
+  { id: 3, name: 'Mohammed Rizwan', grade: 'Engineering', text: 'Best online tuition for Engineering Maths. Very experienced teachers who explain concepts clearly.', rating: 5, image: '/landing-templates/assets/student-rizwan.jpg' },
 ];
 
 const enquirySchema = z.object({
@@ -91,6 +95,9 @@ const enquirySchema = z.object({
   course: z.string().optional(),
   message: z.string().optional(),
 });
+
+const HeroScene = lazy(() => import('../components/marketing/HeroScene'));
+gsap.registerPlugin(ScrollTrigger);
 
 // ─── Animated Counter ─────────────────────────────────────────────────────────
 function AnimatedCounter({ target, suffix, duration = 2000 }) {
@@ -114,10 +121,13 @@ function AnimatedCounter({ target, suffix, duration = 2000 }) {
 }
 
 // ─── Particle Canvas ──────────────────────────────────────────────────────────
-function ParticleCanvas() {
+function ParticleCanvas({ disabled = false }) {
   const canvasRef = useRef(null);
+
   useEffect(() => {
+    if (disabled) return undefined;
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let animId;
     const particles = [];
@@ -147,7 +157,7 @@ function ParticleCanvas() {
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       }
     }
-    for (let i = 0; i < 90; i++) particles.push(new Particle());
+    for (let i = 0; i < 42; i++) particles.push(new Particle());
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach(p => { p.update(); p.draw(); });
@@ -155,8 +165,8 @@ function ParticleCanvas() {
     };
     animate();
     return () => { cancelAnimationFrame(animId); window.removeEventListener('resize', resize); };
-  }, []);
-  return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />;
+  }, [disabled]);
+  return disabled ? null : <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />;
 }
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
@@ -171,7 +181,7 @@ function Navbar({ loggedIn }) {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  const navLinks = [['Courses', '#courses'], ['Teachers', '#teachers'], ['Why Us', '#why-us'], ['Contact', '#contact']];
+  const navLinks = [['About Us', '#about'], ['Courses', '#courses'], ['Teachers', '#teachers'], ['Why Us', '#why-us'], ['Contact', '#contact']];
 
   return (
     <motion.nav
@@ -188,7 +198,7 @@ function Navbar({ loggedIn }) {
             src="/landing-templates/assets/logo_playstore.png"
             alt="Vettri Academy"
             className="h-12 w-12 shrink-0 rounded-xl object-contain ring-1 ring-teal-900/10 sm:h-14 sm:w-14"
-            onError={e => { e.target.onerror = null; e.target.src = '/logo.png'; }}
+            onError={e => { e.target.onerror = null; e.target.src = '/icons/icon-192.png'; }}
           />
           <div className="min-w-0">
             <p className="truncate font-jakarta text-[17px] font-extrabold leading-tight text-teal-950 sm:text-[20px]">
@@ -260,17 +270,10 @@ function Navbar({ loggedIn }) {
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 function Section({ children, id, className = '' }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
   return (
-    <motion.section
-      ref={ref} id={id}
-      initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-      className={className}
-    >
+    <section id={id} className={`scroll-reveal ${className}`.trim()}>
       {children}
-    </motion.section>
+    </section>
   );
 }
 
@@ -296,15 +299,155 @@ export default function Landing() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('All');
   const [teacherIdx, setTeacherIdx] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(true);
   const heroRef = useRef(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
   const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
-  const heroImgScale = useTransform(scrollYProgress, [0, 1], [1, 1.18]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 1]);
 
-  // Page-wide scroll progress, shown as a thin bar under the navbar
   const { scrollYProgress: pageProgress } = useScroll();
   const progressScaleX = useTransform(pageProgress, [0, 1], [0, 1]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleMedia = () => {
+      setReducedMotion(mediaQuery.matches);
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    handleMedia();
+    mediaQuery.addEventListener('change', handleMedia);
+    window.addEventListener('resize', handleMedia);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleMedia);
+      window.removeEventListener('resize', handleMedia);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!heroRef.current) return undefined;
+    const observer = new IntersectionObserver(([entry]) => setHeroVisible(entry.isIntersecting), { threshold: 0 });
+    observer.observe(heroRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!heroRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const ctx = gsap.context(() => {
+      const chars = gsap.utils.toArray('.hero-char');
+      gsap.fromTo(chars, {
+        autoAlpha: 0,
+        x: index => ((index * 37) % 9 - 4) * 18,
+        y: index => ((index * 19) % 7 - 3) * 18,
+        z: -140,
+        rotationY: index => (index % 2 ? 65 : -65),
+        scale: 0.62,
+        filter: 'blur(7px)',
+      }, {
+        autoAlpha: 1,
+        x: 0, y: 0, z: 0, rotationY: 0, scale: 1,
+        filter: 'blur(0px)',
+        duration: 0.9,
+        delay: 0.18,
+        stagger: { each: 0.035, from: 'random' },
+        ease: 'back.out(1.35)',
+      });
+    }, heroRef);
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (isMobile || reducedMotion) return undefined;
+    const lenis = new Lenis({
+      duration: 1.2,
+      smoothWheel: true,
+      syncTouch: false,
+    });
+
+    let rafId = 0;
+
+    function raf(time) {
+      lenis.raf(time);
+      rafId = requestAnimationFrame(raf);
+    }
+
+    rafId = requestAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+    };
+  }, [isMobile, reducedMotion]);
+
+  useEffect(() => {
+    if (!heroRef.current || isMobile || reducedMotion) return undefined;
+
+    const ctx = gsap.context(() => {
+      const heroLines = gsap.utils.toArray('.hero-line');
+
+      gsap.set('.hero-card-scene', { transformOrigin: 'center center' });
+
+      const heroTimeline = gsap.timeline({
+        scrollTrigger: {
+          trigger: heroRef.current,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1.2,
+        },
+      });
+
+      heroTimeline
+        .to(heroLines, {
+          y: -18,
+          opacity: 0.72,
+          stagger: 0.08,
+          ease: 'none',
+          duration: 1,
+        }, 0)
+        .to('.hero-card-scene', {
+          scale: 0.94,
+          opacity: 0.82,
+          y: -24,
+          ease: 'none',
+          duration: 1,
+        }, 0.16);
+    }, heroRef);
+
+    return () => ctx.revert();
+  }, [isMobile, reducedMotion]);
+
+  useEffect(() => {
+    if (isMobile || reducedMotion) return undefined;
+    const reveals = gsap.utils.toArray('.scroll-reveal');
+    if (!reveals.length) return;
+
+    const ctx = gsap.context(() => {
+      gsap.set(reveals, {
+        autoAlpha: 0,
+        y: 60,
+        clipPath: 'inset(0 0 100% 0)',
+      });
+
+      ScrollTrigger.batch(reveals, {
+        start: 'top 84%',
+        once: true,
+        onEnter: (batch) => {
+          gsap.to(batch, {
+            autoAlpha: 1,
+            y: 0,
+            clipPath: 'inset(0 0 0% 0)',
+            duration: 0.9,
+            ease: 'power3.out',
+            stagger: 0.08,
+          });
+        },
+      });
+    });
+
+    return () => ctx.revert();
+  }, [isMobile, reducedMotion]);
 
   const filteredCourses = activeTab === 'All' ? COURSES : COURSES.filter(c => c.category === activeTab);
 
@@ -333,41 +476,45 @@ export default function Landing() {
       />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section ref={heroRef} className="relative flex min-h-screen items-center overflow-hidden pt-20">
+      <section ref={heroRef} className="hero-shell relative flex min-h-[760px] items-center overflow-hidden pt-20 lg:min-h-[820px]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(217,119,6,0.10)_0%,transparent_70%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,rgba(13,148,136,0.14)_0%,transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(13,148,136,0.08)_0%,transparent_50%)]" />
-        <ParticleCanvas />
+        {!isMobile && !reducedMotion && <ParticleCanvas disabled={isMobile || reducedMotion} />}
 
-        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.25, 0.5, 0.25] }} transition={{ duration: 5, repeat: Infinity }}
-          className="pointer-events-none absolute right-[8%] top-[15%] h-72 w-72 rounded-full bg-amber-500/15 blur-3xl" />
-        <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.15, 0.35, 0.15] }} transition={{ duration: 7, repeat: Infinity, delay: 2 }}
+        <motion.div animate={reducedMotion ? undefined : { scale: [1, 1.2, 1], opacity: [0.25, 0.5, 0.25] }} transition={{ duration: 5, repeat: reducedMotion ? 0 : Infinity }}
+          className="hero-spotlight pointer-events-none absolute right-[8%] top-[15%] h-72 w-72 rounded-full bg-amber-500/15 blur-3xl" />
+        <motion.div animate={reducedMotion ? undefined : { scale: [1, 1.3, 1], opacity: [0.15, 0.35, 0.15] }} transition={{ duration: 7, repeat: reducedMotion ? 0 : Infinity, delay: 2 }}
           className="pointer-events-none absolute bottom-[20%] left-[4%] h-60 w-60 rounded-full bg-teal-500/15 blur-3xl" />
 
-        <motion.div style={{ y: heroY, opacity: heroOpacity }} className="relative z-10 mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-14 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-10 xl:px-16">
-          {/* Left */}
+        <motion.div style={{ y: isMobile ? undefined : heroY, opacity: heroOpacity }} className="relative z-10 mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-8 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-10 lg:py-16 xl:px-16">
           <div>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-              className="mb-7 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2">
-              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
-              <span className="text-[14px] font-bold text-amber-700">🏆 Tamil Nadu's #1 Online Coaching</span>
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="text-[12px] font-bold tracking-wide text-amber-800 sm:text-[14px]">ONLINE LEARNING · SINCE 2003</span>
             </motion.div>
 
-            <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}
-              className="mb-6 text-[clamp(2.7rem,5.5vw,4.5rem)] font-black leading-[1.06] tracking-tight">
-              <span className="block text-teal-950">Transform Your</span>
-              <span className="block bg-gradient-to-br from-amber-600 via-amber-500 to-amber-700 bg-clip-text italic text-transparent">Future With</span>
-              <span className="block text-teal-950">Expert Coaching</span>
-            </motion.h1>
+            <h1 aria-label="Learn today. Lead tomorrow."
+              className="mb-6 text-[clamp(2.45rem,5.5vw,4.5rem)] font-black leading-[1.07] tracking-tight [perspective:900px]">
+              {['Learn today.', 'Lead tomorrow.'].map((line) => (
+                <span key={line} aria-hidden="true" className="hero-line block overflow-hidden text-teal-950">
+                  {Array.from(line).map((char, index) => (
+                    <span key={`${line}-${index}`} className="hero-char inline-block">
+                      {char === ' ' ? '\u00A0' : char}
+                    </span>
+                  ))}
+                </span>
+              ))}
+            </h1>
 
             <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.44 }}
-              className="mb-9 max-w-lg text-[19px] leading-relaxed text-teal-950/70">
-              Daily live classes · Free study materials · WhatsApp doubt clearing ·
-              Weekly tests — all under one roof since <strong className="font-extrabold text-amber-600">2003</strong>.
+              className="mb-8 max-w-lg text-[17px] leading-relaxed text-teal-950/70 sm:text-[19px]">
+              Personal guidance, engaging live classes, and thoughtful practice for every step of your learning journey.
             </motion.p>
 
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56 }}
-              className="mb-12 flex flex-wrap gap-4">
+              className="mb-9 flex flex-wrap gap-3 sm:gap-4">
               <motion.a whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.97 }} href="#enquiry" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-amber-600 to-amber-500 px-8 py-4 text-[16px] font-extrabold text-white shadow-lg shadow-amber-500/30">
                 📅 Book Free Demo <FiArrowRight />
               </motion.a>
@@ -377,7 +524,7 @@ export default function Landing() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="flex flex-wrap gap-8">
-              {[['500+', 'Students'], ['12+', 'Teachers'], ['20+', 'Years'], ['98%', 'Success']].map(([v, l]) => (
+              {[['500+', 'Students'], ['12+', 'Teachers'], ['20+', 'Years']].map(([v, l]) => (
                 <div key={l}>
                   <p className="text-[26px] font-extrabold text-amber-600">{v}</p>
                   <p className="text-[13px] font-semibold uppercase tracking-wide text-teal-950/50">{l}</p>
@@ -386,44 +533,19 @@ export default function Landing() {
             </motion.div>
           </div>
 
-          {/* Right — floating card stack */}
-          <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45, duration: 0.7 }}
-            className="relative hidden h-[560px] lg:block">
-            <motion.div style={{ scale: heroImgScale }} className="absolute inset-0 overflow-hidden rounded-[28px] border border-amber-500/20 shadow-xl">
-              <img
-                src="https://cdn.prod.website-files.com/635b9e21a44669d00b2a98b3/635b9e21a4466985b02a990f_Home%20Hero.webp"
-                alt="Students learning together"
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-teal-950/10 to-teal-950/45" />
-            </motion.div>
-
-            <motion.div animate={{ y: [-6, 6, -6] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute left-6 top-6 flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-white/95 px-4 py-3.5 backdrop-blur-lg shadow-lg">
-              <img
-                src="/landing-templates/assets/logo_playstore.png"
-                alt="Vettri Academy"
-                className="h-10 w-10 object-contain"
-                onError={e => { e.target.onerror = null; e.target.src = '/logo.png'; }}
-              />
-              <div>
-                <p className="text-[14px] font-bold text-teal-950">Top Rated Academy</p>
-                <p className="text-[12px] font-semibold text-amber-600">4.9 / 5.0 Rating</p>
-              </div>
-            </motion.div>
-
-            <motion.div animate={{ y: [6, -6, 6] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-              className="absolute bottom-8 right-6 flex items-center gap-2.5 rounded-2xl border border-emerald-500/40 bg-white/95 px-4 py-3.5 backdrop-blur-lg shadow-lg">
-              <span className="h-3 w-3 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_10px_#22c55e]" />
-              <div>
-                <p className="text-[14px] font-bold text-teal-950">🎥 Live Now</p>
-                <p className="text-[12px] font-semibold text-emerald-600">Daily Sessions Active</p>
-              </div>
-            </motion.div>
+          <motion.div initial={{ opacity: 0, x: isMobile ? 0 : 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35, duration: 0.7 }}
+            className="hero-card-scene hero-visual relative h-[310px] sm:h-[440px] lg:h-[560px]">
+            <div className="hero-visual__frame">
+              {!isMobile && !reducedMotion && heroVisible && <Suspense fallback={null}><HeroScene reducedMotion={reducedMotion} /></Suspense>}
+              <img src="/landing-templates/assets/crausel1.png" alt="Student learning online with Vettri Academy" className="hero-visual__photo" fetchpriority="high" />
+              <div className="hero-visual__shade" />
+              <div className="hero-visual__badge"><FiVideo size={18} /><span>Live, guided learning</span></div>
+            </div>
+            <div className="hero-visual__note"><span className="hero-visual__note-icon">✦</span><span><strong>Made for curious minds</strong><small>From school subjects to new skills</small></span></div>
           </motion.div>
         </motion.div>
 
-        <motion.div animate={{ y: [0, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}
+        <motion.div animate={reducedMotion ? undefined : { y: [0, 10, 0] }} transition={{ duration: 2, repeat: reducedMotion ? 0 : Infinity }}
           className="absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
           <span className="text-[13px] font-medium text-teal-950/40">Scroll to explore</span>
           <FiChevronDown className="text-amber-600/70" size={24} />
@@ -431,7 +553,7 @@ export default function Landing() {
       </section>
 
       {/* ── STATS RIBBON ──────────────────────────────────────────────────── */}
-      <section className="border-y border-teal-800/10 bg-teal-600/[0.06] px-4 py-10 sm:px-6 lg:px-10">
+      <section className="hero-rise border-y border-teal-800/10 bg-teal-600/[0.06] px-4 py-10 sm:px-6 lg:px-10">
         <motion.div
           variants={gridContainer} initial="hidden" whileInView="show" viewport={{ once: true }}
           className="mx-auto grid max-w-[1440px] grid-cols-2 gap-6 md:grid-cols-4"
@@ -466,6 +588,36 @@ export default function Landing() {
         </motion.div>
       </div>
 
+      {/* ── ABOUT ─────────────────────────────────────────────────────────── */}
+      <Section id="about" className="bg-white px-4 py-20 sm:px-6 lg:px-10 lg:py-28">
+        <div className="mx-auto grid max-w-[1440px] items-center gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:gap-16">
+          <div>
+            <Eyebrow>About Us</Eyebrow>
+            <h2 className="mb-5 text-[clamp(2.1rem,4vw,3.2rem)] font-black tracking-tight">
+              Learning that builds <span className="bg-gradient-to-br from-amber-600 to-amber-400 bg-clip-text text-transparent">lasting confidence</span>
+            </h2>
+            <p className="mb-8 max-w-2xl text-[17px] leading-relaxed text-teal-950/65">
+              We provide expert online tuition for students from 3rd standard to Engineering in Physics, Maths, and Chemistry. Our focus is on interactive learning, problem-solving, and building a strong academic foundation.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['Who We Are', 'A team of dedicated educators committed to quality online teaching with a student-first approach.'],
+                ['What We Do', 'Interactive online tuition in Maths, Physics, and Chemistry for school to engineering students.'],
+                ['Our Vision', 'Help students build confidence and a lifelong interest in learning.'],
+                ['Our Approach', 'Clear explanations, regular practice, and support when questions arise.'],
+              ].map(([title, text]) => (
+                <div key={title} className="rounded-2xl border border-teal-900/10 bg-teal-50/70 p-5 shadow-[0_8px_24px_rgba(9,52,49,0.04)]">
+                  <h3 className="mb-2 text-[16px] font-extrabold text-teal-950">{title}</h3>
+                  <p className="text-[14px] leading-relaxed text-teal-950/60">{text}</p>
+                </div>
+              ))}
+            </div>
+            <a href="#enquiry" className="mt-7 inline-flex items-center gap-2 font-extrabold text-teal-800 hover:text-amber-700">Discover your next step <FiArrowRight /></a>
+          </div>
+          <AboutCarousel reducedMotion={reducedMotion} />
+        </div>
+      </Section>
+
       {/* ── COURSES ───────────────────────────────────────────────────────── */}
       <Section id="courses" className="bg-teal-50 px-4 py-24 sm:px-6 lg:px-10">
         <div className="mx-auto max-w-[1440px]">
@@ -495,9 +647,12 @@ export default function Landing() {
 
           <motion.div layout variants={gridContainer} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <AnimatePresence mode="popLayout">
-              {filteredCourses.map((course) => (
+              {filteredCourses.map((course, index) => (
                 <motion.div
-                  key={course.id} layout variants={gridItem}
+                  key={course.id}
+                  layout
+                  initial={{ opacity: 0, y: 26, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: 'easeOut', delay: index * 0.06 } }}
                   exit={{ opacity: 0, scale: 0.92 }}
                   whileHover={{ y: -6, rotate: -0.4 }}
                   className="relative overflow-hidden rounded-2xl border-2 bg-gradient-to-br from-teal-100 via-teal-50 to-teal-50 p-7 shadow-sm transition-shadow hover:shadow-xl"
@@ -643,9 +798,7 @@ export default function Landing() {
                 </div>
                 <p className="mb-5 text-[16.5px] italic leading-relaxed text-teal-950/80">"{t.text}"</p>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-[46px] w-[46px] items-center justify-center rounded-full border-2 text-[16px] font-extrabold" style={{ background: `${t.color}22`, borderColor: `${t.color}50`, color: t.color }}>
-                    {t.avatar}
-                  </div>
+                  <img src={t.image} alt="Illustrative student portrait" loading="lazy" decoding="async" width="52" height="52" className="h-[52px] w-[52px] shrink-0 rounded-full border-2 border-white object-cover shadow-md ring-2 ring-amber-500/25" />
                   <div>
                     <p className="text-[16px] font-bold text-teal-950">{t.name}</p>
                     <p className="text-[13.5px] font-semibold text-amber-600">{t.grade}</p>
@@ -654,6 +807,7 @@ export default function Landing() {
               </motion.div>
             ))}
           </motion.div>
+          <p className="mt-5 text-center text-xs text-teal-950/45">Portraits are illustrative.</p>
         </div>
       </Section>
 
@@ -747,7 +901,7 @@ export default function Landing() {
             {[
               { icon: FiPhone, label: 'Phone', val: '90477 58389', href: 'tel:9047758389', color: '#0d9488' },
               { icon: FiMail, label: 'Email', val: 'vettrieducationalinstitutions@gmail.com', href: 'mailto:vettrieducationalinstitutions@gmail.com', color: '#3b82f6' },
-              { icon: FiMapPin, label: 'Location', val: 'Tamil Nadu, India', href: '#', color: '#d97706' },
+              { icon: FiMapPin, label: 'Location', val: 'Puducherry, India', href: 'https://www.google.com/maps/place/Puducherry/@11.9416,79.8083,17z/data=!4m6!3m5!1s0x3a5361ab8e49cfcf:0xcc6bd326d2f0b04e!8m2!3d11.9415915!4d79.8083133!16zL20vMDc3Nzl3?hl=en&entry=ttu&g_ep=EgoyMDI2MDkyMi4wIKXMDSoASAFQAw%3D%3D', color: '#d97706' },
             ].map(c => (
               <a key={c.label} href={c.href} className="mb-5 flex items-center gap-4">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl" style={{ background: `${c.color}18`, border: `1px solid ${c.color}30` }}>
@@ -760,11 +914,19 @@ export default function Landing() {
               </a>
             ))}
           </div>
-          <div className="h-[360px] overflow-hidden rounded-2xl border-2 border-teal-700/20">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d253682.46824000927!2d79.9864087!3d11.9139819!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a5361a498a4e97b%3A0x44b6e6f6f7f6f6f6!2sVellore%2C+Tamil+Nadu!5e0!3m2!1sen!2sin!4v1713300000000"
-              width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" title="Location"
-            />
+          <div>
+            <div className="h-[360px] overflow-hidden rounded-2xl border-2 border-teal-700/20">
+              <iframe
+                src="https://www.google.com/maps?q=11.9415915,79.8083133&z=17&output=embed"
+                width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" title="Puducherry location"
+              />
+            </div>
+            <a
+              href="https://www.google.com/maps/place/Puducherry/@11.9416,79.8083,17z/data=!4m6!3m5!1s0x3a5361ab8e49cfcf:0xcc6bd326d2f0b04e!8m2!3d11.9415915!4d79.8083133!16zL20vMDc3Nzl3?hl=en&entry=ttu&g_ep=EgoyMDI2MDkyMi4wIKXMDSoASAFQAw%3D%3D"
+              target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-[14px] font-extrabold text-teal-700 hover:text-amber-600"
+            >
+              Open in Google Maps <FiArrowRight size={15} />
+            </a>
           </div>
         </div>
       </Section>
@@ -793,7 +955,7 @@ export default function Landing() {
                   src="/landing-templates/assets/logo_playstore.png"
                   alt="Logo"
                   className="h-14 w-14 rounded-xl bg-white/95 object-contain p-1"
-                  onError={e => { e.target.onerror = null; e.target.src = '/logo.png'; }}
+                  onError={e => { e.target.onerror = null; e.target.src = '/icons/icon-192.png'; }}
                 />
                 <div>
                   <p className="text-[19px] font-extrabold text-white">No.1 Vettri Academy</p>
@@ -821,7 +983,7 @@ export default function Landing() {
                 <ul className="flex flex-col gap-3">
                   {col.links.map(l => (
                     <li key={l}>
-                      <a href="#" className="text-[15px] font-medium text-white/60 transition-colors hover:text-white">{l}</a>
+                      <a href={l === 'About Us' ? '#about' : l === 'Teachers' ? '#teachers' : l === 'Why Us' ? '#why-us' : l === 'Contact' ? '#contact' : '#'} className="text-[15px] font-medium text-white/60 transition-colors hover:text-white">{l}</a>
                     </li>
                   ))}
                 </ul>

@@ -1,18 +1,3 @@
-const nodemailer = require('nodemailer');
-
-// ─── Create Transporter ───────────────────────────────────────────────────────
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false, // TLS
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-};
-
 const FROM = process.env.EMAIL_FROM || 'No.1 Vettri Academy <contactus@no1vettriacademy.com>';
 
 // ─── Generic Send ─────────────────────────────────────────────────────────────
@@ -20,6 +5,72 @@ const sendMail = async ({ to, subject, html, text }) => {
   // Email system temporarily disabled by user request
   console.log(`[EMAIL STUB] To: ${to} | Subject: ${subject}`);
   return;
+};
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+// Enquiry notifications use HTTPS, which works on Render's Free web services.
+const sendEnquiryEmail = async (enquiry) => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+
+  const submittedAt = new Date(enquiry.createdAt || Date.now()).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short',
+  }) + ' IST';
+  const fields = [
+    ['Student name', enquiry.name],
+    ['Phone', enquiry.phone],
+    ['Email', enquiry.email],
+    ['Grade', enquiry.grade],
+    ['Course interested in', enquiry.course],
+    ['Message', enquiry.message],
+    ['Submitted', submittedAt],
+  ];
+  const display = (value) => String(value ?? '').trim() || '—';
+  const rows = fields.map(([label, value], index) => `
+    <tr style="background:${index % 2 ? '#f7faf9' : '#ffffff'};">
+      <th scope="row" style="padding:13px 16px;text-align:left;vertical-align:top;width:38%;font-size:13px;color:#516b69;border-bottom:1px solid #e6eeeb;">${escapeHtml(label)}</th>
+      <td style="padding:13px 16px;vertical-align:top;font-size:14px;font-weight:600;color:#123735;border-bottom:1px solid #e6eeeb;word-break:break-word;">${escapeHtml(display(value)).replace(/\r?\n/g, '<br>')}</td>
+    </tr>`).join('');
+
+  const mail = {
+    from: `No.1 Vettri Academy <${process.env.RESEND_FROM_EMAIL || 'notifications@no1vettriacademy.com'}>`,
+    to: ['vettrieducationalinstitutions@gmail.com'],
+    subject: 'New website enquiry — No.1 Vettri Academy',
+    text: fields.map(([label, value]) => `${label}: ${display(value)}`).join('\n'),
+    html: `<div style="margin:0;padding:28px 12px;background:#edf5f2;font-family:Arial,sans-serif;">
+      <div style="max-width:620px;margin:auto;overflow:hidden;border-radius:16px;background:#ffffff;border:1px solid #dbe8e3;">
+        <div style="padding:24px 28px;background:#103b3a;color:#ffffff;">
+          <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#e7b85b;">No.1 Vettri Academy</div>
+          <h1 style="margin:8px 0 0;font-size:23px;line-height:1.3;">New website enquiry</h1>
+        </div>
+        <div style="padding:24px 20px;">
+          <p style="margin:0 8px 18px;color:#516b69;font-size:14px;">A student has submitted the enquiry form. Their details are below.</p>
+          <table role="presentation" style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows}</table>
+        </div>
+      </div>
+    </div>`,
+  };
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(mail),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(`Resend API error ${response.status}: ${detail}`);
+  }
 };
 
 // ─── Welcome Email ────────────────────────────────────────────────────────────
@@ -133,4 +184,5 @@ module.exports = {
   sendDemoConfirmation,
   sendAbsentAlert,
   sendMail,
+  sendEnquiryEmail,
 };

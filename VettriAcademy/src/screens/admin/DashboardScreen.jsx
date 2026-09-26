@@ -19,6 +19,7 @@ const ASSETS = {
    materialUpload: require('../../../assets/materialupload_new.png'),
   pendingApproval: require('../../../assets/pendingapproval_new.png'),
   libraryAccess: require('../../../assets/libraryaccess_new.png'),
+  query: require('../../../assets/query.png'),
 };
 
 // Prefetch assets for faster rendering
@@ -224,7 +225,7 @@ export default function AdminDashboard({ navigation }) {
   ];
 
   const quickActions = [
-    { id: 'admin_queries', icon: ASSETS.chat, label: 'Queries Received', subtitle: 'VASQ / VATQ Tickets', screen: 'AdminQueries', gradient: ['#312E81', '#6366F1'], badge: adminCounts?.open || 0 },
+    { id: 'admin_queries', icon: ASSETS.query, label: 'Queries Received', subtitle: 'VASQ / VATQ Tickets', screen: 'AdminQueries', gradient: ['#1E1B4B', '#3730A3'], badge: adminCounts?.open || 0 },
     { id: 'chat_dm', icon: ASSETS.chat, label: 'Messages', subtitle: 'Direct 1-on-1 Chat', screen: 'AdminChat', gradient: ['#FF4FA3', '#F43F5E'], badge: unreadChatCount || 0 },
     { id: '3', icon: ASSETS.newFee, label: 'Fees', subtitle: 'Manage Payments', screen: 'FeeManagement', gradient: ['#14C8C4', '#38BDF8'] },
     { id: '4', icon: ASSETS.newNotice, label: 'Notice', subtitle: 'Create & View Notices', screen: 'Announcements', gradient: ['#FF4F8B', '#FB7185'] },

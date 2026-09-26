@@ -372,7 +372,11 @@ export default function AdminQueriesScreen({ navigation }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF4FA3']} />}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Ionicons name="checkmark-done-circle-outline" size={60} color="#CBD5E1" />
+              <Image
+                source={require('../../../assets/query.png')}
+                style={{ width: 220, height: 160, marginBottom: 12, borderRadius: 16 }}
+                contentFit="contain"
+              />
               <Text style={[styles.emptyTitle, { color: textColor }]}>No tickets found</Text>
               <Text style={[styles.emptySub, { color: textSec }]}>
                 {searchQuery ? `No matching queries for "${searchQuery}"` : 'All student and teacher queries are cleared!'}

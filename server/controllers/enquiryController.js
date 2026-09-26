@@ -18,8 +18,12 @@ const submitEnquiry = async (req, res) => {
       source: 'landing_page',
     });
 
-    // Send admin notification email
-    sendEnquiryEmail(enquiry);
+    // The saved enquiry is the source of truth; email delivery must not affect the API result.
+    try {
+      await sendEnquiryEmail(enquiry);
+    } catch (emailErr) {
+      console.error('[Enquiry] Email notification failed:', emailErr);
+    }
 
     const notificationService = require('../services/notificationService');
     const { getAdminUserIds } = require('../utils/adminCache');

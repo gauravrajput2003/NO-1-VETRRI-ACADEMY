@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { SOCKET_ORIGIN } from '../config/apiOrigin';
 
 const SocketContext = createContext(null);
 
@@ -13,7 +14,7 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     if (user) {
       // Connect socket
-      const s = io(import.meta.env.VITE_SOCKET_URL || window.location.origin, {
+      const s = io(SOCKET_ORIGIN, {
         withCredentials: true,
         transports: ['websocket', 'polling'],
       });

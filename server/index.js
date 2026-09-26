@@ -48,7 +48,11 @@ const server = http.createServer(app);
 
 // ─── CORS Configuration ────────────────────────────────────────────────────────
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',  // Web client
+  ...(process.env.CLIENT_URL || '').split(',').map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean),
+  'https://no1vettriacademy.com',
+  'https://www.no1vettriacademy.com',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'http://localhost:8081',                             // Expo/React Native app
   'http://127.0.0.1:8081',
   'http://localhost:19000',                            // Expo dev server
