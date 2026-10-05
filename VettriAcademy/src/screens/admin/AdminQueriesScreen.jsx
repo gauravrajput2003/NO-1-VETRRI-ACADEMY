@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,15 @@ import {
   TouchableOpacity as RNTouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
   RefreshControl,
   Modal,
   Alert,
   Linking,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +42,9 @@ const TouchableOpacity = (props) => {
 
 export default function AdminQueriesScreen({ navigation }) {
   const dispatch = useDispatch();
+  const insets = useSafeAreaInsets();
+  const replyScrollRef = useRef(null);
+  const replyFocused = useRef(false);
   const { adminTickets, adminTicketsTotal, adminCounts, adminLoading } = useSelector((s) => s.support);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -53,6 +58,11 @@ export default function AdminQueriesScreen({ navigation }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    setReplyText(selectedTicket?.adminReply || '');
+    replyFocused.current = false;
+  }, [selectedTicket?._id]);
 
   const bgColor = isDark ? Colors.background.dark : '#F8FAFC';
   const cardBg = isDark ? Colors.card.dark : '#FFFFFF';
@@ -114,7 +124,7 @@ export default function AdminQueriesScreen({ navigation }) {
       ).unwrap();
 
       setSelectedTicket(updated);
-      setReplyText('');
+      setReplyText(updated.adminReply || '');
       Toast.show({ type: 'success', text1: `Ticket marked as ${newStatus.replace('_', ' ').toUpperCase()}` });
     } catch (err) {
       Toast.show({ type: 'error', text1: 'Update failed', text2: err || 'Please try again' });
@@ -387,11 +397,20 @@ export default function AdminQueriesScreen({ navigation }) {
       )}
 
       {/* ── Ticket Detail & Reply Modal ── */}
-      <Modal visible={!!selectedTicket} transparent animationType="slide">
-        <View style={styles.detailModalOverlay}>
-          <View style={[styles.detailModalContent, { backgroundColor: cardBg }]}>
+      <Modal visible={!!selectedTicket} transparent animationType="slide" onRequestClose={() => setSelectedTicket(null)} statusBarTranslucent navigationBarTranslucent>
+        <KeyboardAvoidingView style={[styles.detailModalOverlay, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={[styles.detailModalContent, { backgroundColor: cardBg, paddingBottom: 20 + insets.bottom }]}>
             {selectedTicket && (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView
+                ref={replyScrollRef}
+                style={{ flexShrink: 1 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                onLayout={() => {
+                  if (replyFocused.current) replyScrollRef.current?.scrollToEnd({ animated: true });
+                }}
+              >
                 {/* Modal Header */}
                 <View style={styles.modalHeader}>
                   <View style={{ flex: 1 }}>
@@ -489,8 +508,13 @@ export default function AdminQueriesScreen({ navigation }) {
                   style={[styles.modalReplyInput, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC', color: textColor, borderColor }]}
                   placeholder="Type your response to the student/teacher..."
                   placeholderTextColor="#94A3B8"
-                  value={replyText || selectedTicket.adminReply || ''}
+                  value={replyText}
                   onChangeText={setReplyText}
+                  onFocus={() => {
+                    replyFocused.current = true;
+                    replyScrollRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  onBlur={() => { replyFocused.current = false; }}
                   multiline
                   numberOfLines={3}
                 />
@@ -499,7 +523,7 @@ export default function AdminQueriesScreen({ navigation }) {
                   <TouchableOpacity
                     style={styles.sendReplyBtn}
                     onPress={() => handleUpdateStatus(selectedTicket.status)}
-                    disabled={updatingStatus || !replyText.trim()}
+                    disabled={updatingStatus || !replyText.trim() || replyText.trim() === (selectedTicket.adminReply || '').trim()}
                   >
                     <LinearGradient colors={['#10B981', '#059669']} style={styles.sendReplyGradient}>
                       {updatingStatus ? (
@@ -538,7 +562,7 @@ export default function AdminQueriesScreen({ navigation }) {
               </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -643,7 +667,7 @@ const styles = StyleSheet.create({
 
   // Detail Modal
   detailModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  detailModalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '90%' },
+  detailModalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '90%', flexShrink: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
   modalUserRole: { fontSize: 11, fontWeight: '800' },
   modalUserName: { fontSize: 18, fontWeight: '900', marginTop: 4 },
@@ -664,7 +688,7 @@ const styles = StyleSheet.create({
   statusChangeBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
   statusChangeBtnText: { fontSize: 11, fontWeight: '800' },
 
-  modalReplyInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 70, textAlignVertical: 'top' },
+  modalReplyInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 70, maxHeight: 140, textAlignVertical: 'top' },
   modalActionsRow: { marginTop: 10 },
   sendReplyBtn: { borderRadius: 12, overflow: 'hidden' },
   sendReplyGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8 },

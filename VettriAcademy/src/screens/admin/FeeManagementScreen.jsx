@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatCurrency } from '../../utils/formatters';
 import { fetchStudentFeeDirectory } from '../../redux/slices/adminSlice';
 import { LinearGradient } from 'expo-linear-gradient';
-import { toggleAI } from '../../redux/slices/uiSlice';
 import { useResponsive } from '../../utils/responsive';
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -166,7 +165,6 @@ export default function FeeManagementScreen({ navigation }) {
                 <Ionicons name="chevron-back" size={styles.__iconSize + 3} color="#FFF" />
               </TouchableOpacity>
               <View style={styles.headerActions}>
-                <IconChip styles={styles} icon="sparkles" isGold onPress={() => dispatch(toggleAI())} />
                 <IconChip styles={styles} icon="notifications-outline" badge={unreadCount} onPress={() => navigation.navigate('Notifications')} />
               </View>
             </View>

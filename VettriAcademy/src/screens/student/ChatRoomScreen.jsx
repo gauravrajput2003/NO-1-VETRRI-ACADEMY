@@ -12,8 +12,8 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Linking,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -375,6 +375,10 @@ export default function ChatRoomScreen({ route, navigation }) {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
       {/* ── CUSTOM HEADER ── */}
       <View style={[styles.header, { backgroundColor: cardBg, borderBottomColor: isDark ? '#2D3748' : '#E5E7EB' }]}>
@@ -411,11 +415,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       </View>
 
       {/* ── CHAT BODY ── */}
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: bgColor }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
+      <View style={[styles.container, { backgroundColor: bgColor }]}>
         {loading && messages.length === 0 ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={Colors.primary} />
@@ -427,6 +427,9 @@ export default function ChatRoomScreen({ route, navigation }) {
             data={messages}
             keyExtractor={(item) => item._id || item.createdAt}
             renderItem={renderMessage}
+            style={styles.container}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
@@ -472,6 +475,7 @@ export default function ChatRoomScreen({ route, navigation }) {
             value={text}
             onChangeText={handleTextChange}
             multiline
+            textAlignVertical="top"
             maxLength={3000}
           />
 
@@ -529,8 +533,9 @@ export default function ChatRoomScreen({ route, navigation }) {
             {previewImage && <Image source={{ uri: previewImage }} style={styles.previewImage} contentFit="contain" />}
           </View>
         </Modal>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 

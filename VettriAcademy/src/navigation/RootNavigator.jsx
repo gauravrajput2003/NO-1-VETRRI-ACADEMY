@@ -207,7 +207,7 @@ export default function RootNavigator() {
       ) : (
         <AuthNavigator />
       )}
-      {isAuthenticated && user && <AIAssistantDrawer />}
+      {isAuthenticated && user && user.role !== 'admin' && <AIAssistantDrawer />}
       <AnnouncementPopup />
     </NavigationContainer>
   );

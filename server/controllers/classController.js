@@ -240,8 +240,23 @@ const getSchedules = async (req, res) => {
 
     const total = await ClassSchedule.countDocuments(filter);
 
+    let responseSchedules = schedules;
+    if (user.role === 'admin' && schedules.length) {
+      // joinTime is set by student joins, unlike manually marked attendance.
+      // One attendance record per class/student means rejoins count only once.
+      const joinedCounts = await ClassAttendance.aggregate([
+        { $match: { classId: { $in: schedules.map((schedule) => schedule._id) }, joinTime: { $type: 'date' } } },
+        { $group: { _id: '$classId', studentsJoined: { $sum: 1 } } },
+      ]);
+      const countsByClass = new Map(joinedCounts.map((record) => [String(record._id), record.studentsJoined]));
+      responseSchedules = schedules.map((schedule) => ({
+        ...schedule.toObject(),
+        studentsJoined: countsByClass.get(String(schedule._id)) || 0,
+      }));
+    }
+
     // Add recordingUrl but NOT meetLink
-    res.json({ success: true, schedules, total, page: parseInt(page) });
+    res.json({ success: true, schedules: responseSchedules, total, page: parseInt(page) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

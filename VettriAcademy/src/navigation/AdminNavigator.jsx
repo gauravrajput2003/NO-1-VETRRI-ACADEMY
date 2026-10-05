@@ -24,6 +24,7 @@ import ForgotPasswordScreen from '../screens/common/ForgotPasswordScreen';
 import AdminTrainingVideosScreen from '../screens/admin/AdminTrainingVideosScreen';
 import StudentMarksScreen from '../screens/admin/StudentMarksScreen';
 import MonthlyTopRankersScreen from '../screens/admin/MonthlyTopRankersScreen';
+import AdminClassOverviewScreen from '../screens/admin/AdminClassOverviewScreen';
 
 import NotificationsScreen from '../screens/common/NotificationsScreen';
 import SettingsScreen from '../screens/common/SettingsScreen';
@@ -74,6 +75,7 @@ function HomeStack() {
       <Stack.Screen name="AdminTrainingVideos" component={AdminTrainingVideosScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StudentMarks" component={StudentMarksScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MonthlyTopRankers" component={MonthlyTopRankersScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminClassOverview" component={AdminClassOverviewScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DoubtCenter" component={DiscussScenarioScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DoubtDetail" component={DoubtThreadScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Downloads" component={DownloadCenterScreen} options={{ headerShown: true, title: 'Download Center' }} />

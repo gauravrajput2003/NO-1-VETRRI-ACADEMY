@@ -10,6 +10,7 @@ export default function HeaderActions() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { unreadCount } = useSelector((s) => s.notifications);
+  const isAdmin = useSelector((s) => s.auth.user?.role === 'admin');
   const openNotifications = () => {
     const currentState = navigation.getState?.();
     if (currentState?.routeNames?.includes('Notifications')) {
@@ -34,9 +35,9 @@ export default function HeaderActions() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
+      {!isAdmin && <TouchableOpacity style={styles.aiBtn} onPress={() => dispatch(toggleAI())}>
         <Ionicons name="sparkles" size={22} color={Colors.hotPink} />
-      </TouchableOpacity>
+      </TouchableOpacity>}
       
       <TouchableOpacity style={styles.notifBtn} onPress={openNotifications}>
         <Ionicons name="notifications-outline" size={24} color={Colors.hotPink} />

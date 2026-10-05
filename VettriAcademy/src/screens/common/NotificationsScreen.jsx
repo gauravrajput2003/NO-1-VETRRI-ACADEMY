@@ -240,13 +240,13 @@ export default function NotificationsScreen({ navigation }) {
             <Text style={styles.heroSub} numberOfLines={1}>Stay updated with your learning</Text>
           </View>
 
-          <TouchableOpacity
+          {userRole !== 'admin' && <TouchableOpacity
             style={styles.glassBtn}
             onPress={() => dispatch(toggleAI())}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="sparkles" size={r.scaleFont(20)} color="#FFFFFF" />
-          </TouchableOpacity>
+          </TouchableOpacity>}
         </View>
       </LinearGradient>
 

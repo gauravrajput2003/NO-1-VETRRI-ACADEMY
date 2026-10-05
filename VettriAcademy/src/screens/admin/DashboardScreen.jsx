@@ -32,7 +32,6 @@ import { fetchAdminStats } from '../../redux/slices/adminSlice';
 import { fetchUnreadNotificationCount } from '../../redux/slices/notificationsSlice';
 import { fetchUnreadCount as fetchChatUnreadCount } from '../../redux/slices/chatSlice';
 import { fetchAdminSupportTickets } from '../../redux/slices/supportSlice';
-import { toggleAI } from '../../redux/slices/uiSlice';
 import { getAdminStudentMarksAPI, getAdminTopRankersAPI } from '../../services/api';
 
 
@@ -258,16 +257,15 @@ export default function AdminDashboard({ navigation }) {
             <View style={styles.headerContent}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.greeting}>ADMIN PANEL</Text>
-                <View style={styles.headerNameRow}>
-                  <Text style={styles.headerName}>{(user?.displayName || user?.name || '').split(' ')[0]} </Text>
+                <Text style={[styles.headerName, { marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {(user?.displayName || user?.name || '').split(' ')[0]}{' '}
                   <Text style={styles.headerNameAccent}>{(user?.displayName || user?.name || '').split(' ').slice(1).join(' ')}</Text>
-                </View>
+                </Text>
                 <Text style={styles.headerDateline}>
                   {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' })} · All systems normal
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <ActionButton icon="sparkles" isGold onPress={() => dispatch(toggleAI())} delay={100} />
                 <ActionButton icon="chatbubbles" badge={unreadChatCount} onPress={() => navigation.navigate('AdminChat')} delay={150} />
                 <ActionButton icon="notifications" badge={unreadCount} onPress={() => navigation.navigate('Notifications')} delay={200} />
               </View>
@@ -334,6 +332,18 @@ export default function AdminDashboard({ navigation }) {
           delay={900}
           height={120}
           footerText="View Leaderboard"
+        />
+      </View>
+
+      <View style={styles.sectionPad}>
+        <PremiumCard
+          title="📅 Class Schedule Overview"
+          subtitle="All teachers' classes, dates and class counts."
+          gradient={['#0F766E', '#14B8A6']}
+          onPress={() => navigation.navigate('AdminClassOverview')}
+          delay={950}
+          height={120}
+          footerText="View All Classes"
         />
       </View>
 
