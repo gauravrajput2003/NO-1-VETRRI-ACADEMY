@@ -32,6 +32,7 @@ const WeeklyTopPerformer = require('../models/WeeklyTopPerformer');
 const LibraryAccess = require('../models/LibraryAccess');
 const MaterialFolder = require('../models/MaterialFolder');
 const notificationService = require('../services/notificationService');
+const { notifyMaterialAvailable } = require('../services/materialNotificationService');
 const storageService = require('../services/storageService');
 const cache = require('../utils/cache');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
@@ -784,10 +785,8 @@ const approveMaterial = async (req, res) => {
           .catch((deleteErr) => console.warn('[Approve Material] Old file delete failed:', deleteErr.message));
       }
 
-      // Notify students if it was a new upload going live (same logic as teacher controller) or approved edit
       if (wasPendingNew) {
-        // Find enrolled students for the material's course/grade to notify, simplified for admin approval
-        // Wait, for simplicity, we focus on notifying the requesting teacher.
+        await notifyMaterialAvailable({ material, senderId: req.user._id, io: req.app.get('io') });
       }
     }
 

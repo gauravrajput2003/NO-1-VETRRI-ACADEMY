@@ -7,6 +7,7 @@ const MaterialFolder = require('../models/MaterialFolder');
 const User = require('../models/User');
 const storageService = require('../services/storageService');
 const notificationService = require('../services/notificationService');
+const { notifyMaterialAvailable } = require('../services/materialNotificationService');
 const cache = require('../utils/cache');
 const { getAdminUserIds } = require('../utils/adminCache');
 const crypto = require('crypto');
@@ -196,6 +197,7 @@ const confirmUpload = async (req, res) => {
     }
 
     const material = await StudyMaterial.create(materialPayload);
+    if (isAdmin) await notifyMaterialAvailable({ material, senderId: req.user._id, io: req.app.get('io') });
 
     // Invalidate cached material folders and dashboards
     cache.del('teacher_folders');

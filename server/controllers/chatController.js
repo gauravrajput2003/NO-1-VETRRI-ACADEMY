@@ -3,7 +3,7 @@ const Conversation = require('../models/Conversation');
 const User = require('../models/User');
 const TeacherPermissions = require('../models/TeacherPermissions');
 const { uploadToCloudinary, getResourceType } = require('../middleware/upload');
-const { sendPushNotifications } = require('../services/pushService');
+const { notifyChatMessage } = require('../services/chatNotificationService');
 
 // ─── Get Admin Contact Info ───────────────────────────────────────────────────
 // For Students and Teachers to initiate their private chat with Admin
@@ -207,21 +207,7 @@ const sendMessage = async (req, res) => {
       io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:message', populated);
     }
 
-    // Send Expo push notification to receiver if offline/backgrounded
-    if (receiver && receiver.expoPushToken) {
-      const senderName = req.user.displayName || req.user.name || 'New Message';
-      sendPushNotifications([receiver.expoPushToken], {
-        title: senderName,
-        body: message.trim().substring(0, 150),
-        data: {
-          type: 'chat_message',
-          conversationId,
-          senderId: senderId.toString(),
-          senderName,
-          senderRole: req.user.role,
-        },
-      }).catch((pushErr) => console.error('[Chat Push] Notification failed:', pushErr.message));
-    }
+    await notifyChatMessage({ sender: req.user, receiverId, conversationId, messageId: msg._id, preview: message.trim(), io });
 
     res.status(201).json({ success: true, message: populated });
   } catch (error) {
@@ -344,21 +330,7 @@ const sendFile = async (req, res) => {
       io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:file', populated);
     }
 
-    // Send Expo push notification for file/media attachment
-    if (receiver && receiver.expoPushToken) {
-      const senderName = req.user.displayName || req.user.name || 'New Attachment';
-      sendPushNotifications([receiver.expoPushToken], {
-        title: senderName,
-        body: previewLabel,
-        data: {
-          type: 'chat_message',
-          conversationId,
-          senderId: senderId.toString(),
-          senderName,
-          senderRole: req.user.role,
-        },
-      }).catch((pushErr) => console.error('[Chat File Push] Notification failed:', pushErr.message));
-    }
+    await notifyChatMessage({ sender: req.user, receiverId, conversationId, messageId: msg._id, preview: previewLabel, io });
 
     res.status(201).json({ success: true, message: populated });
   } catch (error) {

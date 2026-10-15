@@ -204,7 +204,8 @@ io.on('connection', (socket) => {
       const conversationId = [senderId, receiverId].sort().join('_');
 
       // Check permissions if teacher
-      const senderUser = await User.findById(senderId).select('role');
+      const senderUser = await User.findById(senderId).select('role name displayName');
+      if (!senderUser) return;
       if (senderUser?.role === 'teacher') {
         const perms = await TeacherPermissions.findOne({ teacherId: senderId });
         if (perms && !perms.canSendMessages) {
@@ -228,6 +229,9 @@ io.on('connection', (socket) => {
         .populate('senderId', 'name displayName profilePic role');
 
       io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:message', populated);
+      await require('./services/chatNotificationService').notifyChatMessage({
+        sender: senderUser, receiverId, conversationId, messageId: chatMsg._id, preview: message, io,
+      });
     } catch (error) {
       socket.emit('chat:error', { message: error.message });
     }
@@ -304,6 +308,7 @@ const startCronJobs = () => {
 };
 
 connectDB().then(() => {
+  require('./services/pushService').startPushDeliveryWorker();
   server.listen(PORT, () => {
     infoProd(`🚀 Server running on http://localhost:${PORT}`);
     infoProd(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);

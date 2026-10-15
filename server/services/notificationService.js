@@ -44,25 +44,29 @@ const sendNotification = async ({
       referenceType,
     });
 
-    // 2. Fetch User for Expo Push Token
-    const user = await User.findById(recipientId).select('expoPushToken');
-
-    // 3. Emit Socket.io event if user is online
+    // A socket/population failure must not prevent delivery to a closed app.
     if (io) {
-      // populate sender for immediate UI display if senderId exists
-      let populatedNotif = notification;
-      if (senderId) {
-        populatedNotif = await Notification.findById(notification._id).populate('sender', 'name displayName profilePic');
+      try {
+        let populatedNotif = notification;
+        if (senderId) {
+          populatedNotif = await Notification.findById(notification._id).populate('sender', 'name displayName profilePic');
+        }
+        io.to(`user:${recipientId}`).emit('notification:new', populatedNotif);
+      } catch (socketError) {
+        errorCrit('[NotificationService] Socket delivery failed:', socketError.message);
       }
-      io.to(`user:${recipientId}`).emit('notification:new', populatedNotif);
     }
 
-    // 4. Send Expo Push Notification
-    if (user && user.expoPushToken) {
+    const user = await User.findById(recipientId).select('expoPushToken isActive');
+    if (user && user.isActive !== false && user.expoPushToken) {
       await sendPushNotifications([user.expoPushToken], {
         title,
         body: message,
-        data: { ...data, type, link, notificationId: notification._id.toString() },
+        data: {
+          ...data, type, link, notificationId: notification._id.toString(),
+          ...(referenceId ? { referenceId: String(referenceId) } : {}),
+          ...(referenceType ? { referenceType } : {}),
+        },
       });
     }
 
@@ -86,24 +90,21 @@ const sendBulkNotifications = async ({
   io,
 }) => {
   try {
-    const results = await Promise.all(
-      recipientIds.map((recipientId) =>
-        sendNotification({
-          recipientId,
-          senderId,
-          type,
-          title,
-          message,
-          link,
-          data,
-          referenceId,
-          referenceType,
-          io,
-        })
-      )
-    );
+    const uniqueRecipients = [...new Set(recipientIds.filter(Boolean).map(String))];
+    const results = [];
+    // Bound database work for large announcements. Push sends are batched by the outbox.
+    for (let offset = 0; offset < uniqueRecipients.length; offset += 25) {
+      results.push(...await Promise.all(
+        uniqueRecipients.slice(offset, offset + 25).map((recipientId) =>
+          sendNotification({
+            recipientId, senderId, type, title, message, link, data,
+            referenceId, referenceType, io,
+          })
+        )
+      ));
+    }
 
-    return { success: true, results };
+    return { success: results.every((result) => result.success), results };
   } catch (error) {
     errorCrit(`[NotificationService] Error sending bulk notifications:`, error.message);
     return { success: false, error: error.message };

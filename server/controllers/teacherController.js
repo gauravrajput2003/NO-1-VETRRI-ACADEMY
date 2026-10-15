@@ -13,6 +13,7 @@ const TeacherGrading = require('../models/TeacherGrading');
 const MaterialFolder = require('../models/MaterialFolder');
 const storageService = require('../services/storageService');
 const notificationService = require('../services/notificationService');
+const { notifyMaterialAvailable } = require('../services/materialNotificationService');
 const { logDev, warnDev, errorCrit } = require('../utils/logger');
 const cache = require('../utils/cache');
 const { getAdminUserIds } = require('../utils/adminCache');
@@ -593,6 +594,7 @@ const toggleMaterialLock = async (req, res) => {
       }
       await material.save();
       invalidateMaterialCaches(req.user._id);
+      if (!lockedForAll) await notifyMaterialAvailable({ material, senderId: req.user._id, io: req.app.get('io') });
       return res.status(200).json({ success: true, material });
     }
 
@@ -620,7 +622,7 @@ const toggleMaterialLock = async (req, res) => {
 
     invalidateMaterialCaches(req.user._id);
 
-    if (unlock) {
+    if (unlock && material.approvalStatus === 'approved') {
       await notificationService.sendNotification({
         recipientId: studentId,
         senderId: req.user._id,

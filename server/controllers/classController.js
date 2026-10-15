@@ -28,8 +28,9 @@ const normalizeCourse = (value) => {
   return courseMap[raw] || raw;
 };
 
-const notifyStudentsClassScheduled = async ({ req, schedule }) => {
-  const recipientIds = [...new Set((schedule.studentIds || []).map((id) => String(id)).filter(Boolean))];
+const notifyStudentsClassScheduled = async ({ req, schedule, action = 'scheduled' }) => {
+  const recipientIds = [...new Set([...(schedule.studentIds || []), schedule.teacherId]
+    .filter(Boolean).map(String))].filter((id) => id !== String(req.user._id));
   if (!recipientIds.length) return;
 
   const classDate = schedule.scheduledDate
@@ -40,8 +41,10 @@ const notifyStudentsClassScheduled = async ({ req, schedule }) => {
     recipientIds,
     senderId: req.user._id,
     type: 'class_reminder',
-    title: 'Class Scheduled',
-    message: `${schedule.title || schedule.subject} is scheduled for ${classDate} at ${schedule.scheduledTime}.`,
+    title: `Class ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+    message: action === 'cancelled'
+      ? `${schedule.title || schedule.subject} on ${classDate} at ${schedule.scheduledTime} was cancelled.${schedule.cancelReason ? ` ${schedule.cancelReason}` : ''}`
+      : `${schedule.title || schedule.subject} is ${action} for ${classDate} at ${schedule.scheduledTime}.`,
     link: '/student/classes',
     data: {
       classId: schedule._id,
@@ -705,6 +708,7 @@ const updateSchedule = async (req, res) => {
 
     const schedule = await ClassSchedule.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found.' });
+    await notifyStudentsClassScheduled({ req, schedule, action: 'updated' });
     res.json({ success: true, schedule });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -733,7 +737,8 @@ const cancelSchedule = async (req, res) => {
 
     // Emit cancellation
     const room = `course_${cls.course}_${cls.grade}`;
-    io.to(room).emit('class:cancelled', { classId: cls._id, reason });
+    io?.to(room).emit('class:cancelled', { classId: cls._id, reason });
+    if (existing.status !== 'cancelled') await notifyStudentsClassScheduled({ req, schedule: cls, action: 'cancelled' });
 
     res.json({ success: true, message: 'Class cancelled.' });
   } catch (error) {
@@ -804,6 +809,15 @@ const generateYearSchedule = async (req, res) => {
     }
 
     const created = await ClassSchedule.insertMany(schedules);
+    if (created.length) {
+      await notificationService.sendBulkNotifications({
+        recipientIds: [...studentIds, teacherId].filter((id) => String(id) !== String(req.user._id)),
+        senderId: req.user._id, type: 'class_reminder', title: 'Class Schedule Published',
+        message: `${created.length} ${subject || 'new'} classes have been scheduled. Open your timetable for details.`,
+        referenceId: created[0]._id, referenceType: 'ClassSchedule',
+        data: { classId: String(created[0]._id) }, io: req.app.get('io'),
+      });
+    }
     res.status(201).json({ success: true, created: created.length, message: `${created.length} classes scheduled.` });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

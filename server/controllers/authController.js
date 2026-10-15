@@ -5,6 +5,7 @@ const { generateToken, generateRefreshToken, setCookieToken, clearCookieToken } 
 const { sendWelcomeEmail } = require('../utils/email');
 const jwt = require('jsonwebtoken');
 const Course = require('../models/Course');
+const { isExpoPushToken } = require('../utils/pushToken');
 
 const normalizeBoard = (value) => {
   if (!value) return '';
@@ -273,7 +274,7 @@ const logout = async (req, res) => {
       await log.save();
     }
 
-    await User.findByIdAndUpdate(req.user._id, { refreshToken: '', isOnline: false, lastSeen: new Date() });
+    await User.findByIdAndUpdate(req.user._id, { refreshToken: '', isOnline: false, lastSeen: new Date(), expoPushToken: null });
     res.status(200).json({ success: true, message: 'Logged out successfully.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -353,11 +354,13 @@ const savePushToken = async (req, res) => {
       return res.status(400).json({ success: false, message: 'expoPushToken is required' });
     }
 
-    // Basic validation — Expo tokens always start with "ExponentPushToken["
-    if (!expoPushToken.startsWith('ExponentPushToken[')) {
+    // Both prefixes are valid. Native FCM tokens are not Expo push tokens.
+    if (!isExpoPushToken(expoPushToken)) {
       return res.status(400).json({ success: false, message: 'Invalid Expo push token format' });
     }
 
+    // One installation must not keep receiving a previous account's private alerts.
+    await User.updateMany({ _id: { $ne: req.user._id }, expoPushToken }, { $unset: { expoPushToken: '' } });
     await User.findByIdAndUpdate(req.user._id, { expoPushToken });
 
     res.json({ success: true, message: 'Push token saved' });

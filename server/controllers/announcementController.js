@@ -1,6 +1,7 @@
 const Announcement = require('../models/Announcement');
 const AnnouncementRead = require('../models/AnnouncementRead');
 const User = require('../models/User');
+const Course = require('../models/Course');
 const notificationService = require('../services/notificationService');
 
 const DEFAULT_MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS = 30;
@@ -34,7 +35,7 @@ function buildAnnouncementNotifyCopy({ title, content, media = [], posterName })
     pushTitle: title,
     pushBody: String(content || '').substring(0, 150),
     notifTitle: title,
-    notifMessage: String(content || '').substring(0, 200),
+    notifMessage: String(content || `${name} shared an attachment.`).substring(0, 200),
   };
 }
 
@@ -96,9 +97,9 @@ const createAnnouncement = async (req, res) => {
     });
 
     if (normalizedTargetRole === 'all' || normalizedTargetRole === 'student') {
-      io.emit('announcement:new', { announcement: { ...announcement.toObject(), content: announcement.content.substring(0, 200) } });
+      io?.emit('announcement:new', { announcement: { ...announcement.toObject(), content: String(announcement.content || '').substring(0, 200) } });
     } else if (normalizedTargetRole === 'teacher') {
-      io.emit('announcement:new', { announcement: { ...announcement.toObject() } });
+      io?.emit('announcement:new', { announcement: { ...announcement.toObject() } });
     }
 
     // In-app + push notifications (fire-and-forget)
@@ -108,9 +109,23 @@ const createAnnouncement = async (req, res) => {
           ? { role: { $in: ['student', 'teacher'] } }
           : { role: normalizedTargetRole };
 
+        let courseIds;
+        if (targetCourse && targetCourse !== 'all') {
+          // Web notices can use category names; User.course stores an ObjectId.
+          const category = { Matric: 'State Board', Arts: 'Arts & Science' }[targetCourse] || targetCourse;
+          courseIds = /^[a-f\d]{24}$/i.test(targetCourse) ? [targetCourse]
+            : (await Course.find({ $or: [{ title: targetCourse }, { category }] }).select('_id').lean()).map((course) => course._id);
+        }
+        const grade = targetGrade && targetGrade !== 'all' ? targetGrade : null;
+
         const recipients = await User.find({
           ...roleFilter,
           isActive: true,
+          // Course/grade targets restrict students; teachers still receive staff notices.
+          ...((courseIds || grade) ? { $or: [
+            { role: 'teacher' },
+            { role: 'student', ...(courseIds ? { course: { $in: courseIds } } : {}), ...(grade ? { grade } : {}) },
+          ] } : {}),
         }).select('_id expoPushToken').lean();
 
         const posterName = req.user.displayName || req.user.name || 'Admin';

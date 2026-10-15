@@ -1,4 +1,10 @@
 const Notification = require('../models/Notification');
+const { getPushDiagnostics } = require('../services/pushDiagnostics');
+
+const getPushStatus = async (req, res) => {
+  try { res.json({ success: true, ...await getPushDiagnostics() }); }
+  catch (error) { res.status(500).json({ success: false, message: 'Unable to load push delivery status.' }); }
+};
 
 const getNotifications = async (req, res) => {
   try {
@@ -65,4 +71,4 @@ const deleteNotification = async (req, res) => {
   }
 };
 
-module.exports = { getNotifications, getUnreadCount, markRead, markAllRead, deleteNotification };
+module.exports = { getNotifications, getUnreadCount, markRead, markAllRead, deleteNotification, getPushStatus };
