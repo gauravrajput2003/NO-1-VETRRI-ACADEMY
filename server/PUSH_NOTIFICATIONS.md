@@ -13,6 +13,28 @@ there is no receipt ID to poll. Repair the project's FCM V1 service account in
 EAS using step 4 below. No Firebase service-account private key or EAS CLI was
 available in this workspace to perform that credential change.
 
+Follow-up: the owner uploaded the FCM V1 key to EAS. Subsequent tests returned
+successful provider receipts, and the owner confirmed a visible notification
+and sound on the installed Play Store app. Foreground delivery and sound are
+confirmed; background delivery still needs a separate phone confirmation.
+
+## Follow-up event coverage
+
+Additional backend hooks now cover:
+
+- Manual fee record creation, payment recording and status changes → student.
+- Bulk salary processing and payment-record edits/removals → affected teacher.
+- Teacher account approval/rejection → teacher (when a token is registered).
+- Admin global/per-student material unlocks → eligible students, preserving
+  approval, grade, assignment and lock checks. Repeating an already completed
+  unlock does not send another notification.
+- The older multipart admin material-upload endpoint → eligible students.
+  Admin uploads no longer generate a misleading pending-review notification.
+
+These follow-up code changes require another backend deployment. No frontend
+change or new AAB is required. Financial notification tests use mocked records;
+they do not create, edit or delete real payments or send real payment alerts.
+
 ## What changed
 
 - Accept both `ExpoPushToken[...]` and `ExponentPushToken[...]` registrations.

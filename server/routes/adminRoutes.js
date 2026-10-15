@@ -61,6 +61,7 @@ const {
 } = require('../controllers/enquiryController');
 const Course = require('../models/Course');
 const FeesRecord = require('../models/FeesRecord');
+const { notifyFeeRecord } = require('../services/financialNotificationService');
 const { uploadImage, uploadToCloudinary } = require('../middleware/upload');
 
 // All routes: admin only
@@ -94,6 +95,7 @@ router.post('/fees/record-payment', recordFeePayment);
 router.post('/fees', async (req, res) => {
   try {
     const fee = await FeesRecord.create(req.body);
+    await notifyFeeRecord({ fee, req, action: 'created' });
     res.status(201).json({ success: true, fee });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

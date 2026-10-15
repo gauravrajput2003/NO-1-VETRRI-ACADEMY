@@ -16,10 +16,12 @@ function materialRecipientFilter(material) {
   };
 }
 
-async function notifyMaterialAvailable({ material, senderId, io }) {
+async function notifyMaterialAvailable({ material, senderId, io, recipientIds }) {
   if (material.approvalStatus !== 'approved') return;
   try {
-    const students = await User.find(materialRecipientFilter(material)).select('_id').lean();
+    const filter = materialRecipientFilter(material);
+    if (recipientIds) filter.$and = [{ _id: { $in: recipientIds } }];
+    const students = await User.find(filter).select('_id').lean();
     await sendBulkNotifications({
       recipientIds: students.map((student) => student._id), senderId,
       type: 'study_material', title: 'Study Material Available',

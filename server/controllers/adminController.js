@@ -33,6 +33,7 @@ const LibraryAccess = require('../models/LibraryAccess');
 const MaterialFolder = require('../models/MaterialFolder');
 const notificationService = require('../services/notificationService');
 const { notifyMaterialAvailable } = require('../services/materialNotificationService');
+const { notifyFeeRecord } = require('../services/financialNotificationService');
 const storageService = require('../services/storageService');
 const cache = require('../utils/cache');
 const { resolveFileAccessUrl } = require('../utils/downloadHelper');
@@ -220,6 +221,12 @@ const approveTeacher = async (req, res) => {
 
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found.' });
 
+    await notificationService.sendNotification({
+      recipientId: teacher._id, senderId: req.user._id, type: 'teacher_approval',
+      title: teacher.isApproved ? 'Teacher Account Approved' : 'Teacher Approval Not Granted',
+      message: teacher.isApproved ? 'Your teacher account has been approved by the admin.' : 'Your teacher account approval has not been granted. Please contact the admin.',
+      link: '/teacher/dashboard', data: { isApproved: Boolean(teacher.isApproved) }, io: req.app.get('io'),
+    });
     res.status(200).json({ success: true, teacher });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -531,6 +538,7 @@ const updateFeeStatus = async (req, res) => {
 
     if (!fee) return res.status(404).json({ success: false, message: 'Fee record not found.' });
 
+    await notifyFeeRecord({ fee, req });
     res.status(200).json({ success: true, fee });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -616,6 +624,7 @@ const recordFeePayment = async (req, res) => {
       paidAt: new Date(),
       updatedBy: req.user._id,
     });
+    await notifyFeeRecord({ fee, req, action: 'created' });
     res.status(201).json({ success: true, fee });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -927,16 +936,22 @@ const adminToggleMaterialLock = async (req, res) => {
 
     const hasLockedForAll = typeof lockedForAll === 'boolean';
     if (hasLockedForAll) {
+      const hadLocks = material.lockedForAll || material.lockedFor.length > 0;
       material.lockedForAll = lockedForAll;
       if (!lockedForAll) {
         material.lockedFor = [];
         material.unlockedFor = [];
       }
       await material.save();
+      if (!lockedForAll && hadLocks) {
+        await notifyMaterialAvailable({ material, senderId: req.user._id, io: req.app.get('io') });
+      }
       return res.status(200).json({ success: true, material });
     }
 
     if (!studentId) return res.status(400).json({ success: false, message: 'studentId required' });
+    const wasLocked = material.lockedFor.some((id) => String(id) === String(studentId))
+      || (material.lockedForAll && !material.unlockedFor.some((id) => String(id) === String(studentId)));
 
     if (unlock) {
       if (!material.unlockedFor.includes(studentId)) material.unlockedFor.push(studentId);
@@ -947,6 +962,9 @@ const adminToggleMaterialLock = async (req, res) => {
     }
 
     await material.save();
+    if (unlock && wasLocked) {
+      await notifyMaterialAvailable({ material, senderId: req.user._id, io: req.app.get('io'), recipientIds: [studentId] });
+    }
     res.status(200).json({ success: true, material });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

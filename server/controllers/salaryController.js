@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const SalaryTransaction = require('../models/SalaryTransaction');
 const notificationService = require('../services/notificationService');
+const { notifySalaryRecord } = require('../services/financialNotificationService');
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -427,6 +428,7 @@ const processAllSalaries = async (req, res) => {
         await transaction.save();
         await upsertTeacherSalaryHistory(teacher, { ...transaction.toObject(), salarySlipUrl: slipUrl });
 
+        await notifySalaryRecord({ transaction, req, action: 'processed' });
         processed += 1;
       } catch (innerError) {
         failed += 1;
@@ -640,6 +642,7 @@ const editSalaryPayment = async (req, res) => {
       await upsertTeacherSalaryHistory(teacher, { ...transaction.toObject(), salarySlipUrl: transaction.salarySlipUrl });
     }
 
+    await notifySalaryRecord({ transaction, req, action: 'updated' });
     res.status(200).json({ success: true, message: 'Payment record updated', transaction });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -691,6 +694,7 @@ const deleteSalaryPayment = async (req, res) => {
       await upsertTeacherSalaryHistory(teacher, { ...transaction.toObject(), salarySlipUrl: transaction.salarySlipUrl });
     }
 
+    await notifySalaryRecord({ transaction, req, action: 'removed' });
     res.status(200).json({ success: true, message: 'Payment record removed', transaction });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -383,6 +383,9 @@ const uploadMaterial = async (req, res) => {
 
     // Save to database
     const material = await StudyMaterial.create(materialPayload);
+    if (req.user.role === 'admin') {
+      await notifyMaterialAvailable({ material, senderId: req.user._id, io: req.app.get('io') });
+    }
 
     // Invalidate cached folders & dashboards
     invalidateMaterialCaches(req.user._id);
@@ -394,8 +397,8 @@ const uploadMaterial = async (req, res) => {
       message: `Material uploaded successfully: ${uploadResult.originalFilename}`,
     });
 
-    // Fire-and-forget admin notification in background
-    (async () => {
+    // Only teacher submissions need an admin review notification.
+    if (req.user.role === 'teacher') (async () => {
       try {
         const adminIds = await getAdminUserIds();
         const teacherName = req.user.name || req.user.displayName || 'A teacher';
