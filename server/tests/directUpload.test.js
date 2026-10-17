@@ -54,6 +54,17 @@ test('students, unapproved teachers, teacher training uploads and oversized file
   assert.equal((await f.sign({ ...details, size: 501 * 1024 * 1024 })).code, 400);
 });
 
+test('student exam signing cannot grant material/training access or be confirmed as a study material', async () => {
+  const f = fixture(), student = { _id: 'student', role: 'student' };
+  assert.equal((await f.sign({ ...details, purpose: 'exam' }, student)).code, 200);
+  assert.equal((await f.sign({ ...details, purpose: 'exam', mimetype: 'video/mp4' }, student)).code, 400);
+  assert.equal((await f.sign({ ...details, purpose: 'exam', size: 21 * 1024 * 1024 }, student)).code, 400);
+  assert.equal((await f.sign(details, student)).code, 403);
+  const signed = await f.sign({ ...details, purpose: 'exam' });
+  const res = response(); await f.confirmDirectUpload(request({ uploadToken: signed.body.uploadToken }), res);
+  assert.equal(res.code, 400); assert.equal(f.calls.length, 0);
+});
+
 test('confirmation verifies cloud metadata and ignores forged client URLs and IDs', async () => {
   const f = fixture();
   const signed = await f.sign();

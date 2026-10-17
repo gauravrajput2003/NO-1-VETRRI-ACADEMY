@@ -45,7 +45,8 @@
           "color": "#0A1628",
           "defaultChannel": "vettri-default"
         }
-      ]
+      ],
+      "./plugins/withReleaseOptimization"
     ],
     "extra": {
       "eas": {

@@ -1,0 +1,13 @@
+const router = require('express').Router();
+const { verifyToken } = require('../middleware/auth');
+const controller = require('../controllers/examController');
+router.use(verifyToken);
+router.get('/options', controller.options);
+router.get('/', controller.list);
+router.post('/', controller.create);
+router.get('/:id', controller.detail);
+router.post('/:id/publish', controller.publish);
+router.post('/:id/submit', controller.submit);
+router.put('/:id/submissions/:submissionId/grade', controller.grade);
+router.post('/:id/cancel', controller.cancel);
+module.exports = router;

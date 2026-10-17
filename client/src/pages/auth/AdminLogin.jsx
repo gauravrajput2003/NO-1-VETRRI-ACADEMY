@@ -1,3 +1,4 @@
+import { getLoginErrorMessage } from '../../utils/loginErrors';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,7 +12,7 @@ import { FaGoogle, FaFacebookF, FaApple } from 'react-icons/fa';
 
 const schema = z.object({
   identifier: z.string().min(1, 'Email required'),
-  password: z.string().min(6, 'Password required'),
+  password: z.string().min(1, 'Enter your password'),
 });
 
 function Particles() {
@@ -42,15 +43,17 @@ export default function AdminLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema) });
 
   const onSubmit = async ({ identifier, password }) => {
+    setLoginError('');
     try {
       const data = await login('admin', identifier, password);
       toast.success(`Welcome, ${data.user.name}! 🛡️`);
       navigate('/admin/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Login failed');
+      setLoginError(getLoginErrorMessage(err));
     }
   };
 
@@ -87,10 +90,11 @@ export default function AdminLogin() {
           <div style={styles.roleBadge}>🛡️ Admin Portal – Secured Access</div>
           <h1 style={styles.cardTitle}>Login to Your Account</h1>
 
-          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onChange={() => { if (loginError) setLoginError(''); }} onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {loginError && <div role="alert" aria-live="assertive" style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 12, padding: 14, color: '#B91C1C', fontSize: 14, lineHeight: 1.5 }}><strong>Unable to sign in</strong><div>{loginError}</div></div>}
             <div style={styles.inputWrap}>
               <FiMail style={styles.inputIcon} size={16} />
-              <input {...register('identifier')} placeholder="Email or Username" id="admin-identifier" style={styles.input} />
+              <input {...register('identifier')} placeholder="Phone number or email" id="admin-identifier" style={styles.input} />
               <span style={styles.inputArrow}>›</span>
               {errors.identifier && <p style={styles.errTxt}>{errors.identifier.message}</p>}
             </div>

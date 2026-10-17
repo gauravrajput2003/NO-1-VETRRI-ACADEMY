@@ -60,6 +60,7 @@ const CATEGORIES = [
   { id: 'help',       label: 'Help Desk',  icon: 'help-buoy',   screen: 'HelpCenter', tint: D.pink },
   { id: '1', label: 'Lessons',    icon: 'book',        screen: 'Materials',  tint: D.pink   },
   { id: '2', label: 'Classes',    icon: 'school',       screen: 'Classes',    tint: D.teal   },
+  { id: 'exams', label: 'Exams', icon: 'document-text', screen: 'ExamManagement', tint: D.teal },
   { id: '3', label: 'Scores',     icon: 'bar-chart',    screen: 'ExamScores', tint: D.golden },
   { id: '4', label: 'Attendance', icon: 'calendar',     screen: 'Attendance', tint: D.teal   },
   { id: '5', label: 'Homework',   icon: 'create',       screen: 'Discuss',    tint: D.pink   },

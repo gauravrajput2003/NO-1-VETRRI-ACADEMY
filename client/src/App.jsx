@@ -1,3 +1,5 @@
+import AcademicExams from './pages/academic/Exams';
+import AcademicReports from './pages/academic/Reports';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -156,7 +158,8 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="exams" element={<AcademicExams />} />
+<Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<StudentDashboardHome />} />
         <Route path="classes" element={<StudentClasses />} />
         <Route path="materials" element={<StudentMaterials />} />
@@ -178,7 +181,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="exams" element={<AcademicExams />} />
+<Route path="teacher-performance" element={<AcademicReports />} />
+<Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<TeacherDashboardHome />} />
         <Route path="live-class" element={<TeacherLiveClass />} />
         <Route path="training" element={<TeacherTraining />} />
@@ -202,7 +207,10 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="exams" element={<AcademicExams />} />
+<Route path="teacher-performance" element={<AcademicReports />} />
+<Route path="class-marks" element={<AcademicReports mode="marks" />} />
+<Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardHome />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="teachers" element={<AdminTeachers />} />

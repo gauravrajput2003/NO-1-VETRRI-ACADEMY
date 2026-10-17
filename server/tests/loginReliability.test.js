@@ -90,9 +90,24 @@ test('wrong password and missing accounts return a form error, not session-refre
     const h = loginHarness(options);
     const response = await h.run();
     assert.equal(response.code, 400);
-    assert.match(response.body.message, /incorrect/);
+    assert.equal(response.body.code, options.missing ? 'ACCOUNT_NOT_REGISTERED' : 'INVALID_PASSWORD');
+    assert.match(response.body.message, options.missing ? /not registered/ : /Incorrect password/);
     assert.equal(h.calls.saved, 0);
     assert.equal(h.calls.tokens, 0);
+  }
+});
+
+test('unregistered email/phone messages identify the field across student, teacher and admin logins', async () => {
+  for (const role of ['student', 'teacher', 'admin']) {
+    for (const identifier of ['9876543210', 'missing@example.test']) {
+      const h = loginHarness({ missing: true, role });
+      const response = await h.run(identifier);
+      assert.equal(response.code, 400);
+      assert.equal(response.body.code, 'ACCOUNT_NOT_REGISTERED');
+      assert.ok(response.body.message.includes(identifier.includes('@') ? 'email address' : 'phone number'));
+      assert.equal(h.calls.passwordChecks, 0);
+      assert.equal(h.calls.tokens, 0);
+    }
   }
 });
 

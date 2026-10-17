@@ -127,6 +127,8 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/downloads', downloadRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/exams', require('./routes/examRoutes'));
+app.use('/api/academic-reports', require('./routes/academicReportRoutes'));
 app.use('/api/doubts', doubtRoutes);
 app.use('/api/support', supportRoutes);
 
@@ -299,6 +301,7 @@ const startCronJobs = () => {
     const { startWeeklyTopPerformerJob } = require('./jobs/weeklyTopPerformer');
     const { startClassReminderJob } = require('./jobs/classReminder');
     const { startFeeReminderJob } = require('./jobs/feeReminder');
+    require('./jobs/teacherPerformance').startTeacherPerformanceJob();
     startWeeklyTopPerformerJob();
     startClassReminderJob(io);
     startFeeReminderJob(io);

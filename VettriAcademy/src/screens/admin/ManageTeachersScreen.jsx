@@ -23,6 +23,8 @@ import { Colors } from '../../utils/colors';
 import { getInitials, formatDate } from '../../utils/formatters';
 import { fetchAdminTeachers, approveTeacher, deleteTeacher, editTeacher } from '../../redux/slices/adminSlice';
 import { registerAPI } from '../../services/api';
+import StudentLoginDetails, { copyLoginText } from '../../components/StudentLoginDetails';
+import { normalizeLoginMobile } from '../../utils/loginCredentials';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 const TouchableOpacity = RNTouchableOpacity;
@@ -83,6 +85,9 @@ export default function ManageTeachersScreen({ navigation }) {
   const [viewModal, setViewModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [savingTeacher, setSavingTeacher] = useState(false);
+  const [loginDetails, setLoginDetails] = useState(null);
   const [editData, setEditData] = useState({ name: '', mobile: '', email: '', qualification: '', subjects: '', experience: '', teacherBio: '' });
   const [createData, setCreateData] = useState({
     name: '',
@@ -133,41 +138,65 @@ export default function ManageTeachersScreen({ navigation }) {
     ]);
   };
 
+  const openEditTeacher = (teacher) => {
+    setViewModal(null);
+    setShowEditPassword(false);
+    setEditModal(teacher);
+    setEditData({
+      name: teacher.name || '', mobile: normalizeLoginMobile(teacher.mobile), password: '', email: teacher.email || '',
+      qualification: teacher.qualification || '', subjects: Array.isArray(teacher.subjects) ? teacher.subjects.join(', ') : (teacher.subjects || ''),
+      experience: String(teacher.experience || ''), teacherBio: teacher.teacherBio || '',
+    });
+  };
+
   const handleEditTeacher = async () => {
-    if (!editData.name || !editData.mobile || !editData.email) {
-      Toast.show({ type: 'error', text1: 'Name, mobile and email are required' });
+    if (savingTeacher) return;
+    const password = (editData.password || '').trim();
+    if (password && password.length < 6) return Toast.show({ type: 'error', text1: 'Password must be at least 6 characters' });
+    if (!editData.name || !editData.mobile) {
+      Toast.show({ type: 'error', text1: 'Name and mobile are required' });
       return;
     }
     try {
-      const updates = { ...editData };
+      setSavingTeacher(true);
+      const updates = { ...editData, password };
       if (updates.subjects && typeof updates.subjects === 'string') {
         updates.subjects = updates.subjects.split(',').map((s) => s.trim()).filter(Boolean);
       }
       const result = await dispatch(editTeacher({ id: editModal._id, updates }));
       if (editTeacher.fulfilled.match(result)) {
         Toast.show({ type: 'success', text1: 'Teacher updated successfully' });
+        if (password) setLoginDetails({ name: result.payload.name, mobile: normalizeLoginMobile(result.payload.mobile), password });
+        setEditData({});
+        setShowEditPassword(false);
         setEditModal(null);
       } else {
         Toast.show({ type: 'error', text1: 'Update failed', text2: result.payload || 'Unable to update teacher' });
       }
     } catch (error) {
       Toast.show({ type: 'error', text1: 'Update failed', text2: error.message });
-    }
+    } finally { setSavingTeacher(false); }
   };
 
   const handleCreateTeacher = async () => {
+    if (savingTeacher) return;
     if (!createData.name || !createData.mobile || !createData.email || !createData.password) {
       Toast.show({ type: 'error', text1: 'Name, mobile, email and password are required' });
       return;
     }
 
+    const password = createData.password.trim();
+    const mobile = normalizeLoginMobile(createData.mobile);
+    if (password.length < 6) return Toast.show({ type: 'error', text1: 'Password must be at least 6 characters' });
+    if (!/^\d{10}$/.test(mobile)) return Toast.show({ type: 'error', text1: 'Enter a valid 10-digit mobile number' });
+    setSavingTeacher(true);
     try {
       await registerAPI({
         role: 'teacher',
         name: createData.name.trim(),
-        mobile: createData.mobile.trim(),
+        mobile,
         email: createData.email.trim(),
-        password: createData.password,
+        password,
         qualification: createData.qualification.trim() || undefined,
         subjects: createData.subjects
           ? createData.subjects.split(',').map((s) => s.trim()).filter(Boolean)
@@ -177,6 +206,8 @@ export default function ManageTeachersScreen({ navigation }) {
       });
 
       Toast.show({ type: 'success', text1: 'Teacher account created successfully' });
+      setLoginDetails({ name: createData.name.trim(), mobile, password });
+      setShowCreatePassword(false);
       setShowCreateModal(false);
       setCreateData({
         name: '',
@@ -191,7 +222,7 @@ export default function ManageTeachersScreen({ navigation }) {
       dispatch(fetchAdminTeachers());
     } catch (err) {
       Toast.show({ type: 'error', text1: 'Create failed', text2: err.response?.data?.message || 'Unable to create teacher' });
-    }
+    } finally { setSavingTeacher(false); }
   };
 
   const filteredTeachers = teachers.filter((teacher) => {
@@ -236,6 +267,7 @@ export default function ManageTeachersScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {loginDetails && <StudentLoginDetails accountType="Teacher" details={loginDetails} onClose={() => setLoginDetails(null)} />}
       <View style={styles.pageShell}>
         <LinearGradient
           colors={[B.pink, B.teal]}
@@ -333,7 +365,8 @@ export default function ManageTeachersScreen({ navigation }) {
                 <Text style={styles.viewSectionTitle}>Contact</Text>
                 <View style={styles.viewRow}>
                   <Ionicons name="call-outline" size={18} color={B.teal} />
-                  <Text style={styles.viewRowText}>{viewModal?.mobile || 'Not provided'}</Text>
+                  <Text style={styles.viewRowText}>{normalizeLoginMobile(viewModal?.mobile) || 'Not provided'}</Text>
+                  {!!viewModal?.mobile && <TouchableOpacity accessibilityLabel="Copy teacher login phone" onPress={() => copyLoginText(normalizeLoginMobile(viewModal.mobile))}><Ionicons name="copy-outline" size={22} color={B.teal} /></TouchableOpacity>}
                 </View>
                 <View style={styles.viewRow}>
                   <Ionicons name="mail-outline" size={18} color={B.teal} />
@@ -374,6 +407,7 @@ export default function ManageTeachersScreen({ navigation }) {
               </View>
             </ScrollView>
 
+            {!!viewModal && !viewModal.isApproved && <TouchableOpacity style={styles.confirmBtn} onPress={() => openEditTeacher(viewModal)}><Text style={styles.confirmText}>Edit profile / password</Text></TouchableOpacity>}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setViewModal(null)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
               <TouchableOpacity
@@ -404,17 +438,7 @@ export default function ManageTeachersScreen({ navigation }) {
                     setViewModal(null);
                     handleApprove(teacher);
                   } else {
-                    setViewModal(null);
-                    setEditModal(teacher);
-                    setEditData({
-                      name: teacher.name || '',
-                      mobile: teacher.mobile || '',
-                      email: teacher.email || '',
-                      qualification: teacher.qualification || '',
-                      subjects: Array.isArray(teacher.subjects) ? teacher.subjects.join(', ') : (teacher.subjects || ''),
-                      experience: teacher.experience || '',
-                      teacherBio: teacher.teacherBio || '',
-                    });
+                    openEditTeacher(teacher);
                   }
                 }}
               >
@@ -443,9 +467,17 @@ export default function ManageTeachersScreen({ navigation }) {
             <Text style={[styles.label, { color: textColor }]}>Mobile *</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={editData.mobile} onChangeText={(v) => setEditData({ ...editData, mobile: v })} placeholder="Mobile number" placeholderTextColor={Colors.mediumGray} keyboardType="phone-pad" />
             
-            <Text style={[styles.label, { color: textColor }]}>Email *</Text>
+            <Text style={[styles.label, { color: textColor }]}>Email</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={editData.email} onChangeText={(v) => setEditData({ ...editData, email: v })} placeholder="Email" placeholderTextColor={Colors.mediumGray} autoCapitalize="none" />
             
+            <TouchableOpacity onPress={() => copyLoginText(normalizeLoginMobile(editData.mobile))}><Text style={{ color: B.teal, marginTop: 8 }}>Copy login phone number</Text></TouchableOpacity>
+            <Text style={[styles.label, { color: textColor }]}>New password (optional)</Text>
+            <View style={[styles.input, styles.passwordRow, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}>
+              <TextInput style={[styles.passwordInput, { color: textColor }]} value={editData.password || ''} onChangeText={(password) => setEditData({ ...editData, password })} placeholder="Leave blank to keep current password" placeholderTextColor={Colors.mediumGray} secureTextEntry={!showEditPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" />
+              <TouchableOpacity accessibilityLabel={showEditPassword ? 'Hide new password' : 'Show new password'} onPress={() => setShowEditPassword(!showEditPassword)}><Ionicons name={showEditPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={B.teal} /></TouchableOpacity>
+            </View>
+            <Text style={{ color: Colors.mediumGray, marginTop: 6, fontSize: 12 }}>At least 6 characters. Spaces at the start/end are removed. Copy the new password after saving. Existing passwords cannot be displayed.</Text>
+
             <Text style={[styles.label, { color: textColor }]}>Qualification</Text>
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={editData.qualification} onChangeText={(v) => setEditData({ ...editData, qualification: v })} placeholder="e.g. M.Sc Mathematics" placeholderTextColor={Colors.mediumGray} />
             
@@ -459,8 +491,8 @@ export default function ManageTeachersScreen({ navigation }) {
             <TextInput style={[styles.input, styles.textArea, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={editData.teacherBio} onChangeText={(v) => setEditData({ ...editData, teacherBio: v })} placeholder="Teacher bio" placeholderTextColor={Colors.mediumGray} multiline />
             
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditModal(null)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleEditTeacher}><Text style={styles.confirmText}>Save</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} disabled={savingTeacher} onPress={() => { setEditModal(null); setEditData({}); }}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} disabled={savingTeacher} onPress={handleEditTeacher}><Text style={styles.confirmText}>{savingTeacher ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
             </View>
           </ScrollView>
         </View>
@@ -517,7 +549,7 @@ export default function ManageTeachersScreen({ navigation }) {
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCreateModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleCreateTeacher}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} disabled={savingTeacher} onPress={handleCreateTeacher}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>
             </View>
           </ScrollView>
         </View>

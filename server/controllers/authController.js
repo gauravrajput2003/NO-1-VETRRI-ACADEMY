@@ -149,11 +149,13 @@ const login = async (req, res) => {
       user = matches[0];
     }
 
-    if (!user || !(await user.matchPassword(password))) {
-      // Published clients treat every 401 as an expired session and attempt a
-      // refresh, hiding this error as "Network error" on a fresh installation.
-      // Login form failures are 400; protected API endpoints still return 401.
-      return res.status(400).json({ success: false, message: 'Mobile/email or password is incorrect. Please check your login details or contact the academy.' });
+    // Keep form errors out of the session-refresh flow used by published clients.
+    if (!user) {
+      const field = rawId.includes('@') ? 'email address' : 'phone number';
+      return res.status(400).json({ success: false, code: 'ACCOUNT_NOT_REGISTERED', message: 'This ' + field + ' is not registered' + (role ? ' for this account type' : '') + '. Please check it or contact the academy.' });
+    }
+    if (!(await user.matchPassword(password))) {
+      return res.status(400).json({ success: false, code: 'INVALID_PASSWORD', message: 'Incorrect password. Please try again or use Forgot Password.' });
     }
 
     if (!user.isActive) {

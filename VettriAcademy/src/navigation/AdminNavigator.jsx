@@ -1,3 +1,5 @@
+import ExamManagementScreen from '../screens/common/ExamManagementScreen';
+import AcademicReportsScreen from '../screens/common/AcademicReportsScreen';
 import React from 'react';
 import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -52,6 +54,8 @@ const PINK = '#FF4FA3';
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, headerRight: () => <HeaderActions /> }}>
+      <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="TeacherPerformance" component={AcademicReportsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
       <Stack.Screen name="AdminChat" component={AdminChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />

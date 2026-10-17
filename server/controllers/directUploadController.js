@@ -11,6 +11,10 @@ const resourceTypeFor = (mime) => mime.startsWith('video/') || mime.startsWith('
 const failure = (message, status = 400) => Object.assign(new Error(message), { status });
 
 async function authorize(user, purpose) {
+  if (purpose === 'exam') {
+    if (!['student', 'teacher', 'admin'].includes(user.role) || (user.role === 'teacher' && user.isApproved === false)) throw failure('Access denied.', 403);
+    return;
+  }
   if (!['material', 'training'].includes(purpose)) throw failure('Unsupported upload purpose.');
   if (user.role === 'admin') return;
   if (purpose !== 'material' || user.role !== 'teacher') throw failure('Access denied.', 403);
@@ -23,7 +27,8 @@ async function getDirectUploadParams(req, res) {
     const { uploadId, filename, mimetype = 'application/octet-stream', size, purpose = 'material' } = req.body;
     await authorize(req.user, purpose);
     if (!/^[a-zA-Z0-9_-]{16,100}$/.test(uploadId || '') || typeof filename !== 'string' || !filename.trim() || filename.length > 255 || typeof mimetype !== 'string') throw failure('Invalid upload details.');
-    const maximum = mimetype.startsWith('video/') ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
+    if (purpose === 'exam' && !['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(mimetype)) throw failure('Exam files must be PDF, JPG, PNG or WebP.');
+    const maximum = purpose === 'exam' ? 20 * 1024 * 1024 : mimetype.startsWith('video/') ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
     if (!Number.isSafeInteger(size) || size <= 0 || size > maximum) throw failure('File exceeds the supported upload size.');
     if (purpose === 'training' && !mimetype.startsWith('video/')) throw failure('Please select a video file.');
     const resourceType = resourceTypeFor(mimetype);
@@ -53,6 +58,7 @@ async function confirmDirectUpload(req, res) {
     catch { throw failure('Upload session expired or invalid. Please retry the upload.', 410); }
     if (receipt.kind !== 'direct-upload' || receipt.owner !== String(req.user._id)) throw failure('This upload belongs to another account.', 403);
     purpose = receipt.purpose;
+    if (purpose === 'exam') throw failure('Save exam files through Exam Management.');
     await authorize(req.user, purpose);
     directUploadId = `${receipt.owner}:${receipt.uploadId}`;
     const Model = purpose === 'training' ? TrainingVideo : StudyMaterial;

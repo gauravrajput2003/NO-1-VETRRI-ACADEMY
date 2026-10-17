@@ -181,29 +181,62 @@ const getAllTeachers = async (req, res) => {
 // @access  Admin
 const updateStudent = async (req, res) => {
   try {
-    const { course, assignedTeachers, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes } = req.body;
-
-    const updatePayload = { course, grade, board, isActive, feeAmount, feeFrequency, feeDueDate, feeNotes };
-    // Only touch assignedTeachers if the client actually sent it, so partial updates
-    // (e.g. just toggling isActive) can't accidentally wipe the teacher list.
-    if (assignedTeachers !== undefined) {
-      updatePayload.assignedTeachers = Array.isArray(assignedTeachers) ? assignedTeachers : [];
-    }
-
-    const student = await User.findByIdAndUpdate(
-      req.params.id,
-      updatePayload,
-      { new: true, runValidators: true }
-    )
-      .select('-password -refreshToken')
-      .populate('course', 'title')
-      .populate('assignedTeachers', 'name');
-
+    const { normalizeLoginMobile } = require('../utils/studentCredentials');
+    const { buildLoginLookup } = require('../utils/loginLookup');
+    const student = await User.findOne({ _id: req.params.id, role: 'student' });
     if (!student) return res.status(404).json({ success: false, message: 'Student not found.' });
-
-    res.status(200).json({ success: true, student });
+    const { password, mobile, email, name, assignedTeachers } = req.body;
+    if (password !== undefined && typeof password !== 'string') {
+      return res.status(400).json({ success: false, message: 'Password must be text.' });
+    }
+    const nextPassword = password?.trim();
+    if (nextPassword && (nextPassword.length < 6 || Buffer.byteLength(nextPassword, 'utf8') > 72)) {
+      return res.status(400).json({ success: false, message: 'Password must contain at least 6 characters and at most 72 UTF-8 bytes.' });
+    }
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ success: false, message: 'Student name is required.' });
+      student.name = name.trim();
+    }
+    if (mobile !== undefined) {
+      if (typeof mobile !== 'string') return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+      const normalized = normalizeLoginMobile(mobile);
+      // Leave unchanged legacy numbers alone; copied login numbers are normalized in the UI.
+      if (normalized !== normalizeLoginMobile(student.mobile)) {
+        if (!/^\d{10}$/.test(normalized)) return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+        const lookup = buildLoginLookup(normalized);
+        const taken = await User.findOne({ $and: [lookup.formattedQuery || lookup.exactQuery, { _id: { $ne: student._id } }] });
+        if (taken) return res.status(409).json({ success: false, message: 'Mobile number already in use.' });
+        student.mobile = normalized;
+      }
+    }
+    if (email !== undefined) {
+      if (typeof email !== 'string') return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+      const normalized = email.trim().toLowerCase();
+      if (normalized && !/^\S+@\S+\.\S+$/.test(normalized)) return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+      if (normalized && normalized !== student.email?.toLowerCase()) {
+        const taken = await User.findOne({ email: normalized, _id: { $ne: student._id } });
+        if (taken) return res.status(409).json({ success: false, message: 'Email already in use.' });
+      }
+      student.email = normalized || undefined;
+    }
+    for (const field of ['course', 'grade', 'board', 'isActive', 'feeAmount', 'feeFrequency', 'feeDueDate', 'feeNotes']) {
+      if (req.body[field] !== undefined) student[field] = req.body[field];
+    }
+    if (assignedTeachers !== undefined) student.assignedTeachers = Array.isArray(assignedTeachers) ? assignedTeachers : [];
+    if (nextPassword) {
+      student.password = nextPassword;
+      student.refreshToken = '';
+    }
+    // Document.save runs the existing bcrypt hook. Query updates skip that hook.
+    await student.save();
+    await student.populate([{ path: 'course', select: 'title' }, { path: 'assignedTeachers', select: 'name' }]);
+    const updated = student.toObject();
+    delete updated.password;
+    delete updated.refreshToken;
+    res.status(200).json({ success: true, student: updated, passwordUpdated: Boolean(nextPassword) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.code === 11000 ? 409 : ['ValidationError', 'CastError'].includes(error.name) ? 400 : 500;
+    res.status(status).json({ success: false, message: error.code === 11000 ? 'Mobile number or email already in use.' : error.message });
   }
 };
 
@@ -264,22 +297,29 @@ const updateTeacher = async (req, res) => {
       isApproved,
     } = req.body;
 
+    if (password !== undefined && typeof password !== 'string') return res.status(400).json({ success: false, message: 'Password must be text.' });
+    const nextPassword = password?.trim();
+    if (nextPassword && (nextPassword.length < 6 || Buffer.byteLength(nextPassword, 'utf8') > 72)) {
+      return res.status(400).json({ success: false, message: 'Password must contain at least 6 characters and at most 72 UTF-8 bytes.' });
+    }
     const nextMobile = mobile !== undefined ? mobile : phone;
     if (nextMobile !== undefined) {
-      const mobileValue = String(nextMobile).trim();
-      if (!mobileValue) {
-        return res.status(400).json({ success: false, message: 'Mobile number is required.' });
+      const { normalizeLoginMobile } = require('../utils/studentCredentials');
+      const { buildLoginLookup } = require('../utils/loginLookup');
+      if (typeof nextMobile !== 'string') return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+      const mobileValue = normalizeLoginMobile(nextMobile);
+      if (mobileValue !== normalizeLoginMobile(teacher.mobile)) {
+        if (!/^\d{10}$/.test(mobileValue)) return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+        const lookup = buildLoginLookup(mobileValue);
+        const mobileTaken = await User.findOne({ $and: [lookup.formattedQuery || lookup.exactQuery, { _id: { $ne: teacher._id } }] });
+        if (mobileTaken) return res.status(409).json({ success: false, message: 'Mobile number already in use.' });
+        teacher.mobile = mobileValue;
       }
-      const mobileTaken = await User.findOne({ mobile: mobileValue, _id: { $ne: teacher._id } });
-      if (mobileTaken) {
-        return res.status(409).json({ success: false, message: 'Mobile number already in use.' });
-      }
-      teacher.mobile = mobileValue;
     }
 
     if (email !== undefined) {
       const emailValue = email ? String(email).trim().toLowerCase() : '';
-      if (emailValue) {
+      if (emailValue && emailValue !== teacher.email?.toLowerCase()) {
         const emailTaken = await User.findOne({ email: emailValue, _id: { $ne: teacher._id } });
         if (emailTaken) {
           return res.status(409).json({ success: false, message: 'Email already in use.' });
@@ -302,12 +342,9 @@ const updateTeacher = async (req, res) => {
     if (isActive !== undefined) teacher.isActive = isActive;
     if (isApproved !== undefined) teacher.isApproved = isApproved;
 
-    // Only hash when a new password is provided (User pre-save hook handles hashing)
-    if (password !== undefined && String(password).trim()) {
-      if (String(password).length < 6) {
-        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
-      }
-      teacher.password = String(password);
+    if (nextPassword) {
+      teacher.password = nextPassword;
+      teacher.refreshToken = '';
     }
 
     await teacher.save();
@@ -316,7 +353,7 @@ const updateTeacher = async (req, res) => {
     delete updated.password;
     delete updated.refreshToken;
 
-    res.status(200).json({ success: true, teacher: updated });
+    res.status(200).json({ success: true, teacher: updated, passwordUpdated: Boolean(nextPassword) });
   } catch (error) {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0] || 'field';

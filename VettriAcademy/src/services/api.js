@@ -1,3 +1,4 @@
+import { isLoginRequest } from '../utils/loginErrors';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/constants';
@@ -48,10 +49,10 @@ const processQueue = (error, token = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
 
     // If 401 and not already retrying
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !isLoginRequest(originalRequest.url) && !originalRequest._retry) {
       if (isRefreshing) {
         // Queue parallel requests while refreshing
         return new Promise((resolve, reject) => {

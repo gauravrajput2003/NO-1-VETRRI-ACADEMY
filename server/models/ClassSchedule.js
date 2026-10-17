@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const classScheduleSchema = new mongoose.Schema(
   {
+    performanceTrackingVersion: { type: Number, default: 1 },
+    teacherStartedAt: Date,
     title: { type: String, trim: true },
   course: {
   type: String,
@@ -37,6 +39,7 @@ grade: { type: String, default: '' },    teacherId: { type: mongoose.Schema.Type
     recordingDuration: { type: Number }, // seconds
     recordingUploadedAt: { type: Date },
     cancelReason: { type: String },
+    cancelledAt: Date,
     googleMeetLink: { type: String, trim: true, default: '' },
     zoomMeetingLink: { type: String, trim: true, default: '' },
     // Metadata

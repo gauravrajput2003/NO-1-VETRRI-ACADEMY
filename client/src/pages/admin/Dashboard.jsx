@@ -1,3 +1,5 @@
+import Exams from '../academic/Exams';
+import AcademicReports from '../academic/Reports';
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
@@ -30,6 +32,10 @@ import Admissions from './Admissions';
 import Courses from './Courses';
 
 const LINKS = [
+  { href: '/admin/exams', label: 'Exam Management', icon: FiBook },
+  { href: '/admin/teacher-performance', label: 'Teacher Performance', icon: FiAward },
+  { href: '/admin/class-marks', label: 'Class Marks & Toppers', icon: FiGrid },
+
   { href: '/admin/dashboard', label: 'Dashboard', icon: FiHome },
   { href: '/admin/students', label: 'Students', icon: FiUsers },
   { href: '/admin/teachers', label: 'Teachers', icon: FiUserCheck },
@@ -128,6 +134,10 @@ export default function AdminDashboard() {
 
         <div className="p-4 md:p-6">
           <Routes>
+            <Route path="exams" element={<Exams />} />
+            <Route path="teacher-performance" element={<AcademicReports />} />
+            <Route path="class-marks" element={<AcademicReports mode="marks" />} />
+
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboardHome />} />
             <Route path="students" element={<Students />} />

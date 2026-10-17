@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import StudentLoginDetails, { copyLoginText } from '../../components/StudentLoginDetails';
+import { normalizeLoginMobile } from '../../utils/loginCredentials';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { FiUsers, FiSearch, FiFilter, FiDownload, FiEye, FiEdit2, FiTrash2, FiPlus, FiBell, FiRefreshCw, FiTrendingUp, FiCreditCard, FiCheckCircle, FiUserPlus, FiHome, FiSettings, FiX, FiUser } from 'react-icons/fi';
@@ -16,6 +18,9 @@ export default function Students() {
   const [viewStudent, setViewStudent] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [loginDetails, setLoginDetails] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+
   // Form State
   const [addForm, setAddForm] = useState({
     name: '',
@@ -28,6 +33,7 @@ export default function Students() {
   });
 
   const [editForm, setEditForm] = useState({
+    password: '',
     name: '',
     mobile: '',
     email: '',
@@ -74,14 +80,18 @@ export default function Students() {
       toast.error('Name, mobile and password are required');
       return;
     }
+    const password = addForm.password.trim();
+    const mobile = normalizeLoginMobile(addForm.mobile);
+    if (password.length < 6) return toast.error('Password must be at least 6 characters');
+    if (!/^\d{10}$/.test(mobile)) return toast.error('Enter a valid 10-digit mobile number');
     setSubmitting(true);
     try {
       const { data } = await api.post('/auth/register', {
         role: 'student',
         name: addForm.name.trim(),
-        mobile: addForm.mobile.trim(),
+        mobile,
         email: addForm.email.trim() || undefined,
-        password: addForm.password,
+        password,
         grade: addForm.grade.trim() || undefined,
         board: addForm.board.trim() || undefined,
         assignedTeacher: addForm.assignedTeacher || undefined,
@@ -89,6 +99,8 @@ export default function Students() {
 
       if (data.success) {
         toast.success('✅ Student account created successfully');
+        setLoginDetails({ name: addForm.name.trim(), mobile, password });
+        setShowPassword(false);
         setShowAddModal(false);
         setAddForm({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
         fetchStudents();
@@ -103,12 +115,17 @@ export default function Students() {
   // Handle Edit Student
   const handleEditSubmit = async (e) => {
     e.preventDefault();
-    if (!editStudent) return;
+    if (!editStudent || submitting) return;
+    const password = (editForm.password || '').trim();
+    if (password && password.length < 6) return toast.error('Password must be at least 6 characters');
     setSubmitting(true);
     try {
-      const { data } = await api.put(`/admin/students/${editStudent._id}`, editForm);
+      const { data } = await api.put(`/admin/students/${editStudent._id}`, { ...editForm, password });
       if (data.success) {
         toast.success('✅ Student updated');
+        if (password) setLoginDetails({ name: data.student.name, mobile: normalizeLoginMobile(data.student.mobile), password });
+        setEditForm({});
+        setShowPassword(false);
         setEditStudent(null);
         fetchStudents();
       }
@@ -136,10 +153,12 @@ export default function Students() {
   };
 
   const openEdit = (s) => {
+    setShowPassword(false);
     setEditStudent(s);
     setEditForm({
       name: s.name || '',
-      mobile: s.mobile || '',
+      mobile: normalizeLoginMobile(s.mobile),
+      password: '',
       email: s.email || '',
       grade: s.grade || '',
       board: s.board || '',
@@ -156,6 +175,7 @@ export default function Students() {
 
   return (
     <div className="min-h-screen bg-[#F5F7FB] p-4 md:p-8 font-sans text-[#111827] pb-32">
+      {loginDetails && <StudentLoginDetails details={loginDetails} onClose={() => setLoginDetails(null)} />}
       <style>{`
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(20px); }
@@ -194,7 +214,7 @@ export default function Students() {
             <FiRefreshCw size={18} className={loading ? "animate-spin" : ""} />
           </button>
           <button 
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setShowPassword(false); setShowAddModal(true); }}
             className="bg-[#FF4F8B] hover:bg-[#ff3b7c] text-white px-5 py-2.5 rounded-[14px] shadow-[0_4px_14px_rgba(255,79,139,0.3)] hover:shadow-[0_6px_20px_rgba(255,79,139,0.4)] hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2 font-semibold text-[15px] ml-2"
           >
             <FiPlus size={20} strokeWidth={2.5} /> Add Student
@@ -367,13 +387,17 @@ export default function Students() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Login Password *</label>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                   value={addForm.password}
                   onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
                   placeholder="Set Password"
                   className="w-full px-4 py-3 rounded-xl bg-[#F5F7FB] border border-gray-200 outline-none focus:border-[#FF4F8B]"
                 />
+                <button type="button" className="text-teal-700 mt-2" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'} password</button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -502,6 +526,16 @@ export default function Students() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <button type="button" className="text-teal-700 font-semibold" onClick={() => copyLoginText(normalizeLoginMobile(editForm.mobile))}>Copy login phone number</button>
+                <label className="block text-sm font-semibold text-gray-700" htmlFor="student-new-password">New password (optional)</label>
+                <div className="flex gap-2">
+                  <input id="student-new-password" type={showPassword ? 'text' : 'password'} value={editForm.password || ''} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} autoComplete="new-password" autoCapitalize="none" spellCheck={false} placeholder="Leave blank to keep current password" className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-gray-200" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
+                </div>
+                <p className="text-xs text-gray-500">At least 6 characters. Spaces at the start/end are removed. After saving, you can copy the new password. Existing passwords cannot be displayed.</p>
+              </div>
+
               {/* ASSIGNED TEACHER DROPDOWN */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned Teacher</label>
@@ -572,7 +606,7 @@ export default function Students() {
                   <p className="text-xs text-gray-500">Grade: {viewStudent.grade || 'N/A'} • Board: {viewStudent.board || 'N/A'}</p>
                 </div>
               </div>
-              <p><strong>Mobile:</strong> {viewStudent.mobile || 'N/A'}</p>
+              <p className="select-text"><strong>Login phone:</strong> {normalizeLoginMobile(viewStudent.mobile) || 'N/A'} <button type="button" className="text-teal-700 font-semibold" onClick={() => copyLoginText(normalizeLoginMobile(viewStudent.mobile))}>Copy</button></p>
               <p><strong>Email:</strong> {viewStudent.email || 'N/A'}</p>
               <p><strong>Assigned Teacher:</strong> {viewStudent.assignedTeachers?.length ? viewStudent.assignedTeachers.map((t) => t.name).join(', ') : (viewStudent.assignedTeacher?.name || 'Unassigned')}</p>
               <p><strong>Status:</strong> {viewStudent.isActive !== false ? 'Active' : 'Discontinued / Inactive'}</p>

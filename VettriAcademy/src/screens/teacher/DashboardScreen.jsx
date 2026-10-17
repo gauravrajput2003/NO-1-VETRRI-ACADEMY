@@ -598,6 +598,7 @@ export default function TeacherDashboard({ navigation }) {
         </LinearGradient>
       </ParticleWrapper>
 
+      <View style={st.sectionCard}><Text style={st.sectionTitle}>Exams & Performance</Text><View style={{ flexDirection: 'row', gap: 12 }}><TouchableOpacity onPress={() => navigation.navigate('ExamManagement')} style={{ flex: 1, backgroundColor: '#0F766E', padding: 16, borderRadius: 12, alignItems: 'center' }}><Text style={{ color: '#FFF', fontWeight: '700' }}>Manage Exams</Text></TouchableOpacity><TouchableOpacity onPress={() => navigation.navigate('MonthlyReport')} style={{ flex: 1, backgroundColor: '#102A43', padding: 16, borderRadius: 12, alignItems: 'center' }}><Text style={{ color: '#FFF', fontWeight: '700' }}>My Rating</Text></TouchableOpacity></View></View>
       {/* ── UPCOMING COMPENSATION CLASSES ── */}
       {overview?.pendingCompensationCount > 0 && overview?.pendingCompensationLeaves?.length > 0 && (
         <View style={st.sectionCard}>

@@ -1,3 +1,4 @@
+import ExamManagementScreen from '../screens/common/ExamManagementScreen';
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,7 +19,7 @@ import GradesScreen from '../screens/teacher/GradesScreen';
 import TeacherMaterialsScreen from '../screens/teacher/TeacherMaterialsScreen';
 import StudentsScreen from '../screens/teacher/StudentsScreen';
 import LeaveScreen from '../screens/teacher/LeaveScreen';
-import MonthlyReportScreen from '../screens/teacher/MonthlyReportScreen';
+import MonthlyReportScreen from '../screens/common/AcademicReportsScreen';
 import SalaryScreen from '../screens/teacher/SalaryScreen';
 import ClassSchedulerScreen from '../screens/admin/ClassSchedulerScreen';
 import TrainingVideosScreen from '../screens/teacher/TrainingVideosScreen';
@@ -65,6 +66,7 @@ const HEADER_OPTS = {
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={HEADER_OPTS}>
+      <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TeacherDashboard" component={TeacherDashboard} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />

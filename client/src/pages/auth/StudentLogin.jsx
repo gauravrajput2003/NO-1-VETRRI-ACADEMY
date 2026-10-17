@@ -1,3 +1,4 @@
+import { getLoginErrorMessage } from '../../utils/loginErrors';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -69,6 +70,7 @@ export default function StudentLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const [showAdmissionModal, setShowAdmissionModal] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
@@ -76,6 +78,7 @@ export default function StudentLogin() {
   });
 
   const onSubmit = async ({ identifier, password }) => {
+    setLoginError('');
     try {
       const data = await login('student', identifier, password);
       if (data.user.firstLogin && !data.user.admissionFormFilled) {
@@ -85,7 +88,7 @@ export default function StudentLogin() {
       }
       toast.success(`Welcome back, ${data.user.name}! 🎓`);
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Login failed');
+      setLoginError(getLoginErrorMessage(err));
     }
   };
 
@@ -125,13 +128,14 @@ export default function StudentLogin() {
         <div style={styles.card}>
           <h1 style={styles.cardTitle}>Login to Your Account</h1>
 
-          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onChange={() => { if (loginError) setLoginError(''); }} onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {loginError && <div role="alert" aria-live="assertive" style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 12, padding: 14, color: '#B91C1C', fontSize: 14, lineHeight: 1.5 }}><strong>Unable to sign in</strong><div>{loginError}</div></div>}
             {/* Email / Username */}
             <div style={styles.inputWrap}>
               <FiMail style={styles.inputIcon} size={16} />
               <input
                 {...register('identifier')}
-                placeholder="Email or Username"
+                placeholder="Phone number or email"
                 id="student-identifier"
                 style={styles.input}
               />

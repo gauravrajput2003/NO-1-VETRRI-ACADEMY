@@ -1,3 +1,4 @@
+import { isLoginRequest } from '../utils/loginErrors';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/apiOrigin';
 
@@ -22,8 +23,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const originalRequest = error.config || {};
+    if (error.response?.status === 401 && !isLoginRequest(originalRequest.url) && !originalRequest._retry) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {

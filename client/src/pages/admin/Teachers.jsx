@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import StudentLoginDetails, { copyLoginText } from '../../components/StudentLoginDetails';
+import { normalizeLoginMobile } from '../../utils/loginCredentials';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { FiPhone, FiMail, FiPlus, FiX, FiEye, FiEyeOff, FiCopy, FiUserCheck } from 'react-icons/fi';
+import { FiPhone, FiMail, FiPlus, FiX, FiEye, FiEyeOff, FiCopy } from 'react-icons/fi';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,8 +12,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 const schema = z.object({
   name: z.string().min(2, 'Name is required'),
   email: z.string().email('Valid email required'),
-  mobile: z.string().min(10, 'Valid phone required'),
-  password: z.string().min(6, 'Password required'),
+  mobile: z.string().transform(normalizeLoginMobile).refine((value) => /^\d{10}$/.test(value), 'Valid 10-digit phone required'),
+  password: z.string().trim().min(6, 'Password must be at least 6 characters'),
   subjects: z.string().min(2, 'At least one subject required (comma separated)'),
   qualification: z.string().min(2, 'Qualification required'),
   experience: z.coerce.number().min(0, 'Must be positive number'),
@@ -24,6 +26,9 @@ export default function Teachers() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [credentials, setCredentials] = useState(null);
+  const [editingTeacher, setEditingTeacher] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -68,6 +73,7 @@ export default function Teachers() {
         setCredentials({
           name: data.name,
           email: data.email,
+          mobile: normalizeLoginMobile(data.mobile),
           password: data.password
         });
         reset();
@@ -78,11 +84,22 @@ export default function Teachers() {
     }
   };
 
-  const copyCredentials = () => {
-    if (!credentials) return;
-    const text = `No.1 Vettri Academy Login\nEmail: ${credentials.email}\nPassword: ${credentials.password}\nLogin: no1vettriacademy.com/login/teacher`;
-    navigator.clipboard.writeText(text);
-    toast.success('Credentials copied to clipboard!');
+  const savePassword = async (event) => {
+    event.preventDefault();
+    if (savingPassword) return;
+    const password = newPassword.trim();
+    if (password.length < 6) return toast.error('Enter at least 6 characters, or cancel to keep the current password');
+    setSavingPassword(true);
+    try {
+      const { data } = await api.put('/admin/teachers/' + editingTeacher._id, { password });
+      if (!data.success) throw new Error(data.message || 'Password update failed');
+      setCredentials({ name: data.teacher.name, mobile: normalizeLoginMobile(data.teacher.mobile), password });
+      setEditingTeacher(null);
+      setNewPassword('');
+      setShowPw(false);
+      toast.success('Teacher password updated');
+    } catch (error) { toast.error(error.response?.data?.message || error.message || 'Password update failed'); }
+    finally { setSavingPassword(false); }
   };
 
   return (
@@ -113,13 +130,14 @@ export default function Teachers() {
                       <span className="text-white font-medium">{t.name}</span>
                     </div>
                   </td>
-                  <td className="text-white/60 font-mono flex items-center gap-1"><FiPhone size={12} className="text-white/30" /> {t.mobile}</td>
+                  <td className="text-white/60 font-mono flex items-center gap-1"><FiPhone size={12} className="text-white/30" /> {normalizeLoginMobile(t.mobile)} <button type="button" aria-label="Copy teacher login phone" onClick={() => copyLoginText(normalizeLoginMobile(t.mobile))}><FiCopy /></button></td>
                   <td className="text-white/60"><div className="flex items-center gap-1"><FiMail size={12} className="text-white/30" /> <span className="truncate max-w-[150px]">{t.email || '—'}</span></div></td>
                   <td className="text-white/60">{t.qualification || '—'}</td>
                   <td className="text-white/50 text-xs max-w-32 truncate">{t.subjects?.join(', ') || '—'}</td>
                   <td><span className={`badge ${t.isApproved ? 'badge-green' : 'badge-gold'}`}>{t.isApproved ? 'Approved' : 'Pending'}</span></td>
                   <td>
                     <div className="flex gap-2">
+                      <button onClick={() => { setEditingTeacher(t); setNewPassword(''); setShowPw(false); }} className="text-teal-300 text-xs border border-teal-500/30 px-2 py-1 rounded-lg">Edit password</button>
                       {!t.isApproved && <button onClick={() => approve(t._id)} className="text-green-400 text-xs border border-green-500/30 px-2 py-1 rounded-lg hover:bg-green-500/10">Approve</button>}
                       {t.isApproved && <button onClick={() => suspend(t._id)} className="text-red-400 text-xs border border-red-500/30 px-2 py-1 rounded-lg hover:bg-red-500/10">Suspend</button>}
                     </div>
@@ -227,49 +245,27 @@ export default function Teachers() {
         )}
       </AnimatePresence>
 
-      {/* Credentials Success Modal */}
-      <AnimatePresence>
-        {credentials && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }} 
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-[#0A1628] border border-[#F5A623]/30 rounded-2xl p-8 w-full max-w-sm shadow-[0_0_40px_rgba(245,166,35,0.1)] text-center relative"
-            >
-              <div className="w-16 h-16 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center mx-auto mb-4 border border-green-500/30">
-                <FiUserCheck size={28} />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Teacher Created!</h2>
-              <p className="text-white/50 text-sm mb-6">Share these details privately with the teacher. They will not be shown again.</p>
+      {credentials && <StudentLoginDetails accountType="Teacher" details={credentials} onClose={() => setCredentials(null)} />}
+      {editingTeacher && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Edit teacher password">
+          <form onSubmit={savePassword} className="bg-[#0A1628] rounded-2xl p-6 w-full max-w-md space-y-4 text-white">
+            <h2 className="text-xl font-bold">Edit password: {editingTeacher.name}</h2>
+            <p className="select-text">Login phone: {normalizeLoginMobile(editingTeacher.mobile)}</p>
+            <button type="button" className="text-teal-300" onClick={() => copyLoginText(normalizeLoginMobile(editingTeacher.mobile))}>Copy phone number</button>
+            <label htmlFor="teacher-new-password" className="block">New password</label>
+            <div className="flex gap-2">
+              <input id="teacher-new-password" className="input-field min-w-0 flex-1" type={showPw ? 'text' : 'password'} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" autoCapitalize="none" spellCheck={false} />
+              <button type="button" onClick={() => setShowPw(!showPw)}>{showPw ? 'Hide' : 'Show'}</button>
+            </div>
+            <p className="text-white/60 text-sm">At least 6 characters. Spaces at the start/end are removed. Copy the new password after saving. Existing passwords cannot be displayed.</p>
+            <div className="flex justify-end gap-3">
+              <button type="button" disabled={savingPassword} className="btn-secondary" onClick={() => { setEditingTeacher(null); setNewPassword(''); }}>Cancel</button>
+              <button type="submit" disabled={savingPassword} className="btn-primary">{savingPassword ? 'Saving...' : 'Save password'}</button>
+            </div>
+          </form>
+        </div>
+      )}
 
-              <div className="bg-black/30 border border-white/5 rounded-xl p-4 text-left space-y-3 mb-6 relative group select-all">
-                <div>
-                  <div className="text-white/40 text-xs mb-1 uppercase tracking-wider font-semibold">Name</div>
-                  <div className="text-white font-medium">{credentials.name}</div>
-                </div>
-                <div>
-                  <div className="text-white/40 text-xs mb-1 uppercase tracking-wider font-semibold">Login Email</div>
-                  <div className="text-gold font-mono">{credentials.email}</div>
-                </div>
-                <div>
-                  <div className="text-white/40 text-xs mb-1 uppercase tracking-wider font-semibold">Temporary Password</div>
-                  <div className="text-white font-mono bg-white/5 px-2 py-1 rounded inline-block">{credentials.password}</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button onClick={copyCredentials} className="btn-primary flex items-center justify-center gap-2 w-full py-3">
-                  <FiCopy size={18} /> Copy Credentials
-                </button>
-                <button onClick={() => setCredentials(null)} className="btn-secondary w-full py-3 border-transparent bg-white/5 hover:bg-white/10">
-                  Close Window
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+const { recordTeacherStart } = require('../services/teacherClassActivity');
 const ClassSchedule = require('../models/ClassSchedule');
 const ClassAttendance = require('../models/ClassAttendance');
 const LiveSession = require('../models/LiveSession');
@@ -352,7 +353,7 @@ const goLive = async (req, res) => {
     if (cls.teacherId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Not your class.' });
     }
-    if (cls.status !== 'scheduled') {
+    if (!['scheduled', 'live'].includes(cls.status)) {
       return res.status(400).json({ success: false, message: `Class is already ${cls.status}.` });
     }
 
@@ -363,6 +364,8 @@ const goLive = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid meeting link URL.' });
     }
 
+    const firstTeacherStart = !cls.teacherStartedAt;
+
     // Update class status + store meetLink securely
     cls.status = 'live';
     cls.meetLink = resolvedMeetLink;
@@ -370,17 +373,16 @@ const goLive = async (req, res) => {
     await cls.save();
 
     // Create LiveSession
-    const session = await LiveSession.create({
+    const session = await LiveSession.findOneAndUpdate({ classId }, { $setOnInsert: {
       classId,
       teacherId: req.user._id,
-      meetLink: resolvedMeetLink,
-      meetLinkType: resolvedMeetLinkType,
-      isLive: true,
       startedAt: new Date(),
-    });
+    }, $set: { meetLink: resolvedMeetLink, meetLinkType: resolvedMeetLinkType, isLive: true } }, { new: true, upsert: true });
+
+    await recordTeacherStart(cls, req.user);
 
     // Notify enrolled students via in-app & Expo Push
-    if (cls.studentIds && cls.studentIds.length > 0) {
+    if (firstTeacherStart && cls.studentIds && cls.studentIds.length > 0) {
       notificationService.sendBulkNotifications({
         recipientIds: cls.studentIds,
         senderId: req.user._id,
@@ -481,6 +483,8 @@ const joinClass = async (req, res) => {
         startedAt: new Date(),
       });
     }
+
+    await recordTeacherStart(cls, req.user);
 
     // Record attendance
     const today = new Date().toISOString().split('T')[0];
@@ -730,7 +734,7 @@ const cancelSchedule = async (req, res) => {
 
     const cls = await ClassSchedule.findByIdAndUpdate(
       req.params.id,
-      { status: 'cancelled', cancelReason: reason },
+      { status: 'cancelled', cancelReason: reason, cancelledAt: new Date() },
       { new: true }
     );
     if (!cls) return res.status(404).json({ success: false, message: 'Schedule not found.' });

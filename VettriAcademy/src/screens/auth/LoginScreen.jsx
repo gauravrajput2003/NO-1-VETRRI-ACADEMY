@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, KeyboardAvoidingView, Platform,
+  StatusBar, KeyboardAvoidingView, Platform, ScrollView,
   ActivityIndicator, Dimensions, Animated, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,15 +42,11 @@ export default function LoginScreen({ navigation, route }) {
     dispatch(clearError());
   }, [dispatch]);
 
-  const canSubmit = identifier.trim().length > 0 && password.trim().length >= 6;
+  const canSubmit = identifier.trim().length > 0 && password.length > 0;
 
   const handleLogin = async () => {
-    if (!identifier.trim() || !password.trim()) {
+    if (!identifier.trim() || !password) {
       Toast.show({ type: 'error', text1: 'Missing Fields', text2: 'Please enter mobile/email and password.' });
-      return;
-    }
-    if (password.length < 6) {
-      Toast.show({ type: 'error', text1: 'Invalid Password', text2: 'Password must be at least 6 characters.' });
       return;
     }
     dispatch(clearError());
@@ -98,7 +94,7 @@ export default function LoginScreen({ navigation, route }) {
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={st.inner}>
+          <ScrollView contentContainerStyle={st.inner} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             <TouchableOpacity style={st.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
               <Ionicons name="arrow-back" size={20} color={C.white} />
@@ -124,7 +120,7 @@ export default function LoginScreen({ navigation, route }) {
             {/* Bright white card instead of dark glass panel */}
             <Animated.View style={[st.card, cardStyle]}>
 
-              <View style={[st.inputWrap, focusedField === 'id' && st.inputFocused]}>
+              <View style={[st.inputWrap, focusedField === 'id' && st.inputFocused, error && st.inputError]}>
                 <View style={st.inputIcon}>
                   <Ionicons name="person-outline" size={17} color={focusedField === 'id' ? C.pink : C.textMuted} />
                 </View>
@@ -144,7 +140,7 @@ export default function LoginScreen({ navigation, route }) {
                 />
               </View>
 
-              <View style={[st.inputWrap, focusedField === 'pw' && st.inputFocused]}>
+              <View style={[st.inputWrap, focusedField === 'pw' && st.inputFocused, error && st.inputError]}>
                 <View style={st.inputIcon}>
                   <Ionicons name="lock-closed-outline" size={17} color={focusedField === 'pw' ? C.pink : C.textMuted} />
                 </View>
@@ -157,6 +153,8 @@ export default function LoginScreen({ navigation, route }) {
                     setPassword(text);
                     if (error) dispatch(clearError());
                   }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                   secureTextEntry={!showPassword}
                   onFocus={() => setFocusedField('pw')}
                   onBlur={() => setFocusedField(null)}
@@ -173,9 +171,9 @@ export default function LoginScreen({ navigation, route }) {
 </TouchableOpacity>
 
               {error ? (
-                <View style={st.errorBox}>
+                <View style={st.errorBox} accessibilityRole="alert" accessibilityLiveRegion="assertive">
                   <Ionicons name="alert-circle" size={14} color="#E0335A" />
-                  <Text style={st.errorText}>{error}</Text>
+                  <View style={{ flex: 1 }}><Text style={st.errorTitle}>Unable to sign in</Text><Text style={st.errorText}>{error}</Text></View>
                 </View>
               ) : null}
 
@@ -213,7 +211,7 @@ export default function LoginScreen({ navigation, route }) {
               <Text style={st.tagline}>🔒 Secure · 🎓 Trusted · ⚡ Fast</Text>
             </Animated.View>
 
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -223,7 +221,7 @@ export default function LoginScreen({ navigation, route }) {
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.tealDeep },
   blob: { position: 'absolute', borderRadius: 999 },
-  inner: { flex: 1, paddingHorizontal: 20, paddingBottom: 10 },
+  inner: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 10 },
 
   backBtn: {
     marginTop: 8, width: 40, height: 40, borderRadius: 20,
@@ -256,7 +254,9 @@ const st = StyleSheet.create({
   input: { flex: 1, color: C.ink, fontSize: 14, paddingVertical: 14, paddingRight: 12 },
 
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFE7ED', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#FFC2D3', marginBottom: 4 },
-  errorText: { color: '#E0335A', fontSize: 12, flex: 1 },
+  inputError: { borderColor: '#DC2626', backgroundColor: '#FFF5F5' },
+  errorTitle: { color: '#B91C1C', fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  errorText: { color: '#B91C1C', fontSize: 13, lineHeight: 19 },
 
   btnTouch: {
     height: 56, borderRadius: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10,

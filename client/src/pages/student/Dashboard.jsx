@@ -1,3 +1,5 @@
+import Exams from '../academic/Exams';
+import AcademicReports from '../academic/Reports';
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +27,8 @@ import Profile from './Profile';
 import VettriAIPage from '../common/VettriAIPage';
 
 const LINKS = [
+  { href: '/student/exams', label: 'Exam Management', icon: FiBook },
+
   { href: '/student/dashboard', label: 'Dashboard', icon: FiHome },
   { href: '/student/classes', label: 'My Classes', icon: FiCalendar },
   { href: '/student/materials', label: 'Study Materials', icon: FiBook },
@@ -119,6 +123,8 @@ export default function StudentDashboard() {
 
         <div className="p-4 md:p-6">
           <Routes>
+            <Route path="exams" element={<Exams />} />
+
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<DashboardHome />} />
             <Route path="classes" element={<MyClasses />} />

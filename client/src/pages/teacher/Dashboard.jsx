@@ -1,3 +1,5 @@
+import Exams from '../academic/Exams';
+import AcademicReports from '../academic/Reports';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import NotificationBell from '../../components/NotificationBell';
@@ -23,6 +25,9 @@ import Profile from './Profile';
 import VettriAIPage from '../common/VettriAIPage';
 
 const LINKS = [
+  { href: '/teacher/exams', label: 'Exam Management', icon: FiFileText },
+  { href: '/teacher/teacher-performance', label: 'My Performance', icon: FiAward },
+
   { href: '/teacher/dashboard', label: 'Dashboard', icon: FiHome },
   { href: '/teacher/live-class', label: 'Live Class', icon: FiVideo },
   { href: '/teacher/training', label: 'Training', icon: FiPlay },
@@ -71,6 +76,9 @@ export default function TeacherDashboard() {
 
         <div className="p-6">
           <Routes>
+            <Route path="exams" element={<Exams />} />
+            <Route path="teacher-performance" element={<AcademicReports />} />
+
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<DashboardHome />} />
             <Route path="live-class" element={<LiveClass />} />

@@ -1,3 +1,4 @@
+import { getLoginErrorMessage } from '../../utils/loginErrors';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { REHYDRATE } from 'redux-persist';
 import { loginAPI, logoutAPI, getMeAPI } from '../../services/api';
@@ -9,44 +10,21 @@ import { connectSocket, disconnectSocket } from '../../services/socket';
 export const loginUser = createAsyncThunk(
   'auth/login',
   async ({ role, identifier, password }, { rejectWithValue }) => {
+    let data;
     try {
-      const roleCandidates = role ? [role] : [null];
-      let lastErrorMessage = 'Login failed';
-
-      for (const candidateRole of roleCandidates) {
-        try {
-          const { data } = await loginAPI(candidateRole, identifier, password);
-          if (data.success) {
-            await setToken(data.token);
-            if (data.refreshToken) await setRefreshToken(data.refreshToken);
-            await setUserData(data.user);
-            // Connect socket after login
-            connectSocket(data.user._id, data.user.role);
-            return data;
-          }
-
-          lastErrorMessage = data.message || lastErrorMessage;
-        } catch (error) {
-          if (error.response) {
-            if (error.response.status === 429) {
-              return rejectWithValue(
-                error.response?.data?.message || 'Too many login attempts. Please try again after 15 minutes.'
-              );
-            }
-            lastErrorMessage = error.response?.data?.message || lastErrorMessage;
-            return rejectWithValue(lastErrorMessage);
-          }
-
-          throw error;
-        }
-      }
-
-      return rejectWithValue(lastErrorMessage);
-    } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Network error. Please try again.'
-      );
+      ({ data } = await loginAPI(role || null, identifier, password));
+    } catch (error) { return rejectWithValue(getLoginErrorMessage(error)); }
+    if (!data.success) return rejectWithValue(data.message || 'Unable to sign in. Please try again.');
+    try {
+      await setToken(data.token);
+      if (data.refreshToken) await setRefreshToken(data.refreshToken);
+      await setUserData(data.user);
+    } catch {
+      return rejectWithValue('Signed in, but this device could not save your session. Please try again.');
     }
+    // Realtime connection failures must not turn a successful login into a network error.
+    try { connectSocket(data.user._id, data.user.role); } catch { /* Socket reconnect handles availability. */ }
+    return data;
   }
 );
 

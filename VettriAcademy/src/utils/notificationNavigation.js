@@ -1,5 +1,6 @@
 
 const STUDENT_ROUTES = {
+  academic_exam: { screen: 'ExamManagement' },
   // Core Learning
   live_class: { screen: 'ClassDetail' },
   class_starting: { screen: 'ClassDetail' },
@@ -39,6 +40,7 @@ const STUDENT_ROUTES = {
 };
 
 const TEACHER_ROUTES = {
+  academic_exam: { screen: 'ExamManagement' },
   // Direct Chat & Support
   chat_message: { screen: 'ChatRoom' },
   direct_message: { screen: 'ChatRoom' },
@@ -64,6 +66,7 @@ const TEACHER_ROUTES = {
 };
 
 const ADMIN_ROUTES = {
+  academic_exam: { screen: 'ExamManagement' },
   // Helpdesk & Support Queries
   support_ticket: { screen: 'AdminQueries' },
   support_ticket_reply: { screen: 'AdminQueries' },

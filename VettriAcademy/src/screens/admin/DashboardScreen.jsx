@@ -347,6 +347,8 @@ export default function AdminDashboard({ navigation }) {
         />
       </View>
 
+      <View style={styles.sectionPad}><PremiumCard title="Exam Management" subtitle="Assign papers, review answers and publish marks." gradient={['#102A43', '#0F766E']} onPress={() => navigation.navigate('ExamManagement')} height={120} footerText="Open Exam Management" /></View>
+      <View style={styles.sectionPad}><PremiumCard title="Teacher Performance" subtitle="Automatic monthly ratings and Best Teacher." gradient={['#0F766E', '#14B8A6']} onPress={() => navigation.navigate('TeacherPerformance')} height={120} footerText="View Monthly Reports" /></View>
       {/* STUDENT MARKS SINGLE CARD */}
       <View style={styles.sectionPad}>
         <PremiumCard 

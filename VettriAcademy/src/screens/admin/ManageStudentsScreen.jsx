@@ -23,6 +23,8 @@ import { Colors } from '../../utils/colors';
 import { getInitials } from '../../utils/formatters';
 import { fetchAdminStudents, fetchAdminTeachers, editStudent, deleteStudent } from '../../redux/slices/adminSlice';
 import { registerAPI } from '../../services/api';
+import StudentLoginDetails, { copyLoginText } from '../../components/StudentLoginDetails';
+import { normalizeLoginMobile } from '../../utils/loginCredentials';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 
 // Plain touchable — no particle effect. Used for structural/utility controls
@@ -95,6 +97,9 @@ export default function ManageStudentsScreen({ navigation }) {
   const [viewModal, setViewModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [editData, setEditData] = useState({});
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [savingStudent, setSavingStudent] = useState(false);
+  const [loginDetails, setLoginDetails] = useState(null);
   const [editGradeQuery, setEditGradeQuery] = useState('');
   const [showEditGradeSuggestions, setShowEditGradeSuggestions] = useState(false);
   const [editBoardQuery, setEditBoardQuery] = useState('');
@@ -141,9 +146,17 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
 };
 
   const handleEdit = async () => {
-    const result = await dispatch(editStudent({ id: editModal._id, updates: editData }));
+    if (savingStudent) return;
+    const password = (editData.password || '').trim();
+    if (password && password.length < 6) return Toast.show({ type: 'error', text1: 'Password must be at least 6 characters' });
+    setSavingStudent(true);
+    const result = await dispatch(editStudent({ id: editModal._id, updates: { ...editData, password } }));
+    setSavingStudent(false);
     if (editStudent.fulfilled.match(result)) {
       Toast.show({ type: 'success', text1: 'Student Updated ✅' });
+      if (password) setLoginDetails({ name: result.payload.name, mobile: normalizeLoginMobile(result.payload.mobile), password });
+      setEditData({});
+      setShowEditPassword(false);
       setEditModal(null);
       setEditGradeQuery('');
       setShowEditGradeSuggestions(false);
@@ -159,18 +172,26 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
       Toast.show({ type: 'error', text1: 'Name, mobile and password are required' });
       return;
     }
+    if (savingStudent) return;
+    const createdPassword = createData.password.trim();
+    if (createdPassword.length < 6) return Toast.show({ type: 'error', text1: 'Password must be at least 6 characters' });
+    const createdMobile = normalizeLoginMobile(createData.mobile);
+    if (!/^\d{10}$/.test(createdMobile)) return Toast.show({ type: 'error', text1: 'Enter a valid 10-digit mobile number' });
+    setSavingStudent(true);
     try {
     await registerAPI({
   role: 'student',
   name: createData.name.trim(),
-  mobile: createData.mobile.trim(),
+  mobile: createdMobile,
   email: createData.email.trim() || undefined,
-  password: createData.password,
+  password: createdPassword,
   grade: createData.grade.trim() || undefined,
   board: createData.board.trim() || undefined,
   assignedTeachers: createData.assignedTeachers || [],
 });
       Toast.show({ type: 'success', text1: 'Student account created ✅' });
+      setLoginDetails({ name: createData.name.trim(), mobile: createdMobile, password: createdPassword });
+      setShowCreatePassword(false);
       setShowCreateModal(false);
      setCreateData({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeachers: [] });
       setCreateGradeQuery('');
@@ -180,7 +201,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
       dispatch(fetchAdminStudents({ search }));
     } catch (err) {
       Toast.show({ type: 'error', text1: 'Create failed', text2: err.response?.data?.message || 'Unable to create student' });
-    }
+    } finally { setSavingStudent(false); }
   };
 
   const handleDeleteStudent = (student) => {
@@ -227,6 +248,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
   return (
     <View style={styles.container}>
       <View style={styles.pageShell}>
+        {loginDetails && <StudentLoginDetails details={loginDetails} onClose={() => setLoginDetails(null)} />}
         {/* Header: padding comes from useSafeAreaInsets (not SafeAreaView),
             which reports the correct top inset even with a translucent
             status bar on Android — this is what stops the header from
@@ -343,7 +365,8 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
                 <Text style={styles.viewSectionTitle}>Contact</Text>
                 <View style={styles.viewRow}>
                   <Ionicons name="call-outline" size={18} color={B.teal} />
-                  <Text style={styles.viewRowText}>{viewModal?.mobile || 'Not provided'}</Text>
+                  <Text style={styles.viewRowText}>{normalizeLoginMobile(viewModal?.mobile) || 'Not provided'}</Text>
+                  {!!viewModal?.mobile && <TouchableOpacity accessibilityLabel="Copy login phone number" onPress={() => copyLoginText(normalizeLoginMobile(viewModal.mobile))}><Ionicons name="copy-outline" size={22} color={B.tealDeep} /></TouchableOpacity>}
                 </View>
                 <View style={styles.viewRow}>
                   <Ionicons name="mail-outline" size={18} color={B.teal} />
@@ -405,10 +428,12 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
                 onPress={() => {
                   const item = viewModal;
                   setViewModal(null);
+                  setShowEditPassword(false);
                   setEditModal(item);
                 setEditData({
   name: item.name || '',
-  mobile: item.mobile || '',
+  mobile: normalizeLoginMobile(item.mobile),
+  password: '',
   email: item.email || '',
   grade: item.grade || '',
   board: item.board || '',
@@ -461,6 +486,14 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
               value={editData.email}
               onChangeText={(v) => setEditData({ ...editData, email: v })}
             />
+
+            <TouchableOpacity onPress={() => copyLoginText(normalizeLoginMobile(editData.mobile))}><Text style={{ color: B.tealDeep, marginTop: 8 }}>Copy login phone number</Text></TouchableOpacity>
+            <Text style={[styles.label, { color: textColor }]}>New password (optional)</Text>
+            <View style={[styles.input, styles.passwordRow, { borderColor: isDark ? Colors.navyLight : Colors.gray }]}>
+              <TextInput style={[styles.passwordInput, { color: textColor }]} value={editData.password || ''} onChangeText={(password) => setEditData({ ...editData, password })} placeholder="Leave blank to keep current password" placeholderTextColor={Colors.mediumGray} secureTextEntry={!showEditPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" />
+              <TouchableOpacity accessibilityLabel={showEditPassword ? 'Hide new password' : 'Show new password'} onPress={() => setShowEditPassword(!showEditPassword)}><Ionicons name={showEditPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={B.tealDeep} /></TouchableOpacity>
+            </View>
+            <Text style={{ color: Colors.mediumGray, marginTop: 6, fontSize: 12 }}>At least 6 characters. Spaces at the start/end are removed. After saving, you can copy the new password. Existing passwords cannot be displayed.</Text>
 
             <Text style={[styles.label, { color: textColor }]}>Grade</Text>
             <View style={styles.boardAutocompleteWrap}>
@@ -565,8 +598,8 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
             <TextInput style={[styles.input, { color: textColor, borderColor: isDark ? Colors.navyLight : Colors.gray }]} value={editData.feeNotes} onChangeText={(v) => setEditData({ ...editData, feeNotes: v })} placeholder="Optional note" placeholderTextColor={Colors.mediumGray} />
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditModal(null)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleEdit}><Text style={styles.confirmText}>Save</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} disabled={savingStudent} onPress={() => { setEditModal(null); setEditData({}); }}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} disabled={savingStudent} onPress={handleEdit}><Text style={styles.confirmText}>{savingStudent ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
             </View>
           </ScrollView>
         </View>
@@ -599,6 +632,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
     placeholderTextColor={Colors.mediumGray}
     secureTextEntry={!showCreatePassword}
     autoCapitalize="none"
+    autoCorrect={false}
   />
   <TouchableOpacity onPress={() => setShowCreatePassword(!showCreatePassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
     <Ionicons name={showCreatePassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={B.sec} />
@@ -698,7 +732,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
 </ScrollView>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCreateModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleCreate}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} disabled={savingStudent} onPress={handleCreate}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>
             </View>
           </ScrollView>
         </View>

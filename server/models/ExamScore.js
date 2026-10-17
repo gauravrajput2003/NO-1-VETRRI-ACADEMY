@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const examScoreSchema = new mongoose.Schema(
   {
+    exam: { type: mongoose.Schema.Types.ObjectId, ref: 'Exam' },
+    submission: { type: mongoose.Schema.Types.ObjectId, ref: 'ExamSubmission' },
+    classGrade: String,
+    classBoard: String,
+    kind: { type: String, enum: ['exam', 'homework'], default: 'exam' },
     student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
@@ -33,5 +38,6 @@ examScoreSchema.virtual('percentage').get(function () {
 // Indexes for faster student score and teacher dashboard lookups
 examScoreSchema.index({ student: 1, examDate: -1 });
 examScoreSchema.index({ teacher: 1 });
+examScoreSchema.index({ submission: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('ExamScore', examScoreSchema);

@@ -12,7 +12,7 @@ const {
 } = require('../controllers/storageController');
 
 // All uploads are protected and require teacher or admin role
-router.post('/direct-upload/params', verifyToken, teacherOrAdmin, getDirectUploadParams);
+router.post('/direct-upload/params', verifyToken, getDirectUploadParams);
 router.post('/direct-upload/confirm', verifyToken, teacherOrAdmin, confirmDirectUpload);
 router.post('/s3/upload-url', verifyToken, teacherOrAdmin, getS3UploadUrl);
 router.post('/cloudinary/upload-params', verifyToken, teacherOrAdmin, getCloudinaryUploadParams);
