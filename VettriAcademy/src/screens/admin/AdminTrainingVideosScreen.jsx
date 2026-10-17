@@ -4,18 +4,19 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity as RNTouchableOpacity, StyleSheet,
   TextInput, Alert, Modal, ScrollView, ActivityIndicator,
-  Switch, RefreshControl, Image, Platform,
+  Switch, RefreshControl, Image,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
+import { publishDirectFile } from '../../services/directCloudinaryUpload';
+import { useUploadFormRecovery } from '../../hooks/useUploadFormRecovery';
 import { Colors } from '../../utils/colors';
 import { Shadows } from '../../utils/theme';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import {
   getAdminTrainingVideosAPI, uploadTrainingVideoByUrlAPI,
-  uploadTrainingVideoFileAPI,
   editTrainingVideoAPI, toggleTrainingVideoStatusAPI,
   deleteAdminTrainingVideoAPI, reorderTrainingVideosAPI,
 } from '../../services/api';
@@ -84,11 +85,20 @@ export default function AdminTrainingVideosScreen({ navigation }) {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState('Preparing');
   const [form, setForm] = useState(EMPTY_FORM);
   // 'file' = pick from device, 'url' = paste link
   const [uploadMode, setUploadMode] = useState('file');
   const [selectedFile, setSelectedFile] = useState(null); // { name, uri, mimeType, size }
   const toastTimer = useRef(null);
+  const { ownerId, saveDraft, clearDraft } = useUploadFormRecovery('admin-training', (draft) => {
+    setForm({ ...EMPTY_FORM, ...draft.metadata });
+    setSelectedFile(draft.file);
+    setEditingId(null);
+    setUploadMode('file');
+    setShowModal(true);
+    showToast('Unfinished upload restored. Tap Upload Video to resume.');
+  });
 
   const showToast = (msg, type='ok') => {
     setToast({ msg, type });
@@ -137,6 +147,7 @@ export default function AdminTrainingVideosScreen({ navigation }) {
   };
 
   const pickVideo = async () => {
+    if (saving) return;
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'video/*',
@@ -182,41 +193,18 @@ export default function AdminTrainingVideosScreen({ navigation }) {
       setSaving(true);
       setUploadProgress(0);
       try {
-        const fd = new FormData();
-
-        if (Platform.OS === 'web') {
-          // Expo Web (browser): use the real File object OR fetch blob from URI
-          if (selectedFile.file instanceof File) {
-            fd.append('video', selectedFile.file, selectedFile.name);
-          } else {
-            // Fallback: fetch blob from the blob URI
-            const blobRes = await fetch(selectedFile.uri);
-            const blob = await blobRes.blob();
-            fd.append('video', new File([blob], selectedFile.name, { type: selectedFile.mimeType || 'video/mp4' }));
-          }
-        } else {
-          // Native iOS/Android: React Native's { uri, name, type } pattern
-          fd.append('video', {
-            uri: selectedFile.uri,
-            name: selectedFile.name,
-            type: selectedFile.mimeType || 'video/mp4',
-          });
-        }
-
-        fd.append('title', form.title);
-        fd.append('description', form.description || '');
-        fd.append('category', form.category || 'getting-started');
-        fd.append('thumbnailUrl', form.thumbnailUrl || '');
-        fd.append('duration', String(parseInt(form.duration) || 0));
-        fd.append('isMandatory', String(form.isMandatory));
-         fd.append('targetAudience', form.targetAudience || 'both');
-        console.log('[Upload] Sending file:', selectedFile.name, selectedFile.mimeType, selectedFile.size, 'platform:', Platform.OS);
-        await uploadTrainingVideoFileAPI(fd);
+        setUploadPhase('Preparing');
+        await saveDraft({ file: { uri: selectedFile.uri, name: selectedFile.name, mimeType: selectedFile.mimeType, size: selectedFile.size }, metadata: form });
+        await publishDirectFile(selectedFile, form, {
+          ownerId, purpose: 'training',
+          onProgress: ({ phase, percent }) => { setUploadPhase(phase); setUploadProgress(percent); },
+        });
+        await clearDraft();
         showToast('Video uploaded successfully!');
         setShowModal(false);
         load();
       } catch (e) {
-        const msg = e.message || e.response?.data?.message || 'Upload failed';
+        const msg = e.response?.data?.message || e.message || 'Upload failed';
         console.error('[Upload] Error:', msg, JSON.stringify(e.response?.data));
         showToast(msg, 'error');
       } finally { setSaving(false); setUploadProgress(0); }
@@ -354,12 +342,12 @@ export default function AdminTrainingVideosScreen({ navigation }) {
         />
       )}
 
-      <Modal visible={showModal} animationType='slide' transparent onRequestClose={() => setShowModal(false)}>
+      <Modal visible={showModal} animationType='slide' transparent onRequestClose={() => { if (!saving) setShowModal(false); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalBox, { backgroundColor:cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle,{color:txt}]}>{editingId ? 'Edit Video' : 'Add Training Video'}</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}><Ionicons name='close' size={24} color={txt} /></TouchableOpacity>
+              <TouchableOpacity disabled={saving} onPress={() => setShowModal(false)}><Ionicons name='close' size={24} color={txt} /></TouchableOpacity>
             </View>
             <ScrollView onScroll={onTabBarScroll} scrollEventThrottle={16} showsVerticalScrollIndicator={false}>
               {/* Title */}
@@ -377,14 +365,14 @@ export default function AdminTrainingVideosScreen({ navigation }) {
                   <View style={styles.modeRow}>
                     <TouchableOpacity
                       style={[styles.modeBtn, uploadMode==='file' && styles.modeBtnActive]}
-                      onPress={() => { setUploadMode('file'); setSelectedFile(null); }}
+                      disabled={saving} onPress={() => { setUploadMode('file'); setSelectedFile(null); }}
                     >
                       <Ionicons name='phone-portrait-outline' size={16} color={uploadMode==='file' ? '#fff' : Colors.primary} />
                       <Text style={[styles.modeTxt, uploadMode==='file' && styles.modeTxtActive]}>From Device</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modeBtn, uploadMode==='url' && styles.modeBtnActive]}
-                      onPress={() => { setUploadMode('url'); setSelectedFile(null); }}
+                      disabled={saving} onPress={() => { setUploadMode('url'); setSelectedFile(null); }}
                     >
                       <Ionicons name='link-outline' size={16} color={uploadMode==='url' ? '#fff' : Colors.primary} />
                       <Text style={[styles.modeTxt, uploadMode==='url' && styles.modeTxtActive]}>Paste URL</Text>
@@ -483,8 +471,9 @@ export default function AdminTrainingVideosScreen({ navigation }) {
               </Text>
               {/* Upload progress bar */}
               {saving && uploadMode === 'file' && !editingId && (
-                <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+                <View>
+                  <Text accessibilityLiveRegion='polite' style={{ color: txtSec, marginBottom: 6 }}>{uploadPhase} · {uploadProgress}%</Text>
+                  <View style={styles.progressBar}><View style={[styles.progressFill, { width: `${uploadProgress}%` }]} /></View>
                 </View>
               )}
 

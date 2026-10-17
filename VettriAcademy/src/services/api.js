@@ -649,6 +649,8 @@ export const getAnnouncementDownloadUrlAPI = (id, index) =>
   api.get(`/announcements/${id}/media/${index}/download`);
 
 // Storage — Cloudinary signed upload params (shared with materials)
+export const getDirectUploadParamsAPI = (data) => api.post('/storage/direct-upload/params', data);
+export const confirmDirectUploadAPI = (data) => api.post('/storage/direct-upload/confirm', data);
 export const getCloudinaryUploadParamsAPI = (data) =>
   api.post('/storage/cloudinary/upload-params', data);
 

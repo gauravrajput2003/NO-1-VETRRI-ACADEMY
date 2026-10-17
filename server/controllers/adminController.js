@@ -886,7 +886,10 @@ const directEditMaterial = async (req, res) => {
       storageType: material.storageType,
     };
 
-    if (req.file) {
+    if (req.directUploadAsset) {
+      if (material.publicId === req.directUploadAsset.publicId) return res.json({ success: true, material });
+      Object.assign(updates, buildReplacementFields(req.directUploadAsset, req.directUploadAsset.mimeType));
+    } else if (req.file) {
       newUploadResult = await uploadMaterialReplacement(req.file);
       Object.assign(updates, buildReplacementFields(newUploadResult, req.file.mimetype));
     }
@@ -899,9 +902,9 @@ const directEditMaterial = async (req, res) => {
     await material.save();
 
     if (
-      req.file &&
+      (req.file || req.directUploadAsset) &&
       oldFile.publicId &&
-      (oldFile.publicId !== newUploadResult.publicId || oldFile.resourceType !== newUploadResult.resourceType)
+      (oldFile.publicId !== material.publicId || oldFile.resourceType !== material.resourceType)
     ) {
       storageService.deleteFile(oldFile.publicId, oldFile.storageType, oldFile.resourceType)
         .catch((deleteErr) => console.warn('[Admin Edit] Old file delete failed:', deleteErr.message));

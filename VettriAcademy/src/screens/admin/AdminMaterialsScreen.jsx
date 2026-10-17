@@ -1,3 +1,4 @@
+import { useUploadFormRecovery } from '../../hooks/useUploadFormRecovery';
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -49,18 +50,6 @@ const FILTER_ICONS = {
   'Rejected': '❌',
 };
 
-const appendPickedFile = (formData, pickedFile) => {
-  if (Platform.OS === 'web' && pickedFile.file) {
-    formData.append('file', pickedFile.file);
-  } else {
-    formData.append('file', {
-      uri: pickedFile.uri,
-      name: pickedFile.name,
-      type: pickedFile.mimeType || 'application/octet-stream',
-    });
-  }
-};
-
 export default function AdminMaterialsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { materials, folders, loading, previewLoading } = useSelector((s) => s.admin);
@@ -86,6 +75,17 @@ export default function AdminMaterialsScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [isLocked, setIsLocked] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ phase: '', percent: 0 });
+  const { saveDraft, clearDraft } = useUploadFormRecovery('admin-materials', (draft) => {
+    setFile(draft.file);
+
+    setTitle(draft.metadata.title || ''); setSubject(draft.metadata.subject || '');
+    setGrade(draft.metadata.grade || ''); setDescription(draft.metadata.description || '');
+    setIsLocked(draft.metadata.lockedForAll !== false);
+    setEditingMaterial(draft.materialId ? { _id: draft.materialId } : null);
+    setUploadModalVisible(true);
+    Toast.show({ type: 'info', text1: 'Unfinished upload restored', text2: 'Tap Upload or Update to continue.' });
+  });
   const [previewingId, setPreviewingId] = useState(null);
 
   useEffect(() => {
@@ -145,30 +145,24 @@ export default function AdminMaterialsScreen({ navigation }) {
     const isReplacingFile = !!editingMaterial && !!file;
 
     setUploading(true);
+    setUploadProgress({ phase: 'Preparing', percent: 0 });
+    const metadata = { title, subject, grade, description, lockedForAll: isLocked };
+    if (file) await saveDraft({ file: { uri: file.uri, name: file.name, mimeType: file.mimeType, size: file.size }, metadata, materialId: editingMaterial?._id });
 
     if (editingMaterial) {
       try {
-        let updateData = { title, subject, grade, description, lockedForAll: isLocked };
-
-        if (file) {
-          updateData = new FormData();
-          updateData.append('title', title);
-          updateData.append('subject', subject);
-          updateData.append('grade', grade);
-          updateData.append('description', description);
-          updateData.append('lockedForAll', isLocked);
-          appendPickedFile(updateData, file);
-        }
+        const updateData = { title, subject, grade, description, lockedForAll: isLocked };
 
         const resultAction = await dispatch(editAdminMaterial({
           id: editingMaterial._id,
-          data: updateData
+          data: updateData, file, onProgress: setUploadProgress
         }));
         if (editAdminMaterial.fulfilled.match(resultAction)) {
           Toast.show({ type: 'success', text1: isReplacingFile ? 'File replaced successfully!' : 'Updated successfully!' });
-          closeUploadModal();
+          await clearDraft();
+          closeUploadModal(true);
         } else {
-          Toast.show({ type: 'error', text1: 'Update failed' });
+          Toast.show({ type: 'error', text1: 'Update failed', text2: resultAction.payload });
         }
       } catch (err) {
         Toast.show({ type: 'error', text1: 'Network error' });
@@ -176,23 +170,16 @@ export default function AdminMaterialsScreen({ navigation }) {
         setUploading(false);
       }
     } else {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('subject', subject);
-      formData.append('grade', grade);
-      formData.append('description', description);
-      formData.append('lockedForAll', isLocked);
-
-      appendPickedFile(formData, file);
 
       try {
-        const resultAction = await dispatch(uploadAdminMaterial(formData));
+        const resultAction = await dispatch(uploadAdminMaterial({ file, metadata, onProgress: setUploadProgress }));
         if (uploadAdminMaterial.fulfilled.match(resultAction)) {
           Toast.show({ type: 'success', text1: 'Uploaded successfully!' });
-          closeUploadModal();
+          await clearDraft();
+          closeUploadModal(true);
           dispatch(fetchAdminMaterials());
         } else {
-          Toast.show({ type: 'error', text1: 'Upload failed' });
+          Toast.show({ type: 'error', text1: 'Upload failed', text2: resultAction.payload });
         }
       } catch (err) {
         Toast.show({ type: 'error', text1: 'Network error' });
@@ -202,7 +189,8 @@ export default function AdminMaterialsScreen({ navigation }) {
     }
   };
 
-  const closeUploadModal = () => {
+  const closeUploadModal = (force = false) => {
+    if (uploading && force !== true) return;
     setUploadModalVisible(false);
     setEditingMaterial(null);
     setFile(null);
@@ -493,7 +481,7 @@ export default function AdminMaterialsScreen({ navigation }) {
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.fsScrollContent} showsVerticalScrollIndicator={false}>
 
-              <ScaleBtn activeScale={0.98} onPress={handlePickFile}>
+              <ScaleBtn activeScale={0.98} onPress={handlePickFile} disabled={uploading}>
                 <View style={styles.uploadCard}>
                   {file ? (
                     <View style={{ alignItems: 'center' }}>
@@ -542,6 +530,7 @@ export default function AdminMaterialsScreen({ navigation }) {
                 </View>
               </View>
 
+              {uploading && <Text accessibilityLiveRegion="polite" style={{ color: '#0D9488', textAlign: 'center', marginVertical: 12 }}>{uploadProgress.phase} · {uploadProgress.percent}%</Text>}
               <ScaleBtn activeScale={0.96} onPress={handleUploadOrUpdate} disabled={uploading}>
                 <LinearGradient colors={[MaterialPalette.teal, MaterialPalette.tealDark]} style={styles.fsSubmitBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   {uploading ? (

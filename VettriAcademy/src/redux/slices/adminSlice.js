@@ -1,3 +1,4 @@
+import { publishDirectFile } from '../../services/directCloudinaryUpload';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import {
   getAdminStatsAPI, getAdminStudentsAPI, updateStudentAPI,
@@ -13,7 +14,7 @@ import {
   getLiveMonitorAPI,
   getAdminMaterialsAPI, deleteAdminMaterialAPI, toggleAdminMaterialLockAPI,
   getPendingMaterialsAPI, getAdminMaterialPreviewAPI, getAdminMaterialDownloadAPI, approveMaterialAPI, rejectMaterialAPI,
-  directEditMaterialAPI, uploadAdminMaterialAPI,
+  directEditMaterialAPI,
   getLibraryAccessListAPI, approveLibraryAccessAPI, revokeLibraryAccessAPI,
   getAdminFoldersAPI,
   approveAdminLeaveCompensationAPI,
@@ -246,14 +247,16 @@ export const rejectPendingMaterial = createAsyncThunk('admin/rejectPendingMateri
   catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
 });
 
-export const editAdminMaterial = createAsyncThunk('admin/editAdminMaterial', async ({ id, data }, { rejectWithValue }) => {
-  try { const response = await directEditMaterialAPI(id, data); return response.data.material; }
-  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+export const editAdminMaterial = createAsyncThunk('admin/editAdminMaterial', async ({ id, data, file, onProgress }, { rejectWithValue, getState }) => {
+  try {
+    if (file) return (await publishDirectFile(file, { ...data, materialId: id }, { ownerId: getState().auth.user?._id, onProgress })).material;
+    const response = await directEditMaterialAPI(id, data); return response.data.material; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || e.message || 'Failed'); }
 });
 
-export const uploadAdminMaterial = createAsyncThunk('admin/uploadAdminMaterial', async (formData, { rejectWithValue }) => {
-  try { const { data } = await uploadAdminMaterialAPI(formData); return data.material; }
-  catch (e) { return rejectWithValue(e.response?.data?.message || 'Failed'); }
+export const uploadAdminMaterial = createAsyncThunk('admin/uploadAdminMaterial', async ({ file, metadata, onProgress }, { rejectWithValue, getState }) => {
+  try { return (await publishDirectFile(file, metadata, { ownerId: getState().auth.user?._id, onProgress })).material; }
+  catch (e) { return rejectWithValue(e.response?.data?.message || e.message || 'Failed'); }
 });
 
 export const fetchLibraryAccess = createAsyncThunk('admin/fetchLibraryAccess', async (_, { rejectWithValue }) => {

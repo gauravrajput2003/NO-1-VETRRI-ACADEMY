@@ -466,13 +466,19 @@ const editMaterial = async (req, res) => {
     }
 
     if (material.approvalStatus && material.approvalStatus.startsWith('pending_')) {
+      if (req.directUploadId && material.pendingChanges?.fileReplacement?.uploadId === req.directUploadId) {
+        return res.json({ success: true, material });
+      }
       cleanupTempUpload(req.file);
       return res.status(400).json({ success: false, message: 'This material already has a pending action awaiting admin approval.' });
     }
 
     const pendingChanges = buildMaterialTextUpdates(req.body);
 
-    if (req.file) {
+    if (req.directUploadAsset) {
+      if (material.publicId === req.directUploadAsset.publicId) return res.json({ success: true, material });
+      pendingChanges.fileReplacement = { ...buildReplacementFields(req.directUploadAsset, req.directUploadAsset.mimeType), uploadId: req.directUploadId };
+    } else if (req.file) {
       uploadResult = await uploadMaterialReplacement(req.file);
       pendingChanges.fileReplacement = buildReplacementFields(uploadResult, req.file.mimetype);
     }

@@ -145,6 +145,7 @@ const confirmUpload = async (req, res) => {
     const isAdmin = req.user.role === 'admin';
 
     const materialPayload = {
+      ...(req.directUploadId ? { directUploadId: req.directUploadId } : {}),
       title: title.trim(),
       description: description ? description.trim() : '',
       type: getMaterialTypeFromMime(mimeType),
@@ -246,6 +247,12 @@ const confirmUpload = async (req, res) => {
       })();
     }
   } catch (error) {
+    if (error.code === 11000 && req.directUploadId) {
+      try {
+        const material = await StudyMaterial.findOne({ directUploadId: req.directUploadId });
+        if (material) return res.json({ success: true, material });
+      } catch { /* Preserve the original error if recovery lookup fails. */ }
+    }
     console.error('[Storage confirm] Error:', error.message);
     if (!res.headersSent) {
       res.status(500).json({

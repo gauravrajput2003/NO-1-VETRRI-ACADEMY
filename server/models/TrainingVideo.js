@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const trainingVideoSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
+    directUploadId: { type: String },
     description: { type: String, trim: true },
 
     // ─── Video Source (one of two methods) ──────────────────────────────────
@@ -57,5 +58,6 @@ const trainingVideoSchema = new mongoose.Schema(
 trainingVideoSchema.index({ isActive: 1, order: 1 });
 trainingVideoSchema.index({ category: 1, isActive: 1 });
 trainingVideoSchema.index({ createdAt: -1 });
+trainingVideoSchema.index({ directUploadId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('TrainingVideo', trainingVideoSchema);

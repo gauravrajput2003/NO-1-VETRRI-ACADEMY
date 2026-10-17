@@ -49,6 +49,8 @@ const server = http.createServer(app);
 // ─── CORS Configuration ────────────────────────────────────────────────────────
 const allowedOrigins = [
   ...(process.env.CLIENT_URL || '').split(',').map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean),
+  'https://no1vettriacademy.com', 
+  'https://no1vettriacademy.in',
   'https://no1vettriacademy.com',
   'https://www.no1vettriacademy.com',
   'http://localhost:5173',

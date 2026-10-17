@@ -1,97 +1,17 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { Platform } from 'react-native';
+import { uploadDirectFile, publishDirectFile } from '../../services/directCloudinaryUpload';
 import {
   getTeacherDashboardAPI, getTeacherStudentsAPI, getTeacherMaterialsAPI,
   enterScoreAPI, getRecentScoresAPI, goLiveAPI, endClassAPI,
   toggleMaterialLockAPI, getTeacherGradingAPI, applyTeacherLeaveAPI,
   getTeacherLeavesAPI, getTeacherPermissionsAPI,
   getClassLiveMonitorAPI, sendClassMessageAPI,
-  uploadTeacherMaterialAPI, deleteTeacherMaterialAPI,
+  deleteTeacherMaterialAPI,
   editTeacherMaterialAPI,
   getTeacherSalaryCurrentMonthAPI, getTeacherSalaryHistoryAPI,
   updateTeacherCompensationAPI,
-  getCloudinaryUploadParamsAPI, confirmMaterialUploadAPI, deleteStorageUploadAPI,
+  confirmMaterialUploadAPI, deleteStorageUploadAPI,
 } from '../../services/api';
-
-const getCloudinaryResourceType = (mimeType = '') => {
-  const type = String(mimeType).toLowerCase();
-  if (type.startsWith('image/') || type === 'application/pdf') return 'image';
-  if (type.startsWith('video/') || type.startsWith('audio/')) return 'video';
-  return 'raw';
-};
-
-const uploadFileToCloudinary = async (file, { folder = 'materials/drafts' } = {}) => {
-  const { data } = await getCloudinaryUploadParamsAPI({
-    folder,
-    filename: file.name,
-    mimetype: file.mimeType,
-  });
-
-  if (!data.success) {
-    throw new Error(data.message || 'Failed to get upload params');
-  }
-
-  const { signature, timestamp, apiKey, cloudName, publicId } = data;
-  const mimeType = (file.mimeType || 'application/octet-stream').toLowerCase();
-  const resourceType = getCloudinaryResourceType(mimeType);
-  const formData = new FormData();
-
-  if (Platform.OS === 'web' && file.file) {
-    formData.append('file', file.file);
-  } else if (Platform.OS === 'web') {
-    const response = await fetch(file.uri);
-    if (!response.ok) throw new Error('Unable to read selected file');
-    const blob = await response.blob();
-    formData.append('file', blob, file.name);
-  } else {
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name,
-      type: file.mimeType,
-    });
-  }
-
-  formData.append('api_key', apiKey);
-  formData.append('timestamp', String(timestamp));
-  formData.append('signature', signature);
-  formData.append('folder', folder);
-  if (publicId) formData.append('public_id', publicId);
-
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', uploadUrl);
-
-    xhr.onload = () => {
-      try {
-        const result = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const extension = (file.name || '').includes('.')
-            ? file.name.split('.').pop().toLowerCase()
-            : '';
-          resolve({
-            url: result.secure_url,
-            publicId: result.public_id,
-            resourceType,
-            mimeType: file.mimeType,
-            originalFilename: file.name,
-            fileSize: result.bytes || file.size,
-            extension,
-            storageType: 'cloudinary',
-          });
-        } else {
-          reject(new Error(result.error?.message || `Cloudinary upload failed (${xhr.status})`));
-        }
-      } catch (e) {
-        reject(e);
-      }
-    };
-
-    xhr.onerror = () => reject(new Error('Network error during upload'));
-    xhr.send(formData);
-  });
-};
 
 export const fetchTeacherDashboard = createAsyncThunk('teacher/fetchDashboard', async (_, { rejectWithValue }) => {
   try {
@@ -120,21 +40,16 @@ export const fetchTeacherMaterials = createAsyncThunk('teacher/fetchMaterials', 
   }
 });
 
-export const uploadMaterial = createAsyncThunk('teacher/uploadMaterial', async (formData, { rejectWithValue }) => {
+export const uploadMaterial = createAsyncThunk('teacher/uploadMaterial', async ({ file, metadata, onProgress }, { rejectWithValue, getState }) => {
   try {
-    const { data } = await uploadTeacherMaterialAPI(formData);
+    const data = await publishDirectFile(file, metadata, { ownerId: getState().auth.user?._id, purpose: 'material', onProgress });
     return data.material;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message || 'Failed to upload material');
-  }
+  } catch (err) { return rejectWithValue(err.response?.data?.message || err.message || 'Failed to upload material'); }
 });
 
-export const uploadMaterialDraft = createAsyncThunk('teacher/uploadMaterialDraft', async (pickedFile, { rejectWithValue }) => {
-  try {
-    return await uploadFileToCloudinary(pickedFile, { folder: 'materials/drafts' });
-  } catch (err) {
-    return rejectWithValue(err.message || 'Failed to upload draft for preview');
-  }
+export const uploadMaterialDraft = createAsyncThunk('teacher/uploadMaterialDraft', async (file, { rejectWithValue, getState }) => {
+  try { return await uploadDirectFile(file, { ownerId: getState().auth.user?._id }); }
+  catch (err) { return rejectWithValue(err.message || 'Failed to upload draft for preview'); }
 });
 
 export const confirmMaterialUpload = createAsyncThunk('teacher/confirmMaterialUpload', async (payload, { rejectWithValue }) => {
@@ -171,12 +86,13 @@ export const deleteMaterial = createAsyncThunk('teacher/deleteMaterial', async (
   }
 });
 
-export const editMaterial = createAsyncThunk('teacher/editMaterial', async ({ materialId, data }, { rejectWithValue }) => {
+export const editMaterial = createAsyncThunk('teacher/editMaterial', async ({ materialId, data, file, onProgress }, { rejectWithValue, getState }) => {
   try {
+    if (file) return (await publishDirectFile(file, { ...data, materialId }, { ownerId: getState().auth.user?._id, onProgress })).material;
     const res = await editTeacherMaterialAPI(materialId, data);
     return res.data.material;
   } catch (err) {
-    return rejectWithValue(err.response?.data?.message || 'Failed to edit material');
+    return rejectWithValue(err.response?.data?.message || err.message || 'Failed to edit material');
   }
 });
 

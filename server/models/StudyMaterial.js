@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const studyMaterialSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
+    directUploadId: { type: String },
     description: { type: String },
     type: { type: String, enum: ['pdf', 'ppt', 'video', 'image', 'document', 'archive'], required: true },
     subject: { type: String, required: true },
@@ -58,6 +59,7 @@ const studyMaterialSchema = new mongoose.Schema(
 
 // Indexes for faster queries and aggregation
 studyMaterialSchema.index({ teacher: 1 });
+studyMaterialSchema.index({ directUploadId: 1 }, { unique: true, sparse: true });
 studyMaterialSchema.index({ approvalStatus: 1, grade: 1 });
 studyMaterialSchema.index({ folder: 1 });
 studyMaterialSchema.index({ course: 1 });
