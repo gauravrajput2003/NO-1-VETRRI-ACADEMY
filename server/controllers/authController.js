@@ -6,6 +6,7 @@ const { sendWelcomeEmail } = require('../utils/email');
 const jwt = require('jsonwebtoken');
 const Course = require('../models/Course');
 const { isExpoPushToken } = require('../utils/pushToken');
+const { buildLoginLookup } = require('../utils/loginLookup');
 
 const normalizeBoard = (value) => {
   if (!value) return '';
@@ -134,35 +135,25 @@ const login = async (req, res) => {
     const { identifier, password } = req.body;
 
     const rawId = String(identifier || '').trim();
-    if (!rawId || !password) {
+    if (!rawId || typeof password !== 'string' || !password) {
       return res.status(400).json({ success: false, message: 'Identifier and password are required.' });
     }
 
-    const isEmail = rawId.includes('@');
-    const normalizedEmail = rawId.toLowerCase();
-    const digitsOnly = rawId.replace(/\D/g, '');
-    const tenDigitMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
-
-    const queryConditions = [
-      { email: normalizedEmail },
-      { mobile: rawId },
-    ];
-    if (tenDigitMobile) {
-      queryConditions.push({ mobile: tenDigitMobile });
-      queryConditions.push({ mobile: `+91${tenDigitMobile}` });
-      queryConditions.push({ mobile: `+91 ${tenDigitMobile}` });
+    const { exactQuery, formattedQuery } = buildLoginLookup(rawId, role);
+    let user = await User.findOne(exactQuery).maxTimeMS(8000);
+    if (!user && formattedQuery) {
+      const matches = await User.find(formattedQuery).limit(2).maxTimeMS(8000);
+      if (matches.length > 1) {
+        return res.status(400).json({ success: false, message: 'More than one account uses this mobile number. Please use your registered email or contact the academy.' });
+      }
+      user = matches[0];
     }
 
-    const baseQuery = isEmail
-      ? { email: normalizedEmail }
-      : { $or: queryConditions };
-
-    const user = role
-      ? await User.findOne({ ...baseQuery, role })
-      : await User.findOne(baseQuery);
-
     if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials.' });
+      // Published clients treat every 401 as an expired session and attempt a
+      // refresh, hiding this error as "Network error" on a fresh installation.
+      // Login form failures are 400; protected API endpoints still return 401.
+      return res.status(400).json({ success: false, message: 'Mobile/email or password is incorrect. Please check your login details or contact the academy.' });
     }
 
     if (!user.isActive) {

@@ -1,4 +1,26 @@
 const rateLimit = require('express-rate-limit');
+const { createHash } = require('node:crypto');
+const jwt = require('jsonwebtoken');
+const { buildLoginLookup } = require('../utils/loginLookup');
+
+const authenticatedIds = new WeakMap();
+function getAuthenticatedId(req) {
+  if (req.user?.id) return req.user.id;
+  if (authenticatedIds.has(req)) return authenticatedIds.get(req);
+  let id = null;
+  // The global limiter runs before route authentication. Verify the JWT here
+  // instead of treating every logged-in parent's requests as anonymous IP traffic.
+  const header = req.headers?.authorization;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : req.cookies?.token;
+  if (token && process.env.JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (typeof decoded.id === 'string') id = decoded.id;
+    } catch { /* Invalid/expired tokens retain the anonymous IP limit. */ }
+  }
+  authenticatedIds.set(req, id);
+  return id;
+}
 
 
 // ─────────────────────────────────────────────
@@ -6,7 +28,7 @@ const rateLimit = require('express-rate-limit');
 // ─────────────────────────────────────────────
 //
 // 10 failed login attempts per
-// IP + email combination every 2 minutes.
+// IP + normalized login identifier combination every 2 minutes.
 //
 // Successful logins are NOT counted.
 // ─────────────────────────────────────────────
@@ -17,16 +39,16 @@ const authLimiter = rateLimit({
   max: 10,
 
   keyGenerator: (req) => {
-    const email = String(req.body?.email || '')
-      .trim()
-      .toLowerCase();
+    const identifier = req.body?.identifier ?? req.body?.email ?? req.body?.mobile ?? '';
+    const key = buildLoginLookup(identifier).key;
+    const digest = createHash('sha256').update(key).digest('hex');
 
     const ip =
       req.ip ||
       req.socket.remoteAddress ||
       'unknown';
 
-    return `login:${ip}:${email}`;
+    return `login:${ip}:${digest}`;
   },
 
   skipSuccessfulRequests: true,
@@ -60,7 +82,7 @@ const generalLimiter = rateLimit({
 
   limit: (req) => {
     // Authenticated user
-    if (req.user?.id) {
+    if (getAuthenticatedId(req)) {
       return 300;
     }
 
@@ -70,8 +92,9 @@ const generalLimiter = rateLimit({
 
   keyGenerator: (req) => {
     // Authenticated users get their own limit
-    if (req.user?.id) {
-      return `user:${req.user.id}`;
+    const userId = getAuthenticatedId(req);
+    if (userId) {
+      return `user:${userId}`;
     }
 
     // Unauthenticated users are limited by IP
@@ -86,6 +109,9 @@ const generalLimiter = rateLimit({
   skip: (req) => {
     return (
       req.path === '/api/health' ||
+      // Login has its own failed-attempt limiter. Successful parents must not
+      // exhaust a shared carrier/school IP's general request allowance.
+      /^\/api\/auth\/login(?:\/(?:student|teacher|admin))?\/?$/.test(req.path) ||
       req.path.includes('/download') ||
       req.path.includes('/preview')
     );
