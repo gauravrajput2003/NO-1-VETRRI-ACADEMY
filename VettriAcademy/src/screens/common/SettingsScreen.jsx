@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity as RNTouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
+import PasswordRequestsButton from '../../components/PasswordRequestsButton';
+import { View, Text, ScrollView, TouchableOpacity as RNTouchableOpacity, StyleSheet, Switch, Alert, Linking } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,6 +36,7 @@ const B = {
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const theme = useSelector((s) => s.ui.theme);
+  const role = useSelector((s) => s.auth.user?.role);
   const isDark = theme === 'dark';
 
   const cardBg = isDark ? Colors.card.dark : B.card;
@@ -81,7 +83,7 @@ export default function SettingsScreen({ navigation }) {
 
       <Text style={[styles.sectionTitle, { color: textSec }]}>Account</Text>
       <View style={[styles.card, { backgroundColor: cardBg }]}>
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Coming Soon', 'Change Password feature is under development.')}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Change your password" style={[styles.row, { minHeight: 48 }]} onPress={() => navigation.navigate('ForgotPassword', { changeOwn: true })}>
           <View style={[styles.iconWrap, { backgroundColor: 'rgba(246,196,83,0.16)' }]}>
             <Ionicons name="lock-closed-outline" size={20} color="#B58B29" />
           </View>
@@ -90,6 +92,7 @@ export default function SettingsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      {role === 'admin' && <PasswordRequestsButton onPress={() => navigation.navigate('PasswordRequests')} />}
       <Text style={[styles.sectionTitle, { color: textSec }]}>About</Text>
       <View style={[styles.card, { backgroundColor: cardBg }]}>
         <View style={styles.row}>
@@ -99,6 +102,15 @@ export default function SettingsScreen({ navigation }) {
           <Text style={[styles.rowLabel, { color: textColor }]}>Version</Text>
           <Text style={[styles.rowValue, { color: textSec }]}>{APP_VERSION}</Text>
         </View>
+      </View>
+
+      <Text style={[styles.sectionTitle, { color: textSec }]}>Icon credits</Text>
+      <View style={[styles.card, { backgroundColor: cardBg }]}>
+        <RNTouchableOpacity accessibilityRole="link" accessibilityLabel="Message icons created by Anggara on Flaticon" style={[styles.row, { minHeight: 44 }]} onPress={() => Linking.openURL('https://www.flaticon.com/free-icon/new-message_8138556').catch(() => Alert.alert('Unable to open link', 'Message icons created by Anggara — Flaticon.'))}>
+          <Ionicons name="chatbubble-outline" size={22} color={B.teal} />
+          <Text style={[styles.rowLabel, { color: textColor }]}>Message icons created by Anggara — Flaticon</Text>
+          <Ionicons name="open-outline" size={18} color={B.sec} />
+        </RNTouchableOpacity>
       </View>
 
       {/* ---- Logout: solid pink gradient instead of a flat pale-red block ---- */}

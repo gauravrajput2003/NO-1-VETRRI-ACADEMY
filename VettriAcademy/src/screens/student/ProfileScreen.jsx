@@ -446,7 +446,7 @@ export default function ProfileScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.pink} colors={[T.pink]} />
       }
     >
-      <StatusBar barStyle="light-content" backgroundColor={T.pink} />
+      <StatusBar barStyle="light-content" />
 
       {/* ── HERO ── */}
       <Animated.View style={slide(headerAnim, -10)}>

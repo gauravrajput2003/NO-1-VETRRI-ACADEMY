@@ -8,6 +8,8 @@ const chatMessageSchema = new mongoose.Schema(
     receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     conversationId: { type: String, required: true, index: true }, // sorted "id1_id2"
     message: { type: String, trim: true },
+    recoveryRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'ResetRequest' },
+    recoveryCiphertext: { type: String, select: false },
     messageType: {
       type: String,
       enum: ['text', 'file', 'image', 'video', 'audio', 'system'],

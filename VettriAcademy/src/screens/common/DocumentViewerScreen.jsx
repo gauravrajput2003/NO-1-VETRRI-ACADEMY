@@ -28,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../utils/colors';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   detectFileType, getPreviewStrategy, checkBlockedSite,
   buildGoogleDocsViewerUrl, downloadFileToCache, downloadAndOpenFile,
@@ -148,6 +149,7 @@ const UnsupportedState = ({ fileType, filename, onDownload, onGoBack, downloadin
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function DocumentViewerScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const {
     url,                    // Direct URL to view
     title = 'Document',     // Display title
@@ -390,11 +392,11 @@ export default function DocumentViewerScreen({ route, navigation }) {
   const iconData = FILE_TYPE_ICONS[detectedType] || FILE_TYPE_ICONS.unknown;
 
   return (
-    <Animated.View style={[s.container, { opacity: fadeAnim }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#6C63FF" />
+    <Animated.View style={[s.container, { opacity: fadeAnim, paddingLeft: insets.left, paddingRight: insets.right, paddingBottom: insets.bottom }]}>
+      <StatusBar barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient colors={['#6C63FF', '#8B7DFF']} style={s.header}>
+      <LinearGradient colors={['#6C63FF', '#8B7DFF']} style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>

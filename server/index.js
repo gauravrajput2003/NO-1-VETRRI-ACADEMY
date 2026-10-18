@@ -302,6 +302,8 @@ const startCronJobs = () => {
     const { startClassReminderJob } = require('./jobs/classReminder');
     const { startFeeReminderJob } = require('./jobs/feeReminder');
     require('./jobs/teacherPerformance').startTeacherPerformanceJob();
+    require('./jobs/announcementRetention').startAnnouncementRetentionJob();
+    require('./jobs/passwordRecovery').startPasswordRecoveryJob();
     startWeeklyTopPerformerJob();
     startClassReminderJob(io);
     startFeeReminderJob(io);
@@ -312,13 +314,15 @@ const startCronJobs = () => {
   }
 };
 
-connectDB().then(() => {
+connectDB().then(async () => {
+  // Recovery duplicate prevention must exist before accepting public requests.
+  await Promise.all([require('./models/ResetRequest').init(), require('./models/RecoveryRateLimit').init()]);
   require('./services/pushService').startPushDeliveryWorker();
   server.listen(PORT, () => {
     infoProd(`🚀 Server running on http://localhost:${PORT}`);
     infoProd(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     startCronJobs();
   });
-});
+}).catch(error => { errorCrit('[Startup] Recovery indexes unavailable:', error.name); process.exit(1); });
 
 module.exports = { app, io };

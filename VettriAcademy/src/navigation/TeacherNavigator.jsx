@@ -1,4 +1,5 @@
 import ExamManagementScreen from '../screens/common/ExamManagementScreen';
+import AnnouncementsInboxScreen from '../screens/common/AnnouncementsInboxScreen';
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -65,9 +66,10 @@ const HEADER_OPTS = {
 
 function HomeStack() {
   return (
-    <Stack.Navigator screenOptions={HEADER_OPTS}>
-      <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
+    <Stack.Navigator initialRouteName="TeacherDashboard" screenOptions={HEADER_OPTS}>
       <Stack.Screen name="TeacherDashboard" component={TeacherDashboard} options={{ headerShown: false }} />
+      <Stack.Screen name="Announcements" component={AnnouncementsInboxScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />

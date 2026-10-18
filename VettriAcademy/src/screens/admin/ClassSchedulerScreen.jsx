@@ -449,7 +449,7 @@ export default function ClassSchedulerScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#FFF7FB', '#F8F7FC', '#F5FCFF']} style={StyleSheet.absoluteFillObject} />
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
 
       {/* HERO */}
       <View style={[styles.headerWrap, { paddingTop: Math.max(insets.top, 16) }]}>
@@ -564,7 +564,7 @@ function ScheduleForm({
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8F7FC' }}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView

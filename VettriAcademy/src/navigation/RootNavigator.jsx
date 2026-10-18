@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ActivityIndicator, View, StatusBar } from 'react-native';
@@ -10,7 +10,7 @@ import { lightTheme, darkTheme } from '../utils/theme';
 import { fetchCurrentUser } from '../redux/slices/authSlice';
 import { onNotification, onSocketEvent } from '../services/socket';
 import { addNotification } from '../redux/slices/notificationsSlice';
-import { addIncomingMessage } from '../redux/slices/chatSlice';
+import { addIncomingMessage, fetchUnreadCount as fetchChatUnreadCount } from '../redux/slices/chatSlice';
 import { updateClassStatus } from '../redux/slices/classesSlice';
 import {
   registerForPushNotifications,
@@ -18,6 +18,8 @@ import {
 } from '../services/pushNotifications';
 import { savePushTokenAPI } from '../services/api';
 import { resolveNotificationTarget } from '../utils/notificationNavigation';
+import ForgotPasswordScreen from '../screens/common/ForgotPasswordScreen';
+import { recoveryNotificationPrefill } from '../utils/passwordRecoveryState';
 
 import AuthNavigator from './AuthNavigator';
 import StudentNavigator from './StudentNavigator';
@@ -34,6 +36,10 @@ export default function RootNavigator() {
   const { isAuthenticated, initialLoading, user } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
+  const [recoveryIntent, setRecoveryIntent] = useState(null);
+  const recoveryNavigation = useMemo(() => ({ onRecoveryClose: () => setRecoveryIntent(null),
+    onSecretConsumed: () => setRecoveryIntent(value => value ? { ...value, tempPassword: '' } : null) }), []);
+  const handledRecoveryNotification = useRef(null);
 
   // Track token-refresh subscription so we can clean it up
   const tokenRefreshSub = useRef(null);
@@ -64,12 +70,17 @@ export default function RootNavigator() {
     })();
 
     // Listen for token refreshes (Expo rotates tokens occasionally)
-    tokenRefreshSub.current = Notifications.addPushTokenListener(async ({ data: newToken }) => {
-      if (newToken) {
-        await savePushTokenAPI(newToken).catch((e) =>
-          console.warn('[Push] Token refresh save failed:', e.message)
-        );
-      }
+    let refreshingToken = false;
+    tokenRefreshSub.current = Notifications.addPushTokenListener(async () => {
+      // This listener carries a native FCM/APNs token, not an Expo push token.
+      // Re-register through Expo and configure the private channel before saving.
+      if (refreshingToken || cancelled) return;
+      refreshingToken = true;
+      try {
+        const expoToken = await registerForPushNotifications();
+        if (expoToken && !cancelled) await savePushTokenAPI(expoToken);
+      } catch (e) { console.warn('[Push] Token refresh save failed:', e.message); }
+      finally { refreshingToken = false; }
     });
 
     return () => {
@@ -85,8 +96,24 @@ export default function RootNavigator() {
   //   { type: 'download_complete', fileUri }  → open the downloaded file
   //   everything else → resolveNotificationTarget + navigate
   useEffect(() => {
+    let disposed = false;
+    const handleRecovery = async (response) => {
+      const data = response?.notification?.request?.content?.data;
+      if (data?.type !== 'password_reset') return false;
+      const id = response.notification.request.identifier;
+      if (handledRecoveryNotification.current === id) return true;
+      handledRecoveryNotification.current = id;
+      const prefill = recoveryNotificationPrefill(data);
+      if (!disposed && prefill) setRecoveryIntent({ ...prefill, notificationId: id });
+      else if (!disposed) Toast.show({ type: 'error', text1: 'Temporary password expired', text2: 'Request a new one from your admin.' });
+      // Do not retain the credential in Expo's last-response cache.
+      await Notifications.clearLastNotificationResponseAsync().catch(() => {});
+      return true;
+    };
+    Notifications.getLastNotificationResponseAsync().then(handleRecovery).catch(() => {});
     const subscription = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
+        if (await handleRecovery(response)) return;
         const data = response.notification.request.content.data || {};
 
         if (data.type === 'download_complete' && data.fileUri) {
@@ -110,7 +137,7 @@ export default function RootNavigator() {
       }
     );
 
-    return () => subscription.remove();
+    return () => { disposed = true; subscription.remove(); };
   }, [user?.role]);
 
   // Global socket event listeners (active when authenticated)
@@ -135,7 +162,13 @@ export default function RootNavigator() {
     // Chat message listener (global — for badge count updates)
     const unsubChat = onSocketEvent('chat:message', (msg) => {
       dispatch(addIncomingMessage(msg));
+      dispatch(fetchChatUnreadCount());
     });
+    const unsubChatFile = onSocketEvent('chat:file', (msg) => {
+      dispatch(addIncomingMessage(msg));
+      dispatch(fetchChatUnreadCount());
+    });
+    const unsubChatRead = onSocketEvent('chat:read', () => dispatch(fetchChatUnreadCount()));
 
     // Class status listeners
     const unsubClassStart = onSocketEvent('class:started', (data) => {
@@ -153,6 +186,8 @@ export default function RootNavigator() {
     return () => {
       unsubNotif();
       unsubChat();
+      unsubChatFile();
+      unsubChatRead();
       unsubClassStart();
       unsubClassEnd();
       unsubClassCancel();
@@ -197,8 +232,12 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme} ref={navigationRef}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? Colors.navy : Colors.white} />
-      {isAuthenticated && user ? (
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      {isAuthenticated && user?.mustChangePassword ? (
+        <ForgotPasswordScreen navigation={recoveryNavigation} route={{ params: { forced: true } }} />
+      ) : recoveryIntent ? (
+        <ForgotPasswordScreen key={recoveryIntent.notificationId || recoveryIntent.identifier} navigation={recoveryNavigation} route={{ params: recoveryIntent }} />
+      ) : isAuthenticated && user ? (
         // Role-based navigation
         user.role === 'student' ? <StudentNavigator /> :
         user.role === 'teacher' ? <TeacherNavigator /> :
@@ -207,8 +246,8 @@ export default function RootNavigator() {
       ) : (
         <AuthNavigator />
       )}
-      {isAuthenticated && user && user.role !== 'admin' && <AIAssistantDrawer />}
-      <AnnouncementPopup />
+      {isAuthenticated && user && !user.mustChangePassword && !recoveryIntent && user.role !== 'admin' && <AIAssistantDrawer />}
+      {!user?.mustChangePassword && !recoveryIntent && <AnnouncementPopup />}
     </NavigationContainer>
   );
 }

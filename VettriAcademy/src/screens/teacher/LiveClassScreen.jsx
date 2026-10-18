@@ -338,7 +338,7 @@ export default function LiveClassScreen({ navigation, route }) {
       <Sparkle size={10} color={T.blue} opacity={0.10} style={{ position: 'absolute', top: 650, left: 80 }} />
       <Sparkle size={14} color={T.orange} opacity={0.10} style={{ position: 'absolute', top: 800, right: 60 }} />
 
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
 
       {/* HERO HEADER */}
       <View style={[styles.headerWrap, { height: Math.max(180, insets.top + 140) }]}>

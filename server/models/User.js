@@ -134,6 +134,11 @@ const userSchema = new mongoose.Schema(
 
     // Common
     refreshToken: { type: String },
+    tokenVersion: { type: Number, default: 0 },
+    passwordChangedAt: { type: Date, select: false },
+    mustChangePassword: { type: Boolean, default: false },
+    recoveryDevices: { type: [String], default: [], select: false },
+    recoveryReadyDevices: { type: [String], default: [], select: false },
     notificationCount: { type: Number, default: 0 },
   },
   { timestamps: true }
@@ -142,6 +147,11 @@ const userSchema = new mongoose.Schema(
 // Hash password before save
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
+  if (!this.isNew) {
+    this.tokenVersion = (this.tokenVersion || 0) + 1;
+    this.passwordChangedAt = new Date();
+    this.refreshToken = '';
+  }
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
   next();

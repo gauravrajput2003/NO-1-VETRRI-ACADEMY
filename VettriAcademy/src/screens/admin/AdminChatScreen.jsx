@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,18 @@ import {
   TouchableOpacity as RNTouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../utils/colors';
 import { formatRelativeTime } from '../../utils/formatters';
-import { fetchChatUsers, fetchConversations } from '../../redux/slices/chatSlice';
+import { fetchChatUsers, fetchConversations, fetchUnreadCount } from '../../redux/slices/chatSlice';
+import { buildAdminChatDirectory, adminChatPreview } from '../../utils/adminChatDirectory';
+import { onSocketEvent } from '../../services/socket';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTabBarVisibility } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
@@ -32,7 +34,7 @@ const TouchableOpacity = (props) => {
 
 export default function AdminChatScreen({ navigation }) {
   const dispatch = useDispatch();
-  const { chatUsers, conversations, usersLoading, loading } = useSelector((s) => s.chat);
+  const { chatUsers, conversations, usersLoading, loading, error } = useSelector((s) => s.chat);
   const { user: currentUser } = useSelector((s) => s.auth);
   const theme = useSelector((s) => s.ui.theme);
   const isDark = theme === 'dark';
@@ -50,7 +52,7 @@ export default function AdminChatScreen({ navigation }) {
     }, [hidePermanently, showPermanently])
   );
 
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'teacher' | 'student'
+  const [activeTab, setActiveTab] = useState('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -58,6 +60,7 @@ export default function AdminChatScreen({ navigation }) {
   const cardBg = isDark ? Colors.card.dark : '#FFFFFF';
   const textColor = isDark ? Colors.text.dark : '#1E293B';
   const textSec = isDark ? Colors.textSecondary.dark : '#64748B';
+  const directory = useMemo(() => buildAdminChatDirectory(chatUsers, conversations, currentUser?._id), [chatUsers, conversations, currentUser?._id]);
 
   const teacherCount = useMemo(
     () => (chatUsers || []).filter((u) => u.role?.toLowerCase() === 'teacher').length,
@@ -71,17 +74,26 @@ export default function AdminChatScreen({ navigation }) {
   const loadData = useCallback(() => {
     dispatch(fetchConversations());
     dispatch(fetchChatUsers({ role: 'all', limit: 500 }));
+    dispatch(fetchUnreadCount());
   }, [dispatch]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadData();
-  }, [loadData]);
+    let pending;
+    const update = () => { clearTimeout(pending); pending = setTimeout(() => { dispatch(fetchConversations()); dispatch(fetchUnreadCount()); }, 250); };
+    const removeMessage = onSocketEvent('chat:message', update);
+    const removeFile = onSocketEvent('chat:file', update);
+    const removeRead = onSocketEvent('chat:read', update);
+    const timer = setInterval(update, 30000);
+    return () => { clearTimeout(pending); clearInterval(timer); removeMessage(); removeFile(); removeRead(); };
+  }, [loadData, dispatch]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
       dispatch(fetchConversations()),
       dispatch(fetchChatUsers({ role: 'all', limit: 500 })),
+      dispatch(fetchUnreadCount()),
     ]);
     setRefreshing(false);
   }, [dispatch]);
@@ -89,7 +101,7 @@ export default function AdminChatScreen({ navigation }) {
   const handleSelectUser = (targetUser) => {
     const adminId = currentUser?._id?.toString() || '';
     const targetId = targetUser._id?.toString() || '';
-    const conversationId = [adminId, targetId].sort().join('_');
+    const conversationId = targetUser.conversationId || [adminId, targetId].sort().join('_');
 
     navigation.navigate('ChatRoom', {
       conversationId,
@@ -98,21 +110,21 @@ export default function AdminChatScreen({ navigation }) {
   };
 
   const filteredUsers = useMemo(() => {
-    if (!chatUsers || !Array.isArray(chatUsers)) return [];
-    return chatUsers.filter((u) => {
+    const rows = activeTab === 'recent' ? directory.recent : directory.contacts;
+    return rows.filter((u) => {
       if (activeTab === 'teacher' && u.role?.toLowerCase() !== 'teacher') return false;
       if (activeTab === 'student' && u.role?.toLowerCase() !== 'student') return false;
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.trim().toLowerCase();
         const matchName = (u.name || '').toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q);
         const matchGrade = (u.grade || '').toLowerCase().includes(q);
         const matchMobile = (u.mobile || '').includes(q);
         const matchEmail = (u.email || '').toLowerCase().includes(q);
-        return matchName || matchGrade || matchMobile || matchEmail;
+        return matchName || matchGrade || matchMobile || matchEmail || (u.lastMessage || '').toLowerCase().includes(q);
       }
       return true;
     });
-  }, [chatUsers, activeTab, searchQuery]);
+  }, [directory, activeTab, searchQuery]);
 
   const renderUserItem = ({ item }) => {
     const isTeacher = item.role === 'teacher';
@@ -157,8 +169,8 @@ export default function AdminChatScreen({ navigation }) {
           </View>
 
           <View style={styles.lastMsgRow}>
-            <Text style={[styles.lastMsgText, { color: item.unreadCount > 0 ? textColor : textSec, fontWeight: item.unreadCount > 0 ? '700' : '400' }]} numberOfLines={1}>
-              {item.lastMessage || 'Tap to start direct messaging'}
+            <Text style={[styles.lastMsgText, { color: item.unreadCount > 0 ? textColor : textSec, fontWeight: item.unreadCount > 0 ? '700' : '400' }]} numberOfLines={2}>
+              {adminChatPreview(item, currentUser?._id)}
             </Text>
             {item.unreadCount > 0 && (
               <View style={styles.unreadBadge}>
@@ -209,6 +221,7 @@ export default function AdminChatScreen({ navigation }) {
         {/* Tab Filters */}
         <View style={styles.tabBar}>
           {[
+            { id: 'recent', label: `Recent (${directory.recent.length})`, icon: 'time' },
             { id: 'all', label: `All (${(chatUsers || []).length})`, icon: 'people' },
             { id: 'teacher', label: `Teachers (${teacherCount})`, icon: 'school' },
             { id: 'student', label: `Students (${studentCount})`, icon: 'person' },
@@ -228,11 +241,13 @@ export default function AdminChatScreen({ navigation }) {
         </View>
       </LinearGradient>
 
+      {!!error && <View style={{ padding: 12, backgroundColor: '#FEE2E2' }}><Text accessibilityRole="alert" style={{ color: '#991B1B' }}>{String(error)}</Text><RNTouchableOpacity onPress={loadData} style={{ paddingVertical: 10 }}><Text style={{ color: '#991B1B', fontWeight: '700' }}>Retry</Text></RNTouchableOpacity></View>}
+
       {/* Directory List */}
-      {usersLoading && !refreshing ? (
+      {(activeTab === 'recent' ? loading && !directory.recent.length : usersLoading && !directory.contacts.length) && !refreshing ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#FF4FA3" />
-          <Text style={[styles.loadingText, { color: textSec }]}>Loading contacts...</Text>
+          <Text style={[styles.loadingText, { color: textSec }]}>Loading {activeTab === 'recent' ? 'recent chats' : 'contacts'}...</Text>
         </View>
       ) : (
         <FlatList
@@ -244,9 +259,9 @@ export default function AdminChatScreen({ navigation }) {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="chatbubbles-outline" size={60} color="#CBD5E1" />
-              <Text style={[styles.emptyTitle, { color: textColor }]}>No users found</Text>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>{activeTab === 'recent' ? 'No recent chats' : 'No users found'}</Text>
               <Text style={[styles.emptySub, { color: textSec }]}>
-                {searchQuery ? `No results for "${searchQuery}"` : 'No teachers or students registered yet.'}
+                {searchQuery ? `No results for "${searchQuery}"` : activeTab === 'recent' ? 'Your sent and received conversations appear here, newest first. Choose All to start a new chat.' : 'No teachers or students registered yet.'}
               </Text>
             </View>
           }
@@ -293,12 +308,15 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: '#FFF', fontSize: 14, marginHorizontal: 8, padding: 0 },
 
-  tabBar: { flexDirection: 'row', gap: 8 },
+  tabBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tabItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
+    width: '48%',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
     paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.08)',

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, Linking,
-  Animated, Easing, StatusBar, Dimensions
+  Animated, Easing, StatusBar
 } from 'react-native';
 import { Image } from 'expo-image';
 import { WebView } from 'react-native-webview';
@@ -14,6 +14,9 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import AnnouncementButton from '../../components/announcements/AnnouncementButton';
+import NotificationButton from '../../components/NotificationButton';
+import DashboardIconButton from '../../components/DashboardIconButton';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
 import { fetchTodayClasses, fetchUpcomingClasses, joinClass, clearJoinResult } from '../../redux/slices/classesSlice';
@@ -25,7 +28,6 @@ import { Colors } from '../../utils/colors';
 import { Sparkle, SunCharacter, DottedPath, PaperPlane } from './BadgeIcons';
 import AnnouncementCard from '../../components/announcements/AnnouncementCard';
 
-const { width } = Dimensions.get('window');
 
 // ---- BRAND PALETTE: teal + pink + golden + white ----
 const D = {
@@ -267,7 +269,7 @@ export default function DashboardScreen({ navigation }) {
 const myTeachers = dashboard?.assignedTeachers || [];
   return (
     <View style={{ flex: 1, backgroundColor: D.pageBg }}>
-      <StatusBar barStyle="light-content" backgroundColor={D.pink} />
+      <StatusBar barStyle="light-content" />
 
       <LinearGradient
         colors={[D.pageBg, '#FFFBF6', D.tealLight]}
@@ -292,32 +294,17 @@ const myTeachers = dashboard?.assignedTeachers || [];
           <LinearGradient
             colors={[D.pink, D.teal]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={st.heroGradient}
+            style={[st.heroGradient, { paddingTop: insets.top + 12 }]}
           >
             <View style={st.heroBubble1} />
             <View style={st.heroBubble2} />
             <View style={st.heroBubble3} />
 
-            <View style={[st.heroTopActions, { top: insets.top + 10 }]}>
-              <TouchableOpacity style={st.heroGlassBtn} onPress={() => dispatch(toggleAI())}>
-                <Ionicons name="sparkles" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={st.heroGlassBtn} onPress={handleChatWithAdmin}>
-                <Ionicons name="chatbubbles-outline" size={24} color="#FFFFFF" />
-                {unreadChatCount > 0 && (
-                  <View style={st.notifBadge}>
-                    <Text style={st.notifBadgeText}>{unreadChatCount > 9 ? '9+' : unreadChatCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity style={st.heroGlassBtn} onPress={() => navigation.navigate('Notifications')}>
-                <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
-                {unreadCount > 0 && (
-                  <View style={st.notifBadge}>
-                    <Text style={st.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+            <View style={st.heroTopActions}>
+              <DashboardIconButton icon="ai" onPress={() => dispatch(toggleAI())} />
+              <DashboardIconButton icon="chat" onPress={handleChatWithAdmin} unreadCount={unreadChatCount} />
+              <AnnouncementButton onPress={() => navigation.navigate('Announcements')} />
+              <NotificationButton onPress={() => navigation.navigate('Notifications')} unreadCount={unreadCount} />
             </View>
 
             <View style={st.heroContentRow}>
@@ -665,8 +652,8 @@ const st = StyleSheet.create({
   heroBubble2: { position: 'absolute', bottom: -50, left: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.1)' },
   heroBubble3: { position: 'absolute', top: 40, left: 100, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.08)' },
 
-  heroTopActions: { position: 'absolute', right: 24, flexDirection: 'row', gap: 12, zIndex: 10 },
-  heroGlassBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  heroTopActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 18, zIndex: 10 },
+  heroGlassBtn: { width: 44, height: 44, flexShrink: 0, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
   notifBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#EF4444', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#FFF' },
   notifBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
 
@@ -704,7 +691,7 @@ const st = StyleSheet.create({
   champImage: { width: '100%', height: '100%' },
 
   statsGrid: { flexDirection: 'row', paddingHorizontal: 16, justifyContent: 'space-between', marginBottom: 24 },
-  statCardContainer: { width: (width - 48) / 3 },
+  statCardContainer: { width: '31%' },
   premiumStatCard: {
     borderRadius: 22, padding: 18, alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6,
@@ -719,7 +706,7 @@ const st = StyleSheet.create({
 
   // EXPLORE — icon tile grid (3 columns)
   exploreGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 12, paddingBottom: 20 },
-  exploreTileWrap: { width: (width - 16 * 2 - 12 * 2) / 3 },
+  exploreTileWrap: { width: '30%' },
   exploreTile: {
     borderRadius: 20,
     paddingVertical: 16,
@@ -735,7 +722,7 @@ const st = StyleSheet.create({
   exploreTileLabel: { fontSize: 13, fontWeight: '800', color: D.ink, textAlign: 'center' },
 
   featureGrid: { flexDirection: 'row', paddingHorizontal: 16, justifyContent: 'space-between', marginBottom: 24 },
-  featureCardWrap: { width: (width - 44) / 2 },
+  featureCardWrap: { width: '48%' },
   featureCard: {
     borderRadius: 26, padding: 18, height: 200, justifyContent: 'space-between',
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6,

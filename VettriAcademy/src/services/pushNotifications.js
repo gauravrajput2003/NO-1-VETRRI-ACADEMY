@@ -47,6 +47,13 @@ export const isClassNotification = (data = {}) =>
 export const configurePushChannels = async () => {
   if (Platform.OS !== 'android') return;
 
+  // PRIVATE uses Android's redacted public lock-screen presentation.
+  await Notifications.setNotificationChannelAsync('vettri-recovery', {
+    name: 'Private password recovery', importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default', enableVibrate: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  });
+
   await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
     name: 'Vettri Academy Notifications',
     importance: Notifications.AndroidImportance.HIGH,

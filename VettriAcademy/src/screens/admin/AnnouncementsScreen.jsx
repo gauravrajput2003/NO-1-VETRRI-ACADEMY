@@ -650,6 +650,7 @@ const pickDocument = async () => {
         <Ionicons name="add" size={20} color={Colors.white} />
         <Text style={styles.createText}>New Announcement</Text>
       </TouchableOpacity>
+      <Text style={{ color: textSec, paddingHorizontal: 20, marginBottom: 12, fontSize: 13 }}>Announcements remain available for 7 days, then are automatically deleted.</Text>
 
       <FlatList
         onScroll={onTabBarScroll}

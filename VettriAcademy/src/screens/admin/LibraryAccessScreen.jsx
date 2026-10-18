@@ -216,7 +216,7 @@ export default function LibraryAccessScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
 
       {loading && !refreshing ? (
         <>

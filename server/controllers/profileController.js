@@ -138,6 +138,7 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
     }
 
+    user.mustChangePassword = false;
     user.password = newPassword;
     await user.save();
 

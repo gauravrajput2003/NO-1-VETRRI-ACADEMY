@@ -40,6 +40,20 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Account deactivated. Contact admin.' });
     }
 
+    // Legacy tokens have version zero until this account's first password change.
+    if ((decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ success: false, message: 'Session expired. Please sign in again.' });
+    }
+
+    if (user.mustChangePassword) {
+      if (req.originalUrl?.split('?')[0] === '/api/auth/me') {
+        return res.json({ success: true, user: { _id: user._id, name: user.name, role: user.role, mustChangePassword: true } });
+      }
+      const allowed = (req.method === 'PATCH' && req.originalUrl?.split('?')[0] === '/api/profile/password')
+        || (req.method === 'POST' && req.originalUrl?.split('?')[0] === '/api/auth/logout');
+      if (!allowed) return res.status(403).json({ success: false, code: 'PASSWORD_CHANGE_REQUIRED', message: 'Set a new password to continue.' });
+    }
+
     req.user = user;
 
   

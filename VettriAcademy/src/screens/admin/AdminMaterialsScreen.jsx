@@ -437,7 +437,7 @@ export default function AdminMaterialsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
 
       <FlatList
         data={loading && !uploading ? [] : filteredMaterials}
@@ -462,7 +462,7 @@ export default function AdminMaterialsScreen({ navigation }) {
       {/* FULL SCREEN UPLOAD MODAL */}
       <Modal visible={isUploadModalVisible} animationType="slide" transparent={false} onRequestClose={closeUploadModal}>
         <View style={styles.fullScreenModal}>
-          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          <StatusBar barStyle="light-content" />
 
           <LinearGradient
             colors={[MaterialPalette.primaryPink, MaterialPalette.primaryPinkLight]}

@@ -43,5 +43,8 @@ router.get('/courses/meta', getCoursesMeta);
 // PUT /api/auth/push-token  (saves/refreshes Expo push token after login)
 router.put('/push-token', verifyToken, savePushToken);
 router.post('/forgot-password', authLimiter, forgotPasswordPublic);
+const recovery = require('../controllers/passwordRecoveryController');
+router.post('/password-reset/request', recovery.request);
+router.post('/password-reset/complete', recovery.complete);
 
 module.exports = router;

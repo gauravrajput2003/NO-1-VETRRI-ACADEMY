@@ -416,7 +416,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
     <View style={styles.container}>
       <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#F8FAFC' }]} />
       
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
       
       <View style={styles.contentContainer}>
         {loading && !uploading ? (
@@ -532,7 +532,7 @@ export default function TeacherMaterialsScreen({ navigation }) {
       {/* FULL SCREEN UPLOAD MODAL */}
       <Modal visible={isUploadModalVisible} animationType="slide" transparent={false} onRequestClose={closeUploadModal}>
         <View style={styles.fullScreenModal}>
-          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          <StatusBar barStyle="light-content" />
           
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.fullScreenScrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

@@ -118,11 +118,12 @@ const getMessages = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit))
-      .populate('senderId', 'name displayName profilePic role');
+      .populate('senderId', 'name displayName profilePic role')
+      .select('+recoveryCiphertext');
 
     const total = await ChatMessage.countDocuments({ conversationId, isDeleted: false });
 
-    res.json({ success: true, messages: messages.reverse(), total, page: parseInt(page) });
+    res.json({ success: true, messages: await require('../services/passwordRecoveryService').readRecoveryMessages(messages.reverse(), req.user), total, page: parseInt(page) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -138,81 +139,11 @@ const checkPermission = async (teacherId, permission) => {
 // ─── Send Text Message ────────────────────────────────────────────────────────
 const sendMessage = async (req, res) => {
   try {
-    const { receiverId, message } = req.body;
-    const senderId = req.user._id;
-    const io = req.app.get('io');
-
-    if (!receiverId || !message || !message.trim()) {
-      return res.status(400).json({ success: false, message: 'receiverId and message are required.' });
-    }
-
-    const receiver = await User.findById(receiverId);
-    if (!receiver) {
-      return res.status(404).json({ success: false, message: 'Recipient user not found.' });
-    }
-
-    // Role-based Authorization:
-    // Teachers and Students can ONLY chat directly with Admin
-    if (req.user.role === 'student' || req.user.role === 'teacher') {
-      if (receiver.role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          message: 'Direct messaging is only available between students/teachers and the Admin desk.',
-        });
-      }
-    }
-
-    // Validate permissions for teachers if communicating with admin
-    if (req.user.role === 'teacher') {
-      const canSend = await checkPermission(senderId, 'canSendMessages');
-      if (!canSend) {
-        return res.status(403).json({ success: false, message: 'Message permission disabled by admin.' });
-      }
-    }
-
-    const conversationId = ChatMessage.getConversationId(senderId, receiverId);
-
-    const msg = await ChatMessage.create({
-      senderId,
-      senderRole: req.user.role,
-      senderDisplayName: req.user.displayName || req.user.name,
-      receiverId,
-      conversationId,
-      message: message.trim(),
-      messageType: 'text',
-      // Legacy compat
-      sender: senderId,
-      receiver: receiverId,
-      roomId: conversationId,
-    });
-
-    // Update or insert conversation record
-    await Conversation.findOneAndUpdate(
-      { conversationId },
-      {
-        $setOnInsert: { conversationId, participants: [senderId, receiverId] },
-        lastMessage: message.trim().substring(0, 100),
-        lastMessageAt: new Date(),
-        lastMessageBy: senderId,
-        $inc: { [`unreadCount.${receiverId}`]: 1 },
-      },
-      { upsert: true }
-    );
-
-    const populated = await ChatMessage.findById(msg._id)
-      .populate('senderId', 'name displayName profilePic role');
-
-    // Real-time notification to both parties via Socket.io
-    if (io) {
-      io.to(`user:${senderId}`).to(`user:${receiverId}`).emit('chat:message', populated);
-    }
-
-    await notifyChatMessage({ sender: req.user, receiverId, conversationId, messageId: msg._id, preview: message.trim(), io });
-
-    res.status(201).json({ success: true, message: populated });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+    const service = require('../services/chatMessageService');
+    const record = await service.createTextMessage({ sender: req.user, receiverId: req.body.receiverId, message: req.body.message });
+    const message = await service.publishTextMessage({ sender: req.user, record, io: req.app.get('io') });
+    res.status(201).json({ success: true, message });
+  } catch (error) { res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Unable to send message.' }); }
 };
 
 // ─── Send File / Media (Image, PDF, Audio, Video, Document) ──────────────────

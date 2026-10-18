@@ -329,7 +329,7 @@ export default function MaterialsScreen({ navigation }) {
         style={StyleSheet.absoluteFillObject}
         opacity={0.3}
       />
-      <StatusBar barStyle="light-content" backgroundColor={T.pink} />
+      <StatusBar barStyle="light-content" />
 
       {loading ? (
         <View style={st.loadingWrap}>

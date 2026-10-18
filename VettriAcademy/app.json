@@ -3,7 +3,7 @@
     "name": "No.1 Vettri Academy",
     "slug": "no-1-vettri-academy",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/logo_playstore.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -46,7 +46,8 @@
           "defaultChannel": "vettri-default"
         }
       ],
-      "./plugins/withReleaseOptimization"
+      "./plugins/withReleaseOptimization",
+      "./plugins/withAdaptiveAndroid"
     ],
     "extra": {
       "eas": {

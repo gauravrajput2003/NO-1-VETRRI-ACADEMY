@@ -382,7 +382,7 @@ export default function ChatRoomScreen({ route, navigation }) {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
       {/* ── CUSTOM HEADER ── */}
       <View style={[styles.header, { backgroundColor: cardBg, borderBottomColor: isDark ? '#2D3748' : '#E5E7EB' }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to chats" style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={textColor} />
         </TouchableOpacity>
 

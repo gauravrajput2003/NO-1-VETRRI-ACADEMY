@@ -66,6 +66,12 @@ const { uploadImage, uploadToCloudinary } = require('../middleware/upload');
 
 // All routes: admin only
 router.use(verifyToken, adminOnly);
+const recovery = require('../controllers/passwordRecoveryController');
+router.get('/password-resets', recovery.list);
+router.post('/password-resets/:id/generate', recovery.generate);
+router.post('/password-resets/:id/send', recovery.send);
+router.post('/password-resets/:id/mark-copied', recovery.markCopied);
+router.post('/password-resets/:id/reject', recovery.reject);
 
 // Stats
 router.get('/stats', getAdminStats);

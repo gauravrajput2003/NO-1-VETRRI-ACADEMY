@@ -25,7 +25,7 @@ const downloadAnnouncementMedia = async (req, res) => {
 
     // 1. Fetch Announcement
     const announcement = await Announcement.findById(id);
-    if (!announcement || announcement.deletedAt) {
+    if (!announcement || announcement.deletedAt || +new Date(announcement.createdAt) <= +require('../utils/announcementRetention').retentionCutoff()) {
       console.warn(`[Announcement Media Download] 404: Announcement not found or soft-deleted (ID: ${id})`);
       return res.status(404).json({
         success: false,

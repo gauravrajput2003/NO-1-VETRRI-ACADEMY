@@ -25,6 +25,9 @@ import { fetchAdminContact, fetchUnreadCount as fetchChatUnreadCount } from '../
 import { fetchDoubtMetrics } from '../../redux/slices/doubtsSlice';
 import { getActiveAnnouncementsAPI } from '../../services/api';
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import AnnouncementButton from '../../components/announcements/AnnouncementButton';
+import NotificationButton from '../../components/NotificationButton';
+import DashboardIconButton from '../../components/DashboardIconButton';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import { formatScheduledTime } from '../../utils/formatters';
 import { Sparkle, PaperPlane, DottedPath } from '../student/BadgeIcons';
@@ -325,7 +328,7 @@ export default function TeacherDashboard({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[T.pink]} />}
         showsVerticalScrollIndicator={false}
       >
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+        <StatusBar barStyle="light-content" />
 
         {/* ── BACKGROUND DECORATIONS ── */}
         <Ionicons name="star" size={240} color="#14C8C4" style={[st.bgGeom, { top: 80, left: -90, transform: [{ rotate: '15deg' }] }]} />
@@ -337,12 +340,12 @@ export default function TeacherDashboard({ navigation }) {
         <Ionicons name="star-outline" size={120} color="#14C8C4" style={[st.bgGeom, { top: 450, left: 80, transform: [{ rotate: '10deg' }] }]} />
 
         {/* ── HERO HEADER ── */}
-      <View style={[st.heroWrap, { height: heroHeight }]}>
+      <View style={[st.heroWrap, { minHeight: heroHeight }]}>
         <LinearGradient
           colors={['#C2185B', '#D81B60', '#E83E8C']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[st.heroGradient, { height: heroHeight }]}
+          style={[st.heroGradient, StyleSheet.absoluteFillObject]}
         >
           <FloatingView amplitude={15} duration={8000} style={st.heroPremiumCircle1} />
           <FloatingView amplitude={20} duration={10000} style={st.heroPremiumCircle2} />
@@ -356,35 +359,20 @@ export default function TeacherDashboard({ navigation }) {
           <Sparkle size={18} color="#FFF" opacity={0.15} style={{ position: 'absolute', bottom: 40, left: '50%' }} />
         </LinearGradient>
 
-        <View style={[st.heroTopBar, { top: Math.max(insets.top, 24) }]}>
+        <View style={[st.heroTopBar, { paddingTop: Math.max(insets.top, 12) }]}>
           <ParticleWrapper>
             <TouchableOpacity style={st.glassBtn} onPress={openMenu} activeOpacity={0.8}>
               <Ionicons name="grid" size={24} color={T.white} />
             </TouchableOpacity>
           </ParticleWrapper>
-          <ParticleWrapper>
-            <TouchableOpacity style={st.whiteIconBtn} onPress={handleChatWithAdmin} activeOpacity={0.8}>
-              <Ionicons name="chatbubbles" size={24} color="#E83E8C" />
-              {unreadChatCount > 0 && (
-                <View style={st.notifBadge}>
-                  <Text style={st.notifBadgeText}>{unreadChatCount > 9 ? '9+' : unreadChatCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </ParticleWrapper>
-          <ParticleWrapper>
-            <TouchableOpacity style={st.whiteIconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.8}>
-              <Ionicons name="notifications" size={24} color="#E83E8C" />
-              {unreadCount > 0 && (
-                <View style={st.notifBadge}>
-                  <Text style={st.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </ParticleWrapper>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <DashboardIconButton icon="chat" onPress={handleChatWithAdmin} unreadCount={unreadChatCount} />
+          <AnnouncementButton onPress={() => navigation.navigate('Announcements')} />
+            <NotificationButton onPress={() => navigation.navigate('Notifications')} unreadCount={unreadCount} />
+          </View>
         </View>
 
-        <View style={[st.heroContent, { bottom: 28 }]}>
+        <View style={st.heroContent}>
           <View style={st.heroLeft}>
             <FadeInView delay={100}>
               <Text style={st.greeting}>{dynamicGreeting}</Text>
@@ -725,7 +713,6 @@ const st = StyleSheet.create({
     transform: [{ rotate: '-45deg' }], bottom: 40, left: -20,
   },
   heroTopBar: {
-    position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, zIndex: 3,
   },
@@ -737,7 +724,7 @@ const st = StyleSheet.create({
   },
   whiteIconBtn: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: T.white, marginTop: 6,
+    backgroundColor: T.white,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 6,
   },
@@ -748,15 +735,16 @@ const st = StyleSheet.create({
   },
   notifBadgeText: { fontSize: 8, fontWeight: '900', color: T.white },
   heroContent: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 28,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 28,
+    gap: 12,
     zIndex: 2,
   },
-  heroLeft: { flex: 0.65, paddingRight: 16 },
+  heroLeft: { flex: 1, minWidth: 0 },
   greeting: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.95)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 },
   teacherName: { fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
   subtitleText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)', marginBottom: 6 },
@@ -767,8 +755,8 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
-  datePillText: { fontSize: 12, fontWeight: '800', color: T.white },
-  heroRight: { flex: 0.35, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 8 },
+  datePillText: { flexShrink: 1, fontSize: 12, fontWeight: '800', color: T.white },
+  heroRight: { flexShrink: 0, alignItems: 'flex-end', justifyContent: 'center' },
   avatarFrame: { position: 'relative' },
   avatarOuterGlow: {
     padding: 6,

@@ -4,11 +4,24 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const notificationService = require('../services/notificationService');
 
-const DEFAULT_MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS = 30;
-const parsedMaxAgeDays = Number.parseInt(process.env.MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS, 10);
-const MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS = Number.isFinite(parsedMaxAgeDays) && parsedMaxAgeDays > 0
-  ? parsedMaxAgeDays
-  : DEFAULT_MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS;
+const { retentionCutoff, announcementExpiry } = require('../utils/announcementRetention');
+
+async function audienceFilter(user) {
+  const filter = { targetRole: { $in: ['all', user.role] } };
+  if (user.role !== 'student') return filter;
+  const courses = [null, '', 'all'];
+  if (user.course) {
+    courses.push(String(user.course._id || user.course));
+    const course = await Course.findById(user.course._id || user.course).select('title category').lean();
+    if (course) {
+      courses.push(course.title, course.category);
+      if (course.category === 'State Board') courses.push('Matric');
+      if (course.category === 'Arts & Science') courses.push('Arts');
+    }
+  }
+  filter.$and = [{ targetCourse: { $in: courses.filter(v => v !== undefined) } }, { targetGrade: { $in: [null, '', 'all', ...(user.grade ? [user.grade] : [])] } }];
+  return filter;
+}
 
 function buildAnnouncementNotifyCopy({ title, content, media = [], posterName }) {
   const hasVoice = media.some((m) => m.type === 'audio');
@@ -92,7 +105,7 @@ const createAnnouncement = async (req, res) => {
 
     const announcement = await Announcement.create({
       title, content, targetRole: normalizedTargetRole, targetCourse, targetGrade,
-      isPinned, expiresAt, postedBy: req.user._id,
+      isPinned, expiresAt: announcementExpiry(), postedBy: req.user._id,
       media: mediaList,
     });
 
@@ -165,7 +178,7 @@ const createAnnouncement = async (req, res) => {
 
 const getAnnouncements = async (req, res) => {
   try {
-    const filter = { deletedAt: null };
+    const filter = { deletedAt: null, createdAt: { $gt: retentionCutoff() } };
     const { status, targetRole } = req.query;
     
     if (targetRole && targetRole !== 'all') {
@@ -193,27 +206,18 @@ const getActiveAnnouncements = async (req, res) => {
   try {
     const user = req.user;
     const now = new Date();
-    const staleCutoff = new Date(now.getTime() - MAX_ACTIVE_ANNOUNCEMENT_AGE_DAYS * 24 * 60 * 60 * 1000);
+    const staleCutoff = retentionCutoff(now);
     
     const filter = {
       isActive: true,
       deletedAt: null,
+      createdAt: { $gt: staleCutoff },
       $or: [
         { expiresAt: { $gt: now } },
         { expiresAt: null, createdAt: { $gte: staleCutoff } },
       ],
-      targetRole: { $in: ['all', user.role] },
+      ...await audienceFilter(user),
     };
-
-    if (user.role === 'student') {
-      const courseFilter = [{ targetCourse: null }];
-      if (user.course) courseFilter.push({ targetCourse: user.course?.toString() });
-      if (user.grade) courseFilter.push({ targetGrade: user.grade });
-      filter.$and = [
-        { $or: courseFilter },
-        { $or: [{ targetGrade: null }, ...(user.grade ? [{ targetGrade: user.grade }] : [])] },
-      ];
-    }
 
     const activeAnnouncements = await Announcement.find(filter)
       .populate('postedBy', 'name displayName')
@@ -225,7 +229,9 @@ const getActiveAnnouncements = async (req, res) => {
     });
     const readIds = readRecords.map(r => r.announcementId.toString());
 
-    const unreadAnnouncements = activeAnnouncements.filter(a => !readIds.includes(a._id.toString()));
+    const unreadAnnouncements = req.query.includeRead === 'true'
+      ? activeAnnouncements.map(a => ({ ...a.toObject(), isRead: readIds.includes(a._id.toString()) }))
+      : activeAnnouncements.filter(a => !readIds.includes(a._id.toString()));
 
     res.json({ success: true, announcements: unreadAnnouncements });
   } catch (error) {
@@ -236,6 +242,8 @@ const getActiveAnnouncements = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
+    const announcement = await Announcement.findOne({ _id: id, deletedAt: null, isActive: true, createdAt: { $gt: retentionCutoff() }, ...await audienceFilter(req.user) });
+    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found or expired.' });
     await AnnouncementRead.findOneAndUpdate(
       { announcementId: id, userId: req.user._id },
       { announcementId: id, userId: req.user._id, readAt: new Date() },
@@ -249,11 +257,15 @@ const markAsRead = async (req, res) => {
 
 const updateAnnouncement = async (req, res) => {
   try {
-    const update = { ...req.body };
+    const update = {};
+    for (const key of ['title', 'content', 'targetRole', 'targetCourse', 'targetGrade', 'isPinned', 'isActive', 'media']) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) update[key] = req.body[key];
+    }
     if (Object.prototype.hasOwnProperty.call(update, 'media')) {
       update.media = normalizeAnnouncementMedia(update.media);
     }
-    const announcement = await Announcement.findByIdAndUpdate(req.params.id, update, { new: true });
+    const announcement = await Announcement.findOneAndUpdate({ _id: req.params.id, createdAt: { $gt: retentionCutoff() }, deletedAt: null }, update, { new: true, runValidators: true });
+    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found or expired.' });
     res.json({ success: true, announcement });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

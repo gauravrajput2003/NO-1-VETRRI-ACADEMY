@@ -54,10 +54,12 @@ export const sendMessage = createAsyncThunk('chat/sendMessage', async ({ receive
   }
 });
 
-export const markConversationRead = createAsyncThunk('chat/markRead', async (conversationId, { rejectWithValue }) => {
+export const markConversationRead = createAsyncThunk('chat/markRead', async (conversationId, { rejectWithValue, getState }) => {
   try {
     await markAsReadAPI(conversationId);
-    return conversationId;
+    let unreadCount;
+    try { const { data } = await getUnreadCountAPI(); if (Number.isFinite(Number(data.count))) unreadCount = Math.max(0, Number(data.count)); } catch {}
+    return { conversationId, userId: String(getState().auth.user?._id || ''), unreadCount };
   } catch (error) {
     return rejectWithValue(error.response?.data?.message);
   }
@@ -103,6 +105,7 @@ const chatSlice = createSlice({
             ...conv,
             lastMessage: msg.message || (msg.messageType === 'image' ? '📷 Photo' : msg.messageType === 'video' ? '🎥 Video' : msg.messageType === 'audio' ? '🎙️ Audio' : `📎 ${msg.fileName || 'File'}`),
             lastMessageAt: msg.createdAt,
+            lastMessageBy: msg.senderId?._id || msg.senderId,
           };
         }
         return conv;
@@ -126,7 +129,7 @@ const chatSlice = createSlice({
         state.adminContact = action.payload;
       })
       // Chat users directory
-      .addCase(fetchChatUsers.pending, (state) => { state.usersLoading = true; })
+      .addCase(fetchChatUsers.pending, (state) => { state.usersLoading = true; state.error = null; })
       .addCase(fetchChatUsers.fulfilled, (state, action) => {
         state.usersLoading = false;
         state.chatUsers = action.payload?.users || [];
@@ -138,7 +141,7 @@ const chatSlice = createSlice({
         state.chatUsers = state.chatUsers || [];
       })
       // Conversations
-      .addCase(fetchConversations.pending, (state) => { state.loading = true; })
+      .addCase(fetchConversations.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.loading = false;
         state.conversations = action.payload;
@@ -171,9 +174,14 @@ const chatSlice = createSlice({
       })
       // Mark read
       .addCase(markConversationRead.fulfilled, (state, action) => {
+        const { conversationId, userId, unreadCount } = action.payload;
+        const conversation = state.conversations.find(c => c.conversationId === conversationId);
+        const previous = Number(typeof conversation?.unreadCount === 'number' ? conversation.unreadCount : conversation?.unreadCount?.[userId]) || 0;
         state.conversations = state.conversations.map((c) =>
-          c.conversationId === action.payload ? { ...c, unreadCount: { ...c.unreadCount } } : c
+          c.conversationId === conversationId ? { ...c, unreadCount: { ...(typeof c.unreadCount === 'object' ? c.unreadCount : {}), [userId]: 0 } } : c
         );
+        state.chatUsers = state.chatUsers.map(u => u.conversationId === conversationId ? { ...u, unreadCount: 0 } : u);
+        state.unreadCount = unreadCount ?? Math.max(0, state.unreadCount - previous);
       })
       // Unread count
       .addCase(fetchUnreadCount.fulfilled, (state, action) => {

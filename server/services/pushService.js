@@ -36,7 +36,7 @@ async function recordFailure(delivery, code, retryable = TRANSIENT_ERRORS.has(co
   await PushDelivery.updateOne({ _id: delivery._id }, { $set: {
     status: retry ? 'queued' : 'failed', errorCode: code,
     nextAttemptAt: new Date(Date.now() + Math.min(60 * 60000, 30000 * 2 ** delivery.attempts)),
-  }, $unset: { ticketId: '' } });
+  }, $unset: { ticketId: '', ...(!retry && delivery.recoveryRequestId ? { encryptedPayload: '' } : {}) } });
   // Never log raw tokens or bodies (messages can contain private information).
   console.warn(`[Push] ${code}; delivery=${delivery._id}; retry=${retry}`);
   if (code === 'DeviceNotRegistered') {
@@ -71,7 +71,7 @@ async function sendQueuedBatch() {
       status: { $in: ['queued', 'sending'] }, nextAttemptAt: { $lte: new Date() },
       expiresAt: { $gt: new Date() }, attempts: { $lt: MAX_ATTEMPTS },
     }, { $set: { status: 'sending', nextAttemptAt: new Date(Date.now() + 2 * 60000) }, $inc: { attempts: 1 } },
-    { new: true, sort: { nextAttemptAt: 1 } }).select('+token +payload').lean();
+    { new: true, sort: { nextAttemptAt: 1 } }).select('+token +payload +encryptedPayload').lean();
     if (!delivery) break;
     batch.push(delivery);
   }
@@ -80,11 +80,28 @@ async function sendQueuedBatch() {
 }
 
 async function sendClaimedBatch(batch) {
+  const ready = [];
+  for (const delivery of batch) {
+    if (!delivery.recoveryRequestId) { ready.push(delivery); continue; }
+    try {
+      const payload = await require('./recoveryPushPayload').resolveRecoveryPush(delivery);
+      if (!payload) {
+        await PushDelivery.updateOne({ _id: delivery._id }, { $set: { status: 'failed', errorCode: 'RecoveryUnavailable' }, $unset: { encryptedPayload: '' } });
+        continue;
+      }
+      ready.push({ ...delivery, payload });
+    } catch {
+      await recordFailure(delivery, 'RecoveryConfigurationError', false);
+    }
+  }
+  batch = ready;
+  if (!batch.length) return;
   let tickets;
   try {
     tickets = await expoRequest('send', batch.map(({ token, payload }) => ({
       to: token, title: payload.title, body: payload.body, data: payload.data || {},
-      sound: payload.sound || 'default', priority: 'high', channelId: 'vettri-default',
+      sound: payload.sound || 'default', priority: 'high', channelId: payload.channelId || 'vettri-default',
+      ...(payload.ttl !== undefined ? { ttl: payload.ttl } : {}),
       ...(payload.badge !== undefined ? { badge: payload.badge } : {}),
     })));
     tickets = Array.isArray(tickets) ? tickets : [tickets];
@@ -103,7 +120,7 @@ async function sendClaimedBatch(batch) {
     if (ticket?.status === 'ok' && ticket.id) {
       await PushDelivery.updateOne({ _id: batch[i]._id }, { $set: {
         status: 'receipt_pending', ticketId: ticket.id, nextAttemptAt: new Date(Date.now() + RECEIPT_DELAY_MS),
-      }, $unset: { errorCode: '' } });
+      }, $unset: { errorCode: '', ...(batch[i].recoveryRequestId ? { encryptedPayload: '' } : {}) } });
     } else {
       await recordFailure(batch[i], ticket?.details?.error || 'MissingTicket');
     }

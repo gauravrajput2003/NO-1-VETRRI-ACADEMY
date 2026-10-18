@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const schema = new mongoose.Schema({
   token: { type: String, required: true, select: false },
   payload: { type: mongoose.Schema.Types.Mixed, required: true, select: false },
+  recoveryRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'ResetRequest' },
+  encryptedPayload: { type: String, select: false },
   dedupeKey: { type: String, required: true, unique: true },
   status: { type: String, enum: ['queued', 'sending', 'receipt_pending', 'delivered', 'failed'], default: 'queued' },
   attempts: { type: Number, default: 0 },

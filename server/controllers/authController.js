@@ -66,7 +66,7 @@ const register = async (req, res) => {
 
       sendWelcomeEmail(user);
 
-      const token = generateToken(user._id, user.role);
+      const token = generateToken(user._id, user.role, user.tokenVersion || 0);
       setCookieToken(res, token);
 
       return res.status(201).json({
@@ -75,6 +75,7 @@ const register = async (req, res) => {
         token,
         user: {
           _id: user._id,
+        mustChangePassword: Boolean(user.mustChangePassword),
           name: user.name,
           mobile: user.mobile,
           email: user.email,
@@ -171,8 +172,8 @@ const login = async (req, res) => {
       user.profilePic = User.getDiceBearUrl(user._id);
     }
 
-    const token = generateToken(user._id, user.role);
-    const refreshToken = generateRefreshToken(user._id);
+    const token = generateToken(user._id, user.role, user.tokenVersion || 0);
+    const refreshToken = generateRefreshToken(user._id, user.tokenVersion || 0);
 
     user.refreshToken = refreshToken;
     user.isOnline = true;
@@ -189,6 +190,7 @@ const login = async (req, res) => {
       refreshToken,
       user: {
         _id: user._id,
+        mustChangePassword: Boolean(user.mustChangePassword),
         name: user.name,
         displayName: user.displayName || user.name,
         mobile: role !== 'student' ? user.mobile : undefined,
@@ -208,50 +210,13 @@ const login = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-// ─── Forgot Password (public — no OTP, identifies by mobile/email) ───────────
-const forgotPasswordPublic = async (req, res) => {
-  try {
-    const { identifier, newPassword } = req.body;
-    const rawId = String(identifier || '').trim();
+// Retired public reset: identifiers alone never authorize a password change.
+const forgotPasswordPublic = async (_req, res) => res.status(410).json({
+  success: false,
+  code: 'ADMIN_ASSISTED_RECOVERY_REQUIRED',
+  message: 'Please contact your academy admin for password recovery. Update the app to request a temporary password.',
+});
 
-    if (!rawId || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Mobile/Email and new password are required.' });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
-    }
-
-    const isEmail = rawId.includes('@');
-    const normalizedEmail = rawId.toLowerCase();
-    const digitsOnly = rawId.replace(/\D/g, '');
-    const tenDigitMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
-
-    const queryConditions = [
-      { email: normalizedEmail },
-      { mobile: rawId },
-    ];
-    if (tenDigitMobile) {
-      queryConditions.push({ mobile: tenDigitMobile });
-      queryConditions.push({ mobile: `+91${tenDigitMobile}` });
-      queryConditions.push({ mobile: `+91 ${tenDigitMobile}` });
-    }
-
-    const baseQuery = isEmail ? { email: normalizedEmail } : { $or: queryConditions };
-    const user = await User.findOne(baseQuery);
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this mobile or email.' });
-    }
-
-    user.password = newPassword; // pre-save hook hashes it
-    user.refreshToken = '';      // logs out other sessions
-    await user.save();
-
-    res.json({ success: true, message: 'Password reset successfully. Please login with your new password.' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 // ─── Logout ───────────────────────────────────────────────────────────────────
 const logout = async (req, res) => {
   try {
@@ -295,11 +260,11 @@ const refreshAccessToken = async (req, res) => {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findOne({ _id: decoded.id, refreshToken });
 
-    if (!user) {
+    if (!user || !user.isActive || (decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
       return res.status(401).json({ success: false, message: 'Invalid refresh token.' });
     }
 
-    const newToken = generateToken(user._id, user.role);
+    const newToken = generateToken(user._id, user.role, user.tokenVersion || 0);
     setCookieToken(res, newToken);
 
     res.status(200).json({ success: true, token: newToken });
@@ -354,7 +319,12 @@ const savePushToken = async (req, res) => {
 
     // One installation must not keep receiving a previous account's private alerts.
     await User.updateMany({ _id: { $ne: req.user._id }, expoPushToken }, { $unset: { expoPushToken: '' } });
-    await User.findByIdAndUpdate(req.user._id, { expoPushToken });
+    await User.updateMany({ _id: { $ne: req.user._id }, recoveryDevices: expoPushToken }, { $pull: { recoveryDevices: expoPushToken } });
+    await User.updateMany({ _id: { $ne: req.user._id }, recoveryReadyDevices: expoPushToken }, { $pull: { recoveryReadyDevices: expoPushToken } });
+    await User.findByIdAndUpdate(req.user._id, { $set: { expoPushToken }, $addToSet: { recoveryDevices: expoPushToken } });
+    if (req.body.recoveryChannelReady === true) {
+      await User.findByIdAndUpdate(req.user._id, { $addToSet: { recoveryReadyDevices: expoPushToken } });
+    }
 
     res.json({ success: true, message: 'Push token saved' });
   } catch (error) {

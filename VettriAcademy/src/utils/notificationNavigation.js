@@ -26,7 +26,7 @@ const STUDENT_ROUTES = {
   chat: { screen: 'DoubtDetail' }, // Legacy chat notifications
 
   // Administrative
-  announcement: { screen: 'StudentDashboard' }, // Or a dedicated Announcements screen if one exists
+  announcement: { screen: 'Home', params: { screen: 'Announcements' } },
   fee_reminder: { screen: 'Fees' },
   fee_paid: { screen: 'Fees' },
   fee_partial: { screen: 'Fees' },
@@ -40,6 +40,7 @@ const STUDENT_ROUTES = {
 };
 
 const TEACHER_ROUTES = {
+  announcement: { screen: 'Home', params: { screen: 'Announcements' } },
   academic_exam: { screen: 'ExamManagement' },
   // Direct Chat & Support
   chat_message: { screen: 'ChatRoom' },

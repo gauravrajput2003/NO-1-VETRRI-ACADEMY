@@ -1,4 +1,8 @@
 import { useBottomTabBarPadding } from '../../hooks/useBottomTabBarPadding';
+import AnnouncementButton from '../../components/announcements/AnnouncementButton';
+import NotificationButton from '../../components/NotificationButton';
+import PasswordRequestsButton from '../../components/PasswordRequestsButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarScroll } from '../../context/TabBarVisibilityContext';
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Animated, Easing, FlatList, useWindowDimensions } from 'react-native';
@@ -12,6 +16,7 @@ const ASSETS = {
   newFee: require('../../../assets/new_fees.png'),
   download: require('../../../assets/download.png'),
   chat: require('../../../assets/chat.png'),
+  doubt: require('../../../assets/question.png'),
   newSalary: require('../../../assets/new_salary.png'),
   newNotice: require('../../../assets/new_notice.png'),
   newSchedular: require('../../../assets/new_schedular.png'),
@@ -78,7 +83,7 @@ function ActionButton({ icon, badge, onPress, isGold = false, delay = 0 }) {
 
   return (
     <FadeInDown delay={delay}>
-      <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={1}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={icon === 'chatbubbles' ? 'Open direct messages' : icon} onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={1}>
         <Animated.View style={[
           styles.actionBtn,
           { transform: [{ scale }] },
@@ -173,6 +178,7 @@ function PremiumCard({ title, subtitle, value, icon, iconName, gradient, onPress
 }
 
 export default function AdminDashboard({ navigation }) {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const bottomPadding = useBottomTabBarPadding();
   const { onScroll: onTabBarScroll } = useTabBarScroll();
@@ -235,7 +241,7 @@ export default function AdminDashboard({ navigation }) {
     { id: '9', icon: ASSETS.pendingApproval, label: 'Approvals', subtitle: 'Review Pending Requests', screen: 'AdminPendingApprovals', gradient: ['#F59E0B', '#FBBF24'], badge: s.pendingMaterialsCount || 0 },
     { id: '10', icon: ASSETS.libraryAccess, label: 'Library Access', subtitle: 'Approve Teacher Access', screen: 'LibraryAccess', gradient: ['#8B5CF6', '#A78BFA'] },
     { id: '11', icon: ASSETS.download, label: 'Downloads', subtitle: 'NCERT Books & Materials', screen: 'Downloads', gradient: ['#16D6D1', '#0A8C89'] },
-    { id: '12', icon: ASSETS.chat, label: 'Discussions', subtitle: 'Review & Moderate', screen: 'DoubtCenter', gradient: ['#EC4899', '#F472B6'] },
+    { id: '12', icon: ASSETS.doubt, label: 'Doubt Discussion', subtitle: 'Review & Moderate', screen: 'DoubtCenter', gradient: ['#EC4899', '#F472B6'] },
   ];
 
   const greetingTime = () => {
@@ -253,21 +259,21 @@ export default function AdminDashboard({ navigation }) {
       {/* Teal Wave Header */}
       <FadeInDown delay={0}>
         <View style={styles.headerBg}>
-          <LinearGradient colors={['#1A3C40', '#11C5C6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+          <LinearGradient colors={['#1A3C40', '#11C5C6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.headerGradient, { paddingTop: insets.top + 12 }]}>
             <View style={styles.headerContent}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                <ActionButton icon="chatbubbles" badge={unreadChatCount} onPress={() => navigation.navigate('AdminChat')} delay={0} />
+                <AnnouncementButton onPress={() => navigation.navigate('Announcements')} />
+                <NotificationButton onPress={() => navigation.navigate('Notifications')} unreadCount={unreadCount} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.greeting}>ADMIN PANEL</Text>
                 <Text style={[styles.headerName, { marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {(user?.displayName || user?.name || '').split(' ')[0]}{' '}
-                  <Text style={styles.headerNameAccent}>{(user?.displayName || user?.name || '').split(' ').slice(1).join(' ')}</Text>
+                  Super <Text style={styles.headerNameAccent}>Admin</Text>
                 </Text>
                 <Text style={styles.headerDateline}>
                   {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' })} · All systems normal
                 </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <ActionButton icon="chatbubbles" badge={unreadChatCount} onPress={() => navigation.navigate('AdminChat')} delay={150} />
-                <ActionButton icon="notifications" badge={unreadCount} onPress={() => navigation.navigate('Notifications')} delay={200} />
               </View>
             </View>
           </LinearGradient>
@@ -315,7 +321,7 @@ export default function AdminDashboard({ navigation }) {
         gradient={item.gradient}
         onPress={() => navigation.navigate(item.screen)}
         delay={700 + (index * 60)}
-        footerText="Open"
+        footerText={item.screen === 'DoubtCenter' ? 'Doubts' : 'Open'}
       />
     </View>
   ))}
@@ -349,6 +355,7 @@ export default function AdminDashboard({ navigation }) {
 
       <View style={styles.sectionPad}><PremiumCard title="Exam Management" subtitle="Assign papers, review answers and publish marks." gradient={['#102A43', '#0F766E']} onPress={() => navigation.navigate('ExamManagement')} height={120} footerText="Open Exam Management" /></View>
       <View style={styles.sectionPad}><PremiumCard title="Teacher Performance" subtitle="Automatic monthly ratings and Best Teacher." gradient={['#0F766E', '#14B8A6']} onPress={() => navigation.navigate('TeacherPerformance')} height={120} footerText="View Monthly Reports" /></View>
+      <View style={styles.sectionPad}><PasswordRequestsButton onPress={() => navigation.navigate('PasswordRequests')} /></View>
       {/* STUDENT MARKS SINGLE CARD */}
       <View style={styles.sectionPad}>
         <PremiumCard 
@@ -373,7 +380,7 @@ const styles = StyleSheet.create({
   
   headerBg: { backgroundColor: '#FAFBFC' },
   headerGradient: { paddingTop: 48, paddingBottom: 22, paddingHorizontal: 18 },
-  headerContent: { flexDirection: 'row', alignItems: 'center' },
+  headerContent: { gap: 16 },
   greeting: { fontSize: 11, color: 'rgba(255,255,255,0.5)', letterSpacing: 3, fontWeight: '700', textTransform: 'uppercase' },
   headerNameRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 4 },
   headerName: { fontSize: 26, fontWeight: '900', color: '#FFF', letterSpacing: 0.2 },
@@ -381,7 +388,7 @@ const styles = StyleSheet.create({
   headerDateline: { fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3, fontWeight: '500' },
   
   actionBtn: {
-    width: 52, height: 52, borderRadius: 26,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',

@@ -423,7 +423,7 @@ export default function ClassesScreen({ navigation }) {
 
   return (
     <View style={st.container}>
-      <StatusBar barStyle="light-content" backgroundColor={T.pink} />
+      <StatusBar barStyle="light-content" />
 
       {loading && !refreshing ? (
         <View style={{ flex: 1 }}>

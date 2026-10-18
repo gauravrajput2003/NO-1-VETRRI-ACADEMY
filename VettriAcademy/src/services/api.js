@@ -265,6 +265,13 @@ export const forgotPasswordAPI = (newPassword) =>
 // Public (from Login screen, user not authenticated)
 export const forgotPasswordPublicAPI = (identifier, newPassword) =>
   api.post('/auth/forgot-password', { identifier, newPassword});
+export const requestTemporaryPasswordAPI = (identifier, deviceToken) => api.post('/auth/password-reset/request', { identifier, deviceToken });
+export const completePasswordRecoveryAPI = (details) => api.post('/auth/password-reset/complete', details);
+export const getPasswordRequestsAPI = (params) => api.get('/admin/password-resets', { params });
+export const generateTemporaryPasswordAPI = (id) => api.post(`/admin/password-resets/${id}/generate`);
+export const sendTemporaryPasswordAPI = (id, password) => api.post(`/admin/password-resets/${id}/send`, { password, channels: ['push', 'chat'] });
+export const markRecoveryCopiedAPI = (id, password) => api.post(`/admin/password-resets/${id}/mark-copied`, { password, identityVerified: true });
+export const rejectPasswordRequestAPI = (id) => api.post(`/admin/password-resets/${id}/reject`);
 // Announcements
 export const getAnnouncementsAPI = (params) =>
   api.get('/announcements', { params });
@@ -640,8 +647,8 @@ export const updateAnnouncementAPI = (id, data) =>
 export const deleteAnnouncementAPI = (id) =>
   api.delete(`/announcements/${id}`);
 
-export const getActiveAnnouncementsAPI = () =>
-  api.get('/announcements/active');
+export const getActiveAnnouncementsAPI = (params) =>
+  api.get('/announcements/active', { params });
 
 export const markAnnouncementReadAPI = (id) =>
   api.post(`/announcements/${id}/read`);
@@ -906,6 +913,6 @@ export const uploadSupportAttachmentAPI = async (formData) => {
  * @param {string} expoPushToken  e.g. "ExponentPushToken[xxx]"
  */
 export const savePushTokenAPI = (expoPushToken) =>
-  api.put('/auth/push-token', { expoPushToken });
+  api.put('/auth/push-token', { expoPushToken, recoveryChannelReady: Platform.OS === 'android' });
 
 export default api;

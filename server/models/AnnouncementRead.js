@@ -10,5 +10,6 @@ const announcementReadSchema = new mongoose.Schema(
 );
 
 announcementReadSchema.index({ announcementId: 1, userId: 1 }, { unique: true });
+announcementReadSchema.index({ createdAt: 1 }, { expireAfterSeconds: require('../utils/announcementRetention').RETENTION_SECONDS });
 
 module.exports = mongoose.model('AnnouncementRead', announcementReadSchema);

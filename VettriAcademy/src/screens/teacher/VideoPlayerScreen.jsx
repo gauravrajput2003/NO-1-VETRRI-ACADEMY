@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../utils/colors';
 import { updateWatchProgressAPI, markVideoCompleteAPI } from '../../services/api';
 import ParticleWrapper from '../../components/effects/ParticleWrapper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TouchableOpacity = (props) => {
   const { particleCount = 20, size = "small", colors, children, ...rest } = props;
@@ -23,6 +24,7 @@ try {
 }
 
 export default function VideoPlayerScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { video } = route.params;
   const [loading, setLoading] = useState(true);
   const [elapsed, setElapsed] = useState(0);
@@ -102,10 +104,10 @@ video{width:100%;max-height:100vh;object-fit:contain}</style></head>
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+      <StatusBar barStyle="light-content" />
       {/* Top bar */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
@@ -123,7 +125,7 @@ video{width:100%;max-height:100vh;object-fit:contain}</style></head>
       {renderPlayer()}
 
       {/* Bottom info */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 14 }]}>
         <View style={styles.infoChip}>
           <Ionicons name="time-outline" size={14} color={Colors.gold} />
           <Text style={styles.infoTxt}>Duration: {formatTime(video.duration || 0)}</Text>

@@ -5,12 +5,22 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../utils/colors';
 import { toggleAI } from '../redux/slices/uiSlice';
+import AnnouncementButton from './announcements/AnnouncementButton';
+import NotificationButton from './NotificationButton';
 
 export default function HeaderActions() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { unreadCount } = useSelector((s) => s.notifications);
   const isAdmin = useSelector((s) => s.auth.user?.role === 'admin');
+  const openAnnouncements = () => {
+    if (navigation.getState?.()?.routeNames?.includes('Announcements')) return navigation.navigate('Announcements');
+    let parent = navigation.getParent?.();
+    while (parent) {
+      if (parent.getState?.()?.routeNames?.includes('Home')) return parent.navigate('Home', { screen: 'Announcements' });
+      parent = parent.getParent?.();
+    }
+  };
   const openNotifications = () => {
     const currentState = navigation.getState?.();
     if (currentState?.routeNames?.includes('Notifications')) {
@@ -39,14 +49,8 @@ export default function HeaderActions() {
         <Ionicons name="sparkles" size={22} color={Colors.hotPink} />
       </TouchableOpacity>}
       
-      <TouchableOpacity style={styles.notifBtn} onPress={openNotifications}>
-        <Ionicons name="notifications-outline" size={24} color={Colors.hotPink} />
-        {unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      <AnnouncementButton onPress={openAnnouncements} />
+      <NotificationButton onPress={openNotifications} unreadCount={unreadCount} />
     </View>
   );
 }
@@ -56,15 +60,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 10,
+    gap: 8,
   },
   aiBtn: {
-    padding: 8,
-    marginRight: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255, 20, 147, 0.1)',
     borderRadius: 20,
   },
   notifBtn: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
   },
   badge: {

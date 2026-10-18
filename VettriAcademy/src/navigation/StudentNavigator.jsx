@@ -1,4 +1,5 @@
 import ExamManagementScreen from '../screens/common/ExamManagementScreen';
+import AnnouncementsInboxScreen from '../screens/common/AnnouncementsInboxScreen';
 import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -80,9 +81,10 @@ const HEADER_OPTS = {
 
 function HomeStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
+    <Stack.Navigator initialRouteName="StudentDashboard">
       <Stack.Screen name="StudentDashboard" component={DashboardScreen}       options={{ headerShown: false }} />
+      <Stack.Screen name="Announcements" component={AnnouncementsInboxScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom"         component={ChatRoomScreen}         options={{ headerShown: false }} />
       <Stack.Screen name="HelpCenter"       component={HelpCenterScreen}       options={{ headerShown: false }} />
       <Stack.Screen name="Notifications"    component={NotificationsScreen}   options={{ headerShown: false }} />

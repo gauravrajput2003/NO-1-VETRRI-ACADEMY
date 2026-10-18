@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, 
-  ActivityIndicator, KeyboardAvoidingView, Platform, Animated, Dimensions 
+  ActivityIndicator, KeyboardAvoidingView, Platform, Animated, useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
@@ -13,11 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { setAIOpen } from '../redux/slices/uiSlice';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
-// Use full width on small screens, or a fixed width drawer on larger screens
-const DRAWER_WIDTH = width > 400 ? 350 : width; 
 
 export default function AIAssistantDrawer() {
+  const { width } = useWindowDimensions();
+  const drawerWidth = width > 400 ? 350 : width;
   const dispatch = useDispatch();
   const { isAIOpen, theme } = useSelector((s) => s.ui);
   const isDark = theme === 'dark';
@@ -28,9 +27,9 @@ export default function AIAssistantDrawer() {
   const [chatHistory, setChatHistory] = useState([
     { role: 'ai', text: "Hello! I'm Vettri AI. How can I help you with your studies today?" }
   ]);
-  
+
   const scrollViewRef = useRef();
-  const slideAnim = useRef(new Animated.Value(DRAWER_WIDTH)).current;
+  const slideAnim = useRef(new Animated.Value(drawerWidth)).current;
 
   const bgColor = isDark ? Colors.background.dark : Colors.surface.light;
   const cardBg = isDark ? Colors.card.dark : Colors.card.light;
@@ -46,21 +45,21 @@ export default function AIAssistantDrawer() {
       }).start();
     } else {
       Animated.timing(slideAnim, {
-        toValue: DRAWER_WIDTH,
+        toValue: drawerWidth,
         duration: 250,
         useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
-  }, [isAIOpen]);
+  }, [isAIOpen, drawerWidth, slideAnim]);
 
   const handleSend = async () => {
     if (!question.trim()) return;
-    
+
     const userQ = question.trim();
     setQuestion('');
     setChatHistory(prev => [...prev, { role: 'user', text: userQ }]);
     setLoading(true);
-    
+
     try {
       const response = await askVettriAiAPI(userQ);
       if (response.data.success) {
@@ -85,7 +84,7 @@ export default function AIAssistantDrawer() {
   };
 
   // If completely closed, don't render touchable overlay to save resources
-  if (!isAIOpen && slideAnim._value === DRAWER_WIDTH) return null;
+  if (!isAIOpen && slideAnim._value === drawerWidth) return null;
 
   return (
     <View style={[styles.overlay, { pointerEvents: isAIOpen ? 'auto' : 'none' }]}>
@@ -102,7 +101,7 @@ export default function AIAssistantDrawer() {
       <Animated.View 
         style={[
           styles.drawerContainer, 
-          { backgroundColor: isDark ? '#0f172a' : '#f8fafc', transform: [{ translateX: slideAnim }] }
+          { width: drawerWidth, backgroundColor: isDark ? '#0f172a' : '#f8fafc', transform: [{ translateX: slideAnim }] }
         ]}
       >
         <LinearGradient 
@@ -153,7 +152,7 @@ export default function AIAssistantDrawer() {
                 </Text>
               </View>
             ))}
-            
+
             {loading && (
               <View style={[styles.messageBubble, styles.aiBubble, { backgroundColor: cardBg }]}>
                 <View style={styles.aiAvatar}>
@@ -210,7 +209,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   drawerContainer: {
-    width: DRAWER_WIDTH,
     height: '100%',
     ...Shadows.large,
   },

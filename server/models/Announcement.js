@@ -38,5 +38,6 @@ const announcementSchema = new mongoose.Schema(
 );
 
 announcementSchema.index({ targetRole: 1, isActive: 1 });
+announcementSchema.index({ createdAt: 1 }, { expireAfterSeconds: require('../utils/announcementRetention').RETENTION_SECONDS });
 
 module.exports = mongoose.model('Announcement', announcementSchema);

@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
 
 // Admin Screens
 import AdminDashboard from '../screens/admin/DashboardScreen';
+import PasswordRequestsScreen from '../screens/admin/PasswordRequestsScreen';
 import ManageStudentsScreen from '../screens/admin/ManageStudentsScreen';
 import ManageTeachersScreen from '../screens/admin/ManageTeachersScreen';
 import FeeManagementScreen from '../screens/admin/FeeManagementScreen';
@@ -53,10 +54,11 @@ const PINK = '#FF4FA3';
 
 function HomeStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, headerRight: () => <HeaderActions /> }}>
+    <Stack.Navigator initialRouteName="AdminDashboard" screenOptions={{ headerShown: false, headerRight: () => <HeaderActions /> }}>
+      <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+      <Stack.Screen name="PasswordRequests" component={PasswordRequestsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ExamManagement" component={ExamManagementScreen} options={{ headerShown: false }} />
       <Stack.Screen name="TeacherPerformance" component={AcademicReportsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
       <Stack.Screen name="AdminChat" component={AdminChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AdminQueries" component={AdminQueriesScreen} options={{ headerShown: false }} />
@@ -118,6 +120,7 @@ function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={{ headerRight: () => <HeaderActions /> }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PasswordRequests" component={PasswordRequestsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AdminQueries" component={AdminQueriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />

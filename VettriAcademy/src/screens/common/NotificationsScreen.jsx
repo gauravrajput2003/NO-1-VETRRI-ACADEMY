@@ -266,7 +266,7 @@ export default function NotificationsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FF4F8B" />
+      <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#FFF8FB', '#F8F7FC', '#F5FCFF', '#F2FFFC']}
         style={StyleSheet.absoluteFillObject}

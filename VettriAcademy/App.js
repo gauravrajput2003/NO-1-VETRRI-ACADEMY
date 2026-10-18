@@ -42,7 +42,7 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, overflow: 'hidden' }}>
       <SafeAreaProvider>
         <Provider store={store}>
           <PersistGate

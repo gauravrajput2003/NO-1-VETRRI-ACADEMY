@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   StatusBar, KeyboardAvoidingView, Platform, ScrollView,
-  ActivityIndicator, Dimensions, Animated, Easing,
+  ActivityIndicator, useWindowDimensions, Animated, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { loginUser, clearError } from '../../redux/slices/authSlice';
 
-const { width: SW, height: SH } = Dimensions.get('window');
 
 // Bright teal + pink palette (light, airy — no dark glass panels)
 const C = {
@@ -30,6 +29,7 @@ const C = {
 };
 
 export default function LoginScreen({ navigation, route }) {
+  const { height: SH } = useWindowDimensions();
   const dispatch = useDispatch();
   const { loading, error } = useSelector((s) => s.auth);
 
@@ -100,7 +100,7 @@ export default function LoginScreen({ navigation, route }) {
               <Ionicons name="arrow-back" size={20} color={C.white} />
             </TouchableOpacity>
 
-            <View style={st.hero}>
+            <View style={[st.hero, { paddingVertical: SH < 700 ? 12 : 18 }]}>
               <View style={st.logoWrap}>
                 <Svg width={70} height={70} viewBox="0 0 24 24">
                   <Defs>
@@ -229,7 +229,7 @@ const st = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
 
-  hero: { alignItems: 'center', paddingVertical: SH < 700 ? 12 : 18 },
+  hero: { alignItems: 'center' },
   logoWrap: {
     width: 88, height: 88, borderRadius: 44, backgroundColor: C.white,
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,

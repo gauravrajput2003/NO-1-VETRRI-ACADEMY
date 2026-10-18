@@ -95,6 +95,10 @@ export default function ManageStudentsScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [viewModal, setViewModal] = useState(null);
+  const [detailPassword, setDetailPassword] = useState('');
+  const [savedDetailPassword, setSavedDetailPassword] = useState('');
+  const [showDetailPassword, setShowDetailPassword] = useState(false);
+  const [detailPasswordError, setDetailPasswordError] = useState('');
   const [editModal, setEditModal] = useState(null);
   const [editData, setEditData] = useState({});
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -113,6 +117,32 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
   const [showCreatePassword, setShowCreatePassword] = useState(false);
 
   const textColor = isDark ? Colors.text.dark : Colors.text.light;
+
+  useEffect(() => {
+    setDetailPassword('');
+    setSavedDetailPassword('');
+    setShowDetailPassword(false);
+    setDetailPasswordError('');
+  }, [viewModal?._id]);
+
+  const saveDetailPassword = async () => {
+    if (savingStudent || !viewModal) return;
+    const password = detailPassword.trim();
+    if (password.length < 6) return setDetailPasswordError('Enter at least 6 characters.');
+    setSavingStudent(true);
+    setDetailPasswordError('');
+    try {
+      const result = await dispatch(editStudent({ id: viewModal._id, updates: { password } }));
+      if (!editStudent.fulfilled.match(result)) {
+        setDetailPasswordError(String(result.payload || 'Password could not be saved. Please retry.'));
+        return;
+      }
+      setSavedDetailPassword(password);
+      setDetailPassword('');
+      setShowDetailPassword(true);
+      Toast.show({ type: 'success', text1: 'New login password saved' });
+    } finally { setSavingStudent(false); }
+  };
 
   useEffect(() => {
     dispatch(fetchAdminStudents({ search }));
@@ -341,7 +371,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
         />
       </View>
 
-      <Modal visible={!!viewModal} transparent animationType="slide">
+      <Modal visible={!!viewModal} transparent animationType="slide" onRequestClose={() => { if (!savingStudent) setViewModal(null); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, styles.viewModalContent]}>
             <View style={styles.viewModalHeader}>
@@ -355,7 +385,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
                   <Text style={styles.viewStatusText}>{viewModal?.isActive ? 'Active' : 'Inactive'}</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setViewModal(null)} style={styles.viewCloseBtn}>
+              <TouchableOpacity disabled={savingStudent} onPress={() => setViewModal(null)} style={styles.viewCloseBtn}>
                 <Ionicons name="close" size={20} color={B.sec} />
               </TouchableOpacity>
             </View>
@@ -372,6 +402,25 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
                   <Ionicons name="mail-outline" size={18} color={B.teal} />
                   <Text style={styles.viewRowText}>{viewModal?.email || 'Not provided'}</Text>
                 </View>
+              </View>
+
+              <View style={styles.viewSection}>
+                <Text style={styles.viewSectionTitle}>Login password</Text>
+                {savedDetailPassword ? <>
+                  <Text selectable={showDetailPassword} style={[styles.viewRowText, { flex: 0, marginBottom: 10 }]}>{showDetailPassword ? savedDetailPassword : '••••••••'}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity accessibilityLabel={showDetailPassword ? 'Hide saved password' : 'Show saved password'} style={[styles.cancelBtn, { minHeight: 44 }]} onPress={() => setShowDetailPassword(!showDetailPassword)}><Text style={styles.cancelText}>{showDetailPassword ? 'Hide' : 'Show'}</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.confirmBtn, { minHeight: 44 }]} onPress={() => copyLoginText(savedDetailPassword)}><Text style={styles.confirmText}>Copy password</Text></TouchableOpacity>
+                  </View>
+                  <TouchableOpacity style={{ paddingVertical: 14 }} onPress={() => copyLoginText(`Phone: ${normalizeLoginMobile(viewModal?.mobile)}\nPassword: ${savedDetailPassword}`)}><Text style={{ color: B.tealDeep, fontWeight: '700' }}>Copy phone + password</Text></TouchableOpacity>
+                  <Text style={{ color: B.sec, fontSize: 12, marginBottom: 12 }}>Saved successfully. Copy now; this password is cleared from this panel when you close it.</Text>
+                </> : <Text style={{ color: B.sec, fontSize: 12, marginBottom: 12 }}>The existing password cannot be retrieved. Set a new one below, then show or copy it here. The student must use the new password to log in.</Text>}
+                <View style={[styles.input, styles.passwordRow]}>
+                  <TextInput accessibilityLabel="Replacement student password" style={[styles.passwordInput, { color: B.text }]} value={detailPassword} onChangeText={setDetailPassword} placeholder="New password (minimum 6 characters)" placeholderTextColor={Colors.mediumGray} secureTextEntry={!showDetailPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" editable={!savingStudent} />
+                  <TouchableOpacity accessibilityLabel={showDetailPassword ? 'Hide password text' : 'Show password text'} style={{ padding: 10 }} onPress={() => setShowDetailPassword(!showDetailPassword)}><Ionicons name={showDetailPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={B.tealDeep} /></TouchableOpacity>
+                </View>
+                {!!detailPasswordError && <Text accessibilityRole="alert" style={{ color: '#B91C1C', marginVertical: 8 }}>{detailPasswordError}</Text>}
+                <TouchableOpacity disabled={savingStudent || !detailPassword.trim()} style={[styles.confirmBtn, { flex: 0, minHeight: 44, marginTop: 10, opacity: savingStudent || !detailPassword.trim() ? 0.5 : 1 }]} onPress={saveDetailPassword}><Text style={styles.confirmText}>{savingStudent ? 'Saving…' : 'Save new login password'}</Text></TouchableOpacity>
               </View>
 
               <View style={styles.viewSection}>
@@ -412,9 +461,10 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
             </ScrollView>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setViewModal(null)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
+              <TouchableOpacity disabled={savingStudent} style={styles.cancelBtn} onPress={() => setViewModal(null)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteModalBtn}
+                disabled={savingStudent}
                 onPress={() => {
                   const item = viewModal;
                   setViewModal(null);
@@ -425,6 +475,7 @@ const [createData, setCreateData] = useState({ name: '', mobile: '', email: '', 
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmBtn}
+                disabled={savingStudent}
                 onPress={() => {
                   const item = viewModal;
                   setViewModal(null);
