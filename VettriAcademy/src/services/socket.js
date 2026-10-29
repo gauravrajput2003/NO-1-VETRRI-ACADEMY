@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { SOCKET_URL } from '../utils/constants';
+import { getToken } from './storage';
 import { logDev, warnDev } from '../utils/logger';
 
 // ─── Socket.io Service ─────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ export const connectSocket = (userId, role) => {
   if (socket?.connected) return socket;
 
   socket = io(SOCKET_URL, {
+    auth: async (callback) => callback({ token: await getToken() }),
     transports: ['websocket'],
     autoConnect: true,
     reconnection: true,

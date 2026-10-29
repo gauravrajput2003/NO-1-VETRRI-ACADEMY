@@ -139,6 +139,7 @@ const userSchema = new mongoose.Schema(
     mustChangePassword: { type: Boolean, default: false },
     recoveryDevices: { type: [String], default: [], select: false },
     recoveryReadyDevices: { type: [String], default: [], select: false },
+    recoveryRegistrations: { type: [{ _id: false, token: String, registeredAt: Date, tokenVersion: Number }], default: [], select: false },
     notificationCount: { type: Number, default: 0 },
   },
   { timestamps: true }
@@ -151,6 +152,7 @@ userSchema.pre('save', async function (next) {
     this.tokenVersion = (this.tokenVersion || 0) + 1;
     this.passwordChangedAt = new Date();
     this.refreshToken = '';
+    Object.assign(this, require('../utils/recoveryDevices').revokedDeviceFields());
   }
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);

@@ -6,6 +6,7 @@ import {
   getTrainingVideos, getTrainingProgress, deleteTrainingVideo, uploadTrainingVideo,
 } from '../../services/api';
 import UploadProgress from '../../components/UploadProgress';
+import api from '../../services/api';
 
 const CATEGORIES = ['platform-tutorial', 'teaching-methods', 'technical-setup', 'other'];
 
@@ -77,6 +78,10 @@ export default function AdminTrainingVideos() {
     isMandatory: false, orderNumber: 1,
   });
   const [videoFile, setVideoFile] = useState(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [audience, setAudience] = useState('both');
+  const [editVideo, setEditVideo] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -84,7 +89,7 @@ export default function AdminTrainingVideos() {
     setLoading(true);
     try {
       const [videosRes, progressRes] = await Promise.all([
-        getTrainingVideos(),
+        api.get('/training-videos/admin/all'),
         getTrainingProgress(),
       ]);
       if (videosRes.data.success) {
@@ -117,10 +122,10 @@ export default function AdminTrainingVideos() {
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!videoFile) { toast.error('Please select a video file'); return; }
+    if (!videoFile && !videoUrl) { toast.error('Please select a video file or enter a video URL'); return; }
     if (!form.title) { toast.error('Title is required'); return; }
 
-    if (videoFile.size > 500 * 1024 * 1024) { toast.error('File must be under 500MB'); return; }
+    if (videoFile && videoFile.size > 500 * 1024 * 1024) { toast.error('File must be under 500MB'); return; }
 
     setUploading(true);
     setUploadProgress(0);
@@ -130,16 +135,18 @@ export default function AdminTrainingVideos() {
     fd.append('description', form.description);
     fd.append('category', form.category);
     fd.append('isMandatory', form.isMandatory);
-    fd.append('orderNumber', form.orderNumber);
+    fd.append('order', form.orderNumber);
+    fd.append('targetAudience', audience);
 
     try {
-      const { data } = await uploadTrainingVideo(fd, {
+      const { data } = videoUrl ? await api.post('/training-videos/url', { ...form, videoUrl, order: form.orderNumber, targetAudience: audience }) : await uploadTrainingVideo(fd, {
         onUploadProgress: (e) => setUploadProgress(Math.round((e.loaded * 100) / e.total)),
       });
       if (data.success) {
         toast.success('Video uploaded successfully!');
         setForm({ title: '', description: '', category: 'platform-tutorial', isMandatory: false, orderNumber: 1 });
         setVideoFile(null);
+        setVideoUrl('');
         setUploadProgress(0);
         fetchAll();
       }
@@ -165,6 +172,7 @@ export default function AdminTrainingVideos() {
       </div>
 
       {/* Progress Summary */}
+      <section className="glass-card p-4 grid md:grid-cols-2 gap-3"><label className="text-white">Video URL (alternative to file upload)<input className="input-field" type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://…" /></label><label className="text-white">New video audience<select className="input-field" value={audience} onChange={(event) => setAudience(event.target.value)}>{['both', 'student', 'teacher'].map((value) => <option key={value}>{value}</option>)}</select></label></section>
       <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-white font-semibold">
@@ -245,7 +253,7 @@ export default function AdminTrainingVideos() {
 
           {uploading && <UploadProgress progress={uploadProgress} />}
 
-          <button type="submit" disabled={uploading || !videoFile}
+          <button type="submit" disabled={uploading || (!videoFile && !videoUrl)}
             className="bg-gold text-navy font-semibold px-6 py-3 rounded-xl hover:bg-yellow-400 transition-all disabled:opacity-60 flex items-center gap-2">
             {uploading ? (
               <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
@@ -309,7 +317,7 @@ export default function AdminTrainingVideos() {
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <a
-                        href={video.cloudinaryUrl}
+                        href={video.playableUrl || video.videoUrl || video.cloudinaryUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-400/60 hover:text-blue-400 border border-blue-500/20 hover:border-blue-500/40 p-1.5 rounded-lg transition-all"
@@ -319,7 +327,7 @@ export default function AdminTrainingVideos() {
                         <FiPlay size={13} />
                       </a>
                       <a
-                        href={video.cloudinaryUrl}
+                        href={video.playableUrl || video.videoUrl || video.cloudinaryUrl}
                         download
                         target="_blank"
                         rel="noopener noreferrer"
@@ -336,6 +344,8 @@ export default function AdminTrainingVideos() {
                       >
                         <FiTrash2 size={13} />
                       </button>
+                      <button className="text-gold text-sm" onClick={(event) => { event.stopPropagation(); setEditVideo(video); setEditForm({ title: video.title, description: video.description || '', order: video.order || 1, targetAudience: video.targetAudience || 'both', isMandatory: video.isMandatory, videoUrl: video.videoUrl || '', duration: video.duration || 0 }); }}>Edit</button>
+                      <button className="text-gold text-sm" onClick={async (event) => { event.stopPropagation(); try { await api.patch(`/training-videos/${video._id}/toggle`); fetchAll(); } catch { toast.error('Unable to update video status'); } }}>{video.isActive ? 'Deactivate' : 'Activate'}</button>
                       {isExpanded ? <FiChevronUp size={16} className="text-white/30" /> : <FiChevronDown size={16} className="text-white/30" />}
                     </div>
                   </div>
@@ -376,6 +386,7 @@ export default function AdminTrainingVideos() {
         )}
       </div>
 
+      {editVideo && <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-5"><form className="bg-navy border border-white/20 rounded-xl p-5 max-w-xl w-full space-y-3" onSubmit={async (event) => { event.preventDefault(); try { await api.put(`/training-videos/${editVideo._id}`, editForm); setEditVideo(null); fetchAll(); } catch { toast.error('Unable to save video'); } }}><h2 className="text-white font-bold">Edit training video</h2>{['title', 'description', 'videoUrl', 'order', 'duration'].map((key) => <label className="block text-white" key={key}>{key}<input className="input-field" type={['order', 'duration'].includes(key) ? 'number' : 'text'} value={editForm[key]} onChange={(event) => setEditForm({ ...editForm, [key]: event.target.value })} /></label>)}<label className="block text-white">Audience<select className="input-field" value={editForm.targetAudience} onChange={(event) => setEditForm({ ...editForm, targetAudience: event.target.value })}>{['both', 'student', 'teacher'].map((value) => <option key={value}>{value}</option>)}</select></label><label className="flex gap-2 text-white"><input type="checkbox" checked={editForm.isMandatory} onChange={(event) => setEditForm({ ...editForm, isMandatory: event.target.checked })} />Mandatory</label><div className="flex gap-4"><button className="btn-primary">Save</button><button type="button" className="text-white" onClick={() => setEditVideo(null)}>Cancel</button></div></form></div>}
       {/* Delete Modal */}
       <AnimatePresence>
         {deleteModal && (

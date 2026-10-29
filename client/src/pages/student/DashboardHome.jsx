@@ -350,7 +350,7 @@ export default function StudentDashboardHome() {
           ) : (
             <div className="space-y-3">
               {recentScores.map((sc) => {
-                const pct = Math.round((sc.marksObtained / sc.totalMarks) * 100);
+                const pct = Math.round((sc.marksObtained / (sc.maxMarks ?? sc.totalMarks ?? 100)) * 100);
                 return (
                   <div key={sc._id} className="p-3 bg-white/5 rounded-xl border border-white/5">
                     <div className="flex items-center justify-between mb-1">
@@ -360,7 +360,7 @@ export default function StudentDashboardHome() {
                     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-gold' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-white/30 text-xs mt-1">{sc.marksObtained}/{sc.totalMarks} · {formatDate(sc.examDate)}</p>
+                    <p className="text-white/30 text-xs mt-1">{sc.marksObtained}/{sc.maxMarks ?? sc.totalMarks} · {formatDate(sc.examDate)}</p>
                   </div>
                 );
               })}

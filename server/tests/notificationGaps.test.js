@@ -152,12 +152,12 @@ test('bulk salary processing notifies only newly processed teachers after transa
   const teachers = ['paid', 'unpaid'].map((_id) => ({ _id, salary: { baseSalary: 1000 }, save: async () => calls.push('history') }));
   class Transaction {
     constructor(value) { Object.assign(this, { _id: 'salary' }, value); }
-    static async findOne({ teacherId }) { return teacherId === 'paid' ? { paymentStatus: 'paid' } : null; }
+    static async findOne({ teacherId }) { return teacherId === 'paid' ? { paymentStatus: 'paid', paidAmount: 1000 } : null; }
     async save() { calls.push('save'); }
     toObject() { return { ...this }; }
   }
   const controller = load('controllers/salaryController.js', {
-    '../models/User': { find: async () => teachers }, '../models/SalaryTransaction': Transaction,
+    '../models/User': { find: async () => teachers, findOne: async ({ _id }) => teachers.find((teacher) => teacher._id === _id) }, '../models/SalaryTransaction': Transaction,
     '../services/financialNotificationService': { notifySalaryRecord: async ({ transaction, action }) => calls.push(`${transaction.teacherId}:${action}`) },
   });
   const res = response();

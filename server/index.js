@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io'); 
@@ -39,6 +39,8 @@ const ChatMessage = require('./models/ChatMessage');
 const Notification = require('./models/Notification');
 const User = require('./models/User');
 const TeacherPermissions = require('./models/TeacherPermissions');
+const UserSession = require('./models/UserSession');
+const jwt = require('jsonwebtoken');
 
 // ─── Express App Setup ─────────────────────────────────────────────────────────
 const app = express();
@@ -51,6 +53,7 @@ const allowedOrigins = [
   ...(process.env.CLIENT_URL || '').split(',').map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean),
   'https://no1vettriacademy.com', 
   'https://no1vettriacademy.in',
+  'https://www.no1vettriacademy.in',
   'https://no1vettriacademy.com',
   'https://www.no1vettriacademy.com',
   'http://localhost:5173',
@@ -165,19 +168,59 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Socket.io Logic ───────────────────────────────────────────────────────────
-const onlineUsers = new Map(); // userId → socketId
+const onlineUsers = new Map(); // userId → Set of socket IDs
+const socketRollout = { authenticatedConnections: 0, legacyConnections: 0, rejectedConnections: 0 };
+app.set('socketRollout', socketRollout);
+
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    if (process.env.SOCKET_REQUIRE_AUTH === 'true') { socketRollout.rejectedConnections++; return next(new Error('Authentication required')); }
+    socketRollout.legacyConnections++;
+    socket.legacyClient = true;
+    return next();
+  }
+  try {
+    const claims = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(claims.id);
+    if (!user || !user.isActive || (claims.tokenVersion || 0) !== (user.tokenVersion || 0)) throw new Error('Session expired');
+    if (claims.sid && !await UserSession.exists({ _id: claims.sid, userId: user._id, revokedAt: null, expiresAt: { $gt: new Date() } })) throw new Error('Session expired');
+    socket.authUser = user;
+    socket.authClaims = claims;
+    socketRollout.authenticatedConnections++;
+    return next();
+  } catch { socketRollout.rejectedConnections++; return next(new Error('Authentication failed')); }
+});
 
 io.on('connection', (socket) => {
   logDev('Socket connected');
+  if (socket.authUser) socket.use(async (_packet, next) => {
+    try {
+      const claims = jwt.verify(socket.handshake.auth.token, process.env.JWT_SECRET);
+      const user = await User.findById(claims.id);
+      if (!user?.isActive || user.mustChangePassword || (claims.tokenVersion || 0) !== (user.tokenVersion || 0)) throw new Error('Session expired');
+      if (claims.sid && !await UserSession.exists({ _id: claims.sid, userId: user._id, revokedAt: null, expiresAt: { $gt: new Date() } })) throw new Error('Session expired');
+      socket.authUser = user;
+      next();
+    } catch { socket.emit('auth:error', { message: 'Session expired. Sign in again.' }); socket.disconnect(true); }
+  });
 
   // ─── User identifies + joins rooms ────────────────────────────────────────
-  socket.on('user:join', async ({ userId, role }) => {
-    onlineUsers.set(userId, socket.id);
-    socket.userId = userId;
+  socket.on('user:join', async ({ userId, role } = {}) => {
+    if (!userId) return;
+    if (socket.authUser && String(socket.authUser._id) !== String(userId)) return;
+    if (socket.authUser) role = socket.authUser.role;
+    if (socket.userId && socket.userId !== String(userId)) return;
+    const key = String(userId);
+    const connections = onlineUsers.get(key) || new Set();
+    connections.add(socket.id);
+    onlineUsers.set(key, connections);
+    socket.userId = key;
     socket.role = role;
 
     // Personal room
     socket.join(`user:${userId}`);
+    socket.join(`user_${userId}`);
 
     // Update online status
     try {
@@ -188,7 +231,30 @@ io.on('connection', (socket) => {
   });
 
   // ─── Room management for broadcasts ───────────────────────────────────────
-  socket.on('join:room', ({ room }) => {
+  socket.on('join:room', async ({ room } = {}) => {
+    if (typeof room !== 'string' || room.length > 200) return;
+    if (socket.authUser) {
+      const id = String(socket.authUser._id);
+      const role = socket.authUser.role;
+      let ownRoom = room === `user:${id}` || room === `user_${id}` ||
+        (role === 'teacher' && room === `teacher_${id}`) ||
+        (role === 'admin' && room === 'admin_room');
+      try {
+        if (!ownRoom && role === 'student' && socket.authUser.course && socket.authUser.grade) {
+          const course = await require('./models/Course').findById(socket.authUser.course).select('title');
+          ownRoom = [String(socket.authUser.course), course?.title].filter(Boolean).some((value) => room === `course_${value}_${socket.authUser.grade}`);
+        }
+        if (!ownRoom && /^class_[0-9a-f]{24}$/i.test(room)) {
+          const cls = await require('./models/ClassSchedule').findById(room.slice(6)).select('teacherId studentIds');
+          ownRoom = Boolean(cls && (role === 'admin' || String(cls.teacherId) === id || cls.studentIds?.some((student) => String(student) === id)));
+        }
+        if (!ownRoom && /^doubt:[0-9a-f]{24}$/i.test(room)) {
+          const doubt = await require('./models/Doubt').findById(room.slice(6)).select('studentId assignedTeachers participants');
+          ownRoom = Boolean(doubt && (role === 'admin' || String(doubt.studentId) === id || doubt.assignedTeachers?.some((teacher) => String(teacher) === id) || doubt.participants?.some((participant) => String(participant) === id)));
+        }
+      } catch { return; }
+      if (!ownRoom) return;
+    }
     socket.join(room);
     logDev('Socket joined room');
   });
@@ -199,12 +265,21 @@ io.on('connection', (socket) => {
 
   // ─── Admin monitor room ────────────────────────────────────────────────────
   socket.on('admin:join-monitor', () => {
+    if (socket.authUser && socket.authUser.role !== 'admin') return;
     socket.join('admin_room');
   });
 
   // ─── Chat (text, via socket for real-time) ────────────────────────────────
   socket.on('chat:send', async ({ senderId, receiverId, message }) => {
     try {
+      if (socket.authUser) senderId = String(socket.authUser._id);
+      if (!socket.userId || String(socket.userId) !== String(senderId)) return;
+      if (socket.authUser) {
+        const service = require('./services/chatMessageService');
+        const record = await service.createTextMessage({ sender: socket.authUser, receiverId, message });
+        await service.publishTextMessage({ sender: socket.authUser, record, io });
+        return;
+      }
       const conversationId = [senderId, receiverId].sort().join('_');
 
       // Check permissions if teacher
@@ -243,12 +318,14 @@ io.on('connection', (socket) => {
 
   // ─── Chat: Join room ───────────────────────────────────────────────────────
   socket.on('chat:join', ({ userId1, userId2 }) => {
+    if (socket.authUser && ![userId1, userId2].some((id) => String(id) === String(socket.authUser._id))) return;
     const roomId = [userId1, userId2].sort().join('_');
     socket.join(roomId);
   });
 
   // ─── Chat: Typing indicator ────────────────────────────────────────────────
   socket.on('chat:typing', ({ conversationId, isTyping, targetUserId }) => {
+    if (socket.authUser && (!targetUserId || !conversationId?.split('_').includes(String(socket.authUser._id)) || !conversationId.split('_').includes(String(targetUserId)))) return;
     socket.to(`user:${targetUserId}`).emit('chat:typing', {
       conversationId,
       isTyping,
@@ -259,17 +336,21 @@ io.on('connection', (socket) => {
   // ─── Notification read ─────────────────────────────────────────────────────
   socket.on('notification:read', async ({ notificationId }) => {
     try {
-      await Notification.findByIdAndUpdate(notificationId, { isRead: true, readAt: new Date() });
+      await Notification.findOneAndUpdate({ _id: notificationId, ...(socket.authUser ? { recipient: socket.authUser._id } : {}) }, { isRead: true, readAt: new Date() });
     } catch {}
   });
 
   // ─── Disconnect ────────────────────────────────────────────────────────────
   socket.on('disconnect', async () => {
     if (socket.userId) {
-      onlineUsers.delete(socket.userId);
-      try {
-        await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
-      } catch {}
+      const connections = onlineUsers.get(socket.userId);
+      connections?.delete(socket.id);
+      if (!connections?.size) {
+        onlineUsers.delete(socket.userId);
+        try {
+          await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
+        } catch {}
+      }
     }
     logDev('Socket disconnected');
   });
@@ -277,6 +358,7 @@ io.on('connection', (socket) => {
 
 // ─── Make io available to routes ─────────────────────────────────────────────
 app.set('io', io);
+require('./services/passwordRecoveryService').configureIO(io);
 app.set('onlineUsers', onlineUsers);
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
@@ -317,11 +399,11 @@ const startCronJobs = () => {
 connectDB().then(async () => {
   // Recovery duplicate prevention must exist before accepting public requests.
   await Promise.all([require('./models/ResetRequest').init(), require('./models/RecoveryRateLimit').init()]);
-  require('./services/pushService').startPushDeliveryWorker();
-  server.listen(PORT, () => {
+  if (process.env.BACKGROUND_JOBS_ENABLED !== 'false') require('./services/pushService').startPushDeliveryWorker();
+  server.listen(PORT, process.env.BIND_HOST || undefined, () => {
     infoProd(`🚀 Server running on http://localhost:${PORT}`);
     infoProd(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    startCronJobs();
+    if (process.env.BACKGROUND_JOBS_ENABLED !== 'false') startCronJobs();
   });
 }).catch(error => { errorCrit('[Startup] Recovery indexes unavailable:', error.name); process.exit(1); });
 

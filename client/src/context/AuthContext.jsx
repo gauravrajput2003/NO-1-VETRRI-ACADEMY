@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { disableBrowserPush } from '../services/browserPush';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState('');
   const [token, setToken] = useState(() => localStorage.getItem('token'));
 
   // Set token in axios defaults
@@ -20,6 +22,17 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
+  useEffect(() => {
+    const expired = () => { disableBrowserPush(true).catch(() => {}); setToken(null); setUser(null); setSessionError(''); };
+    const refreshed = (event) => setToken(event.detail);
+    window.addEventListener('auth-session-expired', expired);
+    window.addEventListener('auth-token-refreshed', refreshed);
+    return () => {
+      window.removeEventListener('auth-session-expired', expired);
+      window.removeEventListener('auth-token-refreshed', refreshed);
+    };
+  }, []);
+
   // Fetch current user on mount
   useEffect(() => {
     if (token) {
@@ -30,21 +43,39 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const fetchMe = async () => {
+    setLoading(true);
+    setSessionError('');
     try {
       const { data } = await api.get('/auth/me');
       if (data.success) setUser(data.user);
-    } catch {
-      // Token invalid — clear it
-      setToken(null);
-      setUser(null);
+    } catch (error) {
+      if ([401, 403].includes(error.response?.status)) {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('refreshToken');
+      } else {
+        setSessionError('Unable to reach the academy. Check your connection and retry.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    const synchronize = (event) => {
+      if (event.key !== 'token' && event.key !== null) return;
+      setUser(null); setSessionError(''); setToken(event.newValue);
+      if (event.newValue) fetchMe(); else setLoading(false);
+    };
+    window.addEventListener('storage', synchronize);
+    return () => window.removeEventListener('storage', synchronize);
+  }, []);
+
   const login = async (role, identifier, password) => {
-    const { data } = await api.post(`/auth/login/${role}`, { identifier, password });
+    const { data } = await api.post(role ? `/auth/login/${role}` : '/auth/login', { identifier, password });
     if (data.success) {
+      if (localStorage.getItem('browser-push-user') && localStorage.getItem('browser-push-user') !== data.user._id) await disableBrowserPush(true).catch(() => {});
+      setSessionError('');
       setToken(data.token);
       setUser(data.user);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
@@ -65,12 +96,14 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
+      await disableBrowserPush().catch(() => {});
       await api.post('/auth/logout');
     } catch {
       // Silent fail
     } finally {
       setToken(null);
       setUser(null);
+      setSessionError('');
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       toast.success('Logged out successfully');
@@ -87,6 +120,7 @@ export const AuthProvider = ({ children }) => {
         user,
         token,
         loading,
+        sessionError,
         isAuthenticated: !!user,
         login,
         register,

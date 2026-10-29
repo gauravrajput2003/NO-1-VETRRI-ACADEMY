@@ -4,6 +4,7 @@ import api from '../../services/api';
 import { FiLock, FiFileText, FiVideo, FiEye } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
+import { useNavigate } from 'react-router-dom';
 
 const TYPE_ICONS = { pdf: FiFileText, video: FiVideo, ppt: FiFileText, image: FiFileText };
 const TYPE_COLORS = { pdf: 'text-red-400', video: 'text-purple-400', ppt: 'text-orange-400', image: 'text-blue-400' };
@@ -13,6 +14,7 @@ export default function StudyMaterials() {
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState(null);
   const { socket } = useSocket();
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.get('/student/materials').then(r => {
@@ -41,6 +43,10 @@ export default function StudyMaterials() {
   const viewMaterial = async (material) => {
     if (material.isLocked) {
       toast.error('This material is locked. Ask your teacher to unlock it.');
+      return;
+    }
+    if (material.type === 'pdf') {
+      navigate(`/student/materials/pdf/${material._id}`);
       return;
     }
     try {

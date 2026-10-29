@@ -678,6 +678,7 @@ const getClassAttendance = async (req, res) => {
     const classId = req.params.id;
     const cls = await ClassSchedule.findById(classId);
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
+    if (req.user.role === 'student') return res.status(403).json({ success: false, message: 'Use your own attendance report.' });
 
     // Only teacher of the class or admin
     if (req.user.role === 'teacher' && cls.teacherId.toString() !== req.user._id.toString()) {
@@ -704,13 +705,22 @@ const updateSchedule = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You can only update your own classes.' });
     }
 
-    const updates = { ...req.body };
-    if (req.user.role === 'teacher') {
-      delete updates.teacherId;
-      delete updates.teacher;
+    const updates = {};
+    for (const field of ['title', 'course', 'board', 'subject', 'grade', 'scheduledDate', 'scheduledTime', 'durationMinutes', 'repeatType', 'dayOfWeek', 'academicYear', 'batch', 'googleMeetLink', 'zoomMeetingLink', 'notes']) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
+    if (req.user.role === 'admin' && (req.body.teacherId || req.body.teacher)) updates.teacherId = req.body.teacherId || req.body.teacher;
+    const studentIds = req.body.studentIds || req.body.students;
+    if (studentIds !== undefined) {
+      if (!Array.isArray(studentIds) || new Set(studentIds.map(String)).size !== studentIds.length) return res.status(400).json({ success: false, message: 'Choose a valid student list.' });
+      const teacherId = updates.teacherId || existing.teacherId;
+      const count = await User.countDocuments({ _id: { $in: studentIds }, role: 'student', assignedTeachers: teacherId });
+      if (count !== studentIds.length) return res.status(403).json({ success: false, message: 'Only assigned students may join this class.' });
+      updates.studentIds = studentIds;
+    }
+    if (updates.scheduledTime && !/^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(updates.scheduledTime)) return res.status(400).json({ success: false, message: 'Choose a valid class time.' });
 
-    const schedule = await ClassSchedule.findByIdAndUpdate(req.params.id, updates, { new: true });
+    const schedule = await ClassSchedule.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
     if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found.' });
     await notifyStudentsClassScheduled({ req, schedule, action: 'updated' });
     res.json({ success: true, schedule });
@@ -832,6 +842,9 @@ const generateYearSchedule = async (req, res) => {
 const manualAttendance = async (req, res) => {
   try {
     const { classId, studentId, status, reason } = req.body;
+    const cls = await ClassSchedule.findById(classId);
+    if (!cls || !cls.studentIds.some((id) => String(id) === String(studentId))) return res.status(400).json({ success: false, message: 'Select a student assigned to this class.' });
+    if (!['present', 'late', 'absent'].includes(status) || !String(reason || '').trim()) return res.status(400).json({ success: false, message: 'Attendance status and correction reason are required.' });
     const record = await ClassAttendance.findOneAndUpdate(
       { classId, studentId },
       { status, isManualEntry: true, markedBy: req.user._id, manualReason: reason },
@@ -882,6 +895,8 @@ const getClassDetails = async (req, res) => {
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found.' });
 
     const obj = cls.toObject();
+    if (req.user.role === 'student' && !cls.studentIds.some((id) => String(id._id || id) === String(req.user._id))) return res.status(403).json({ success: false, message: 'Class access denied.' });
+    if (req.user.role === 'teacher' && String(cls.teacherId._id || cls.teacherId) !== String(req.user._id)) return res.status(403).json({ success: false, message: 'Class access denied.' });
     // SECURITY: Remove meetLink for students (they must call /join)
     if (req.user.role === 'student') {
       delete obj.meetLink;

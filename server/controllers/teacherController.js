@@ -787,10 +787,13 @@ const getMonthlyGrading = async (req, res) => {
 // @access  Teacher
 const applyLeave = async (req, res) => {
   try {
-    const { leaveType, fromDate, toDate, reason } = req.body;
+    const { leaveType, fromDate, toDate, reason, compensationClassDate } = req.body;
+    if (!Number.isFinite(+new Date(fromDate)) || !Number.isFinite(+new Date(toDate)) || new Date(toDate) < new Date(fromDate)) return res.status(400).json({ success: false, message: 'Choose valid leave dates in order.' });
+    if (compensationClassDate && (!Number.isFinite(+new Date(compensationClassDate)) || new Date(compensationClassDate) < new Date(toDate))) return res.status(400).json({ success: false, message: 'Compensation must be on or after the leave end date.' });
     const leave = await LeaveApplication.create({
       applicant: req.user._id,
       applicantRole: 'teacher',
+      ...(compensationClassDate ? { compensationClassDate: new Date(compensationClassDate), compensationStatus: 'pending' } : {}),
       leaveType,
       fromDate: new Date(fromDate),
       toDate: new Date(toDate),

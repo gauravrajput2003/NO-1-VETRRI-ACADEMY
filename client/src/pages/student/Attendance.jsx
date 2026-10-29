@@ -85,12 +85,12 @@ export default function StudentAttendance() {
     try {
       const params = {};
       if (subjectFilter) params.subject = subjectFilter;
-      if (monthFilter) params.month = parseInt(monthFilter) + 1;
-      const { data } = await api.get('/attendance/my-class', { params });
+      if (monthFilter) { params.month = parseInt(monthFilter) + 1; params.year = year; }
+      const { data } = await api.get(`/attendance/student/${user._id}/class`, { params });
       if (data.success) {
-        setClassAttendance(data.attendance || []);
-        setOverallPct(data.overallPercent || 0);
-        setSubjectBreakdown(data.subjectBreakdown || []);
+        setClassAttendance((data.records || []).map((record) => ({ ...record, duration: record.durationPresent })));
+        setOverallPct(data.summary?.attendancePercent || 0);
+        setSubjectBreakdown([]);
       }
     } catch { toast.error('Failed to load class attendance'); }
     finally { setLoading(false); }

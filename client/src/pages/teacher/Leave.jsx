@@ -30,6 +30,7 @@ export default function Leave() {
             <div><label className="input-label">Type</label><select {...register('leaveType')} className="input-field">{['sick','personal','emergency','other'].map(t=><option key={t}>{t}</option>)}</select></div>
             <div><label className="input-label">From</label><input {...register('fromDate',{required:true})} type="date" className="input-field" /></div>
             <div><label className="input-label">To</label><input {...register('toDate',{required:true})} type="date" className="input-field" /></div>
+            <div><label className="input-label">Compensation class date (optional)</label><input {...register('compensationClassDate')} type="date" className="input-field" /></div>
           </div>
           <div><label className="input-label">Reason *</label><textarea {...register('reason',{required:true})} rows={3} className="input-field resize-none" /></div>
           <button type="submit" disabled={isSubmitting} className="btn-primary py-2.5 px-6 flex items-center gap-2"><FiClock size={16} /> Submit</button>
@@ -39,9 +40,9 @@ export default function Leave() {
         <div className="p-4 border-b border-white/10"><h3 className="text-white font-semibold">My Applications</h3></div>
         <div className="overflow-x-auto">
           <table className="data-table">
-            <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
+            <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Compensation</th></tr></thead>
             <tbody>
-              {leaves.map(l=><tr key={l._id}><td className="capitalize text-white/70">{l.leaveType}</td><td className="text-white/60">{new Date(l.fromDate).toLocaleDateString('en-IN')}</td><td className="text-white/60">{new Date(l.toDate).toLocaleDateString('en-IN')}</td><td className="text-white/60">{l.totalDays}</td><td><span className={`badge ${l.status==='approved'?'badge-green':l.status==='rejected'?'badge-red':'badge-gold'}`}>{l.status}</span></td></tr>)}
+              {leaves.map(l=><tr key={l._id}><td className="capitalize text-white/70">{l.leaveType}</td><td className="text-white/60">{new Date(l.fromDate).toLocaleDateString('en-IN')}</td><td className="text-white/60">{new Date(l.toDate).toLocaleDateString('en-IN')}</td><td className="text-white/60">{l.totalDays}</td><td><span className={`badge ${l.status==='approved'?'badge-green':l.status==='rejected'?'badge-red':'badge-gold'}`}>{l.status}</span></td><td className="text-white/60 text-sm">{l.compensationClassDate ? new Date(l.compensationClassDate).toLocaleDateString('en-IN') : '—'} · {l.compensationStatus || ''}{l.status === 'approved' && l.compensationStatus === 'pending' && <button className="block text-gold" onClick={async () => { try { await api.patch('/teacher/leaves/' + l._id + '/compensation/status', { status: 'completed_by_teacher' }); fetch(); } catch (e) { toast.error(e.response?.data?.message || 'Unable to update compensation'); } }}>Mark class completed</button>}</td></tr>)}
               {!leaves.length && <tr><td colSpan={5} className="text-center py-8 text-white/30">No applications</td></tr>}
             </tbody>
           </table>

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import api from './api';
 import {
   getS3UploadUrl,
   getCloudinaryUploadParams,
@@ -138,7 +139,26 @@ export const uploadToCloudinaryDirect = async (file, folder = 'materials/study-m
  * @param {function} onProgress - Progress tracking callback
  * @returns {Promise<object>} The saved DB document response
  */
+const uploadReceipts = new WeakMap();
 export const performDirectUploadFlow = async (file, payload, storageType = 'cloudinary', onProgress) => {
+  if (storageType === 'cloudinary') {
+    let receipt = uploadReceipts.get(file);
+    if (!receipt) {
+      const uploadId = crypto.randomUUID();
+      const { data } = await api.post('/storage/direct-upload/params', { uploadId, filename: file.name, mimetype: file.type || 'application/octet-stream', size: file.size, purpose: 'material' });
+      receipt = { params: data, uploaded: false }; uploadReceipts.set(file, receipt);
+    }
+    if (!receipt.uploaded) {
+      const params = receipt.params;
+      const body = new FormData(); body.append('file', file);
+      for (const [key, value] of Object.entries({ api_key: params.apiKey, timestamp: params.timestamp, signature: params.signature, folder: params.folder, public_id: params.publicId, overwrite: false })) body.append(key, String(value));
+      await axios.post(`https://api.cloudinary.com/v1_1/${params.cloudName}/${params.resourceType}/upload`, body, { timeout: 300000, onUploadProgress: (event) => onProgress?.(Math.round(event.loaded * 100 / Math.max(file.size, event.total || 0))) });
+      receipt.uploaded = true;
+    }
+    const { data } = await api.post('/storage/direct-upload/confirm', { ...payload, uploadToken: receipt.params.uploadToken });
+    if (!data.success) throw new Error(data.message || 'Unable to save uploaded material');
+    return data.material;
+  }
   let uploadResult;
 
   if (storageType === 's3') {

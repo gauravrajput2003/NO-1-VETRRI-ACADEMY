@@ -95,6 +95,7 @@ const uploadTrainingVideoByUrl = async (req, res) => {
       cloudinaryUrl: '',
       cloudinaryPublicId: '',
       videoUrl,
+      targetAudience: targetAudience || 'both',
       thumbnailUrl: thumbnailUrl || '',
       duration: parseInt(duration) || 0,
       isMandatory: isMandatory === 'true' || isMandatory === true,
@@ -153,8 +154,8 @@ const editTrainingVideo = async (req, res) => {
   try {
     const { title, description, category, isMandatory, order, videoUrl, thumbnailUrl, duration, isActive,targetAudience  } = req.body;
     const video = await TrainingVideo.findById(req.params.id);
-        if (targetAudience !== undefined) video.targetAudience = targetAudience;
     if (!video) return res.status(404).json({ success: false, message: 'Video not found.' });
+    if (targetAudience !== undefined) video.targetAudience = targetAudience;
 
     if (title !== undefined) video.title = title;
     if (description !== undefined) video.description = description;
@@ -309,7 +310,7 @@ const updateWatchProgress = async (req, res) => {
 // ─── TEACHER: Get Incomplete Mandatory Count ───────────────────────────────────
 const getIncompleteMandatoryCount = async (req, res) => {
   try {
-    const mandatoryVideos = await TrainingVideo.find({ isMandatory: true, isActive: true });
+    const mandatoryVideos = await TrainingVideo.find({ isMandatory: true, isActive: true, targetAudience: { $in: [req.user.role, 'both'] } });
     const mandatoryIds = mandatoryVideos.map((v) => v._id);
 
     const completed = await TrainingVideoProgress.countDocuments({

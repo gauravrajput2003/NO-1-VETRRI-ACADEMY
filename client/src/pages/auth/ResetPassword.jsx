@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const [identifier, setIdentifier] = useState(searchParams.get('identifier') || '');
+  const [tempPassword, setTempPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -18,17 +18,17 @@ export default function ResetPassword() {
       toast.error('Passwords do not match.');
       return;
     }
-    if (!STRONG_PASSWORD_REGEX.test(password)) {
-      toast.error('Use 8+ chars with uppercase, number and special char.');
+    if (password.length < 6 || password === tempPassword.trim()) {
+      toast.error('Use a different password of at least 6 characters.');
       return;
     }
 
     try {
       setSubmitting(true);
-      const { data } = await api.post(`/auth/password/reset/${token}`, { password });
+      const { data } = await api.post('/auth/password-reset/complete', { identifier: identifier.trim(), tempPassword: tempPassword.trim(), newPassword: password, confirmPassword });
       if (data.success) {
         toast.success('Password reset successful.');
-        navigate('/login', { replace: true });
+        navigate('/login/student', { replace: true });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Reset failed.');
@@ -40,11 +40,13 @@ export default function ResetPassword() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <Link to="/login" style={styles.back}>Back to Login</Link>
+        <Link to="/login/student" style={styles.back}>Back to Login</Link>
         <h1 style={styles.title}>Reset Password</h1>
-        <p style={styles.sub}>Enter your new password below.</p>
+        <p style={styles.sub}>Enter the temporary password received from the academy admin, then choose a new password.</p>
 
         <form onSubmit={onSubmit} style={styles.form}>
+          <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Registered phone or email" style={styles.input} required />
+          <input type="password" autoComplete="off" value={tempPassword} onChange={(e) => setTempPassword(e.target.value)} placeholder="Temporary password" style={styles.input} required />
           <input
             type="password"
             value={password}

@@ -41,7 +41,7 @@ function getStrength(pw) {
 }
 
 export default function TeacherProfile() {
-  const { user, setUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const [profilePic, setProfilePic] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -115,10 +115,11 @@ export default function TeacherProfile() {
         ...vals,
         subjects: vals.subjects ? vals.subjects.split(',').map((s) => s.trim()).filter(Boolean) : [],
       };
+      delete payload.name; delete payload.email; delete payload.mobile;
       const { data } = await updateProfile(payload);
       if (data.success) {
         toast.success('Profile saved!');
-        if (setUser) setUser((u) => ({ ...u, name: vals.name }));
+        updateUser(data.profile || {});
       }
     } catch {
       toast.error('Failed to save profile');
@@ -132,7 +133,7 @@ export default function TeacherProfile() {
     try {
       const { data } = await changePassword({ currentPassword: vals.currentPassword, newPassword: vals.newPassword });
       if (data.success) {
-        toast.success('Password updated!');
+        toast.success('Password updated. Sign in again.'); await logout();
         resetPw();
         setNewPw('');
       }
@@ -184,16 +185,16 @@ export default function TeacherProfile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="input-label">Display Name *</label>
-              <input {...register('name')} className="input-field" placeholder="Your name" />
+              <input {...register('name')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" className="input-field" placeholder="Your name" />
               {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>}
             </div>
             <div>
               <label className="input-label">Mobile</label>
-              <input {...register('mobile')} className="input-field" placeholder="+91 XXXXXXXXXX" />
+              <input {...register('mobile')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" className="input-field" placeholder="+91 XXXXXXXXXX" />
             </div>
             <div>
               <label className="input-label">Email</label>
-              <input {...register('email')} type="email" className="input-field" placeholder="you@email.com" />
+              <input {...register('email')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" type="email" className="input-field" placeholder="you@email.com" />
               {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
             </div>
             <div>

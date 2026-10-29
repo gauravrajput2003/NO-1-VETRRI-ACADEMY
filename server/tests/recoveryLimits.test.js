@@ -12,7 +12,7 @@ test('Mongo-backed recovery limits count both normalized identifier and IP indep
       'node:crypto': require('node:crypto'), '../utils/loginLookup': { buildLoginLookup },
       '../utils/passwordRecovery': { RESET_REQUESTS_PER_HOUR: 3 },
       '../models/RecoveryRateLimit': { findOneAndUpdate: async ({ _id }) => {
-        const attempts = (counters.get(_id) || 0) + 1; counters.set(_id, attempts); return { attempts };
+        const attempts = (counters.get(_id) || 0) + 1; counters.set(_id, attempts); return { allowed: attempts <= 3 };
       } },
     }[key]),
   });

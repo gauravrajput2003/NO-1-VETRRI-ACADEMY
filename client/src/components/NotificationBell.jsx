@@ -4,6 +4,10 @@ import { FiBell, FiCheck } from 'react-icons/fi';
 import { useSocket } from '../context/SocketContext';
 import { getNotifications, getNotificationUnreadCount, markAllNotificationsRead, markNotificationRead } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import BrowserPushControl from './BrowserPushControl';
+
+import { notificationDestination as destination } from '../utils/notificationDestination';
 
 const typeIcons = {
   class_starting: '🔔',
@@ -24,6 +28,7 @@ export default function NotificationBell() {
   const { socket } = useSocket();
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchNotifications();
@@ -34,11 +39,18 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!socket) return;
     const handler = (notif) => {
-      setNotifications((prev) => [notif, ...prev].slice(0, 20));
-      setUnreadCount((c) => c + 1);
+      fetchNotifications();
+      fetchUnreadCount();
     };
+    const refresh = () => { fetchNotifications(); fetchUnreadCount(); };
     socket.on('notification:new', handler);
-    return () => socket.off('notification:new', handler);
+    socket.on('connect', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      socket.off('notification:new', handler);
+      socket.off('connect', refresh);
+      window.removeEventListener('focus', refresh);
+    };
   }, [socket]);
 
   // Close on outside click
@@ -74,7 +86,7 @@ export default function NotificationBell() {
       setUnreadCount((c) => Math.max(0, c - 1));
       setNotifications((prev) => prev.map((n) => n._id === notif._id ? { ...n, isRead: true } : n));
     }
-    if (notif.link) navigate(notif.link);
+    if (notif.link) navigate(destination(notif.link, user?.role || 'student'));
     setOpen(false);
   };
 
@@ -131,6 +143,7 @@ export default function NotificationBell() {
             </div>
 
             {/* List */}
+            <BrowserPushControl />
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center text-white/40 text-sm">

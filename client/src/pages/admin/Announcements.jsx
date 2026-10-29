@@ -6,6 +6,7 @@ import {
   getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../../services/api';
 import { uploadToCloudinaryDirect } from '../../services/directUpload';
+import MediaRecorderInput from '../../components/MediaRecorderInput';
 
 const GRADES = ['4th','5th','6th','7th','8th','9th','10th','11th','12th'];
 const COURSES = ['CBSE', 'Matric', 'Engineering', 'Arts', 'Language', 'Competitive'];
@@ -218,6 +219,7 @@ export default function AdminAnnouncements() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display font-bold text-2xl text-white">Announcements</h1>
+        <div className="flex gap-4 mt-3"><MediaRecorderInput onFile={(file) => setMediaFiles((files) => [...files, file])} /><MediaRecorderInput video onFile={(file) => setMediaFiles((files) => [...files, file])} /></div>
         <p className="text-white/40 text-sm mt-1">Post and manage announcements with images, videos, and audio for students and teachers</p>
       </div>
 

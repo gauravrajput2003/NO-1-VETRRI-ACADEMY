@@ -179,7 +179,7 @@ export default function TeacherDashboardHome() {
                   </div>
                   <div className="text-right">
                     <p className="text-gold text-sm font-semibold">{formatTime(cls.scheduledTime)}</p>
-                    <p className="text-white/30 text-xs">{cls.enrolledStudents?.length || 0} students</p>
+                    <p className="text-white/30 text-xs">{(cls.studentIds || cls.enrolledStudents || []).length} students</p>
                   </div>
                 </div>
               ))}
@@ -249,7 +249,7 @@ export default function TeacherDashboardHome() {
                     <tr key={sc._id}>
                       <td className="text-white/80">{sc.student?.displayName || sc.student?.name || '—'}</td>
                       <td className="text-white/60">{sc.subject}</td>
-                      <td><span className="badge badge-gold">{sc.marksObtained}/{sc.totalMarks}</span></td>
+                      <td><span className="badge badge-gold">{sc.marksObtained}/{sc.maxMarks ?? sc.totalMarks}</span></td>
                       <td className="text-white/40 text-xs">{formatDate(sc.examDate || sc.createdAt)}</td>
                     </tr>
                   ))}

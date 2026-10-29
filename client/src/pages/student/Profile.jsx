@@ -38,7 +38,7 @@ function getStrength(pw) {
 }
 
 export default function StudentProfile() {
-  const { user, setUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const [profilePic, setProfilePic] = useState('');
   const [profileData, setProfileData] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -97,10 +97,10 @@ export default function StudentProfile() {
   const onSave = async (vals) => {
     setSaving(true);
     try {
-      const { data } = await updateProfile(vals);
+      const { data } = await updateProfile(user.role === 'admin' ? vals : { bio: vals.bio });
       if (data.success) {
         toast.success('Profile saved!');
-        if (setUser) setUser((u) => ({ ...u, name: vals.name }));
+        updateUser(data.profile || {});
       }
     } catch { toast.error('Failed to save'); }
     finally { setSaving(false); }
@@ -110,7 +110,7 @@ export default function StudentProfile() {
     setPwLoading(true);
     try {
       const { data } = await changePassword({ currentPassword: vals.currentPassword, newPassword: vals.newPassword });
-      if (data.success) { toast.success('Password updated!'); resetPw(); setNewPw(''); }
+      if (data.success) { toast.success('Password updated. Sign in again.'); await logout(); resetPw(); setNewPw(''); }
     } catch (err) { toast.error(err?.response?.data?.message || 'Failed to update password'); }
     finally { setPwLoading(false); }
   };
@@ -168,16 +168,16 @@ export default function StudentProfile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="input-label">Display Name *</label>
-              <input {...register('name')} className="input-field" placeholder="Your name" />
+              <input {...register('name')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" className="input-field" placeholder="Your name" />
               {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>}
             </div>
             <div>
               <label className="input-label">Mobile</label>
-              <input {...register('mobile')} className="input-field" placeholder="+91 XXXXXXXXXX" />
+              <input {...register('mobile')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" className="input-field" placeholder="+91 XXXXXXXXXX" />
             </div>
             <div className="sm:col-span-2">
               <label className="input-label">Email</label>
-              <input {...register('email')} type="email" className="input-field" placeholder="you@email.com" />
+              <input {...register('email')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" type="email" className="input-field" placeholder="you@email.com" />
               {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
             </div>
           </div>

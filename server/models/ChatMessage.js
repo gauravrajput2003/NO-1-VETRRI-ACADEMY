@@ -10,6 +10,9 @@ const chatMessageSchema = new mongoose.Schema(
     message: { type: String, trim: true },
     recoveryRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'ResetRequest' },
     recoveryCiphertext: { type: String, select: false },
+    credentialType: { type: String, enum: ['password_recovery'] },
+    expiresAt: Date,
+    recoveryStatus: { type: String, enum: ['sent', 'used', 'expired', 'locked', 'rejected', 'revoked'] },
     messageType: {
       type: String,
       enum: ['text', 'file', 'image', 'video', 'audio', 'system'],

@@ -103,6 +103,8 @@ const getConversations = async (req, res) => {
 
 // ─── Get Messages ─────────────────────────────────────────────────────────────
 const getMessages = async (req, res) => {
+  // All message reads are private: this endpoint may decrypt a recovery credential.
+  res.set('Cache-Control', 'no-store');
   try {
     const { conversationId } = req.params;
     const { page = 1, limit = 30 } = req.query;
@@ -323,6 +325,8 @@ const deleteMessage = async (req, res) => {
 
     msg.isDeleted = true;
     await msg.save();
+    const io = req.app.get('io');
+    for (const id of [msg.senderId, msg.receiverId]) io?.to(`user:${id}`).emit('chat:deleted', { conversationId: msg.conversationId, messageId: msg._id });
 
     res.json({ success: true });
   } catch (error) {

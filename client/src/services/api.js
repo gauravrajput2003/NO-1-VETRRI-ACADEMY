@@ -9,6 +9,8 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+let refreshPromise = null;
+
 // ─── Request: attach token ────────────────────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
@@ -29,18 +31,29 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-          if (data.success) {
-            localStorage.setItem('token', data.token);
-            api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-            originalRequest.headers['Authorization'] = `Bearer ${data.token}`;
-            return api(originalRequest);
+          if (!refreshPromise) refreshPromise = axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 30000 })
+            .then(({ data }) => {
+              if (!data.success || !data.token) throw new Error('Refresh failed');
+              localStorage.setItem('token', data.token);
+              api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+              window.dispatchEvent(new CustomEvent('auth-token-refreshed', { detail: data.token }));
+              return data.token;
+            }).finally(() => { refreshPromise = null; });
+          const nextToken = await refreshPromise;
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers['Authorization'] = `Bearer ${nextToken}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          if (refreshError.response?.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            window.dispatchEvent(new Event('auth-session-expired'));
           }
-        } catch {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/login/student';
+          return Promise.reject(refreshError);
         }
+      } else {
+        localStorage.removeItem('token');
+        window.dispatchEvent(new Event('auth-session-expired'));
       }
     }
     return Promise.reject(error);
@@ -61,7 +74,10 @@ export const changePassword = (data) => api.patch('/profile/password', data);
 
 // ─── Classes ──────────────────────────────────────────────────────────────────
 export const createSchedule = (data) => api.post('/classes/schedule', data);
-export const getSchedules = (params) => api.get('/classes/schedule', { params });
+export const getSchedules = (params) => api.get('/classes/schedule', { params }).then((response) => {
+  response.data.classes = response.data.schedules || response.data.classes || [];
+  return response;
+});
 export const getTodayClasses = () => api.get('/classes/today');
 export const getUpcomingClasses = () => api.get('/classes/upcoming');
 export const getCalendarData = (params) => api.get('/classes/calendar', { params });
@@ -79,7 +95,7 @@ export const manualAttendance = (data) => api.post('/classes/attendance/manual',
 export const getUploadSignature = (data) => api.post('/classes/upload/sign', data);
 
 // ─── Training Videos ─────────────────────────────────────────────────────────
-export const uploadTrainingVideo = (formData) => api.post('/training-videos', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const uploadTrainingVideo = (formData, options = {}) => api.post('/training-videos', formData, { ...options, timeout: 300000, headers: { 'Content-Type': 'multipart/form-data' } });
 export const getTrainingVideos = () => api.get('/training-videos');
 export const markVideoComplete = (id, data) => api.patch(`/training-videos/${id}/complete`, data);
 export const updateVideoProgress = (id, data) => api.patch(`/training-videos/${id}/progress`, data);
@@ -98,9 +114,21 @@ export const deleteMessage = (id) => api.delete(`/chat/message/${id}`);
 export const getChatLogs = (params) => api.get('/chat/logs', { params });
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
-export const getMyLoginLogs = (params) => api.get('/attendance/login/my-logs', { params });
-export const getAllLoginLogs = (params) => api.get('/attendance/login/all', { params });
-export const getTodayLogins = () => api.get('/attendance/login/today');
+const normalizeLoginResponse = (response) => {
+  const data=response.data;
+  data.logs=(data.logs || []).map((record)=>({...record,user:record.userId,role:record.userRole,duration:record.sessionDuration,device:record.deviceType}));
+  if(data.summary)data.stats={daysPresent:data.summary.loginDays,avgDuration:data.summary.avgSessionMinutes,currentStreak:data.summary.currentStreak};
+  return response;
+};
+const loginRange = (params={}) => {
+  if(!params.month || !params.year)return params;
+  const end=new Date(params.year,params.month,0).getDate();
+  const prefix=String(params.year)+'-'+String(params.month).padStart(2,'0');
+  return {...params,from:prefix+'-01',to:prefix+'-'+end};
+};
+export const getMyLoginLogs = (params) => api.get('/attendance/login/my-logs', { params }).then(normalizeLoginResponse);
+export const getAllLoginLogs = (params) => api.get('/attendance/login/all', { params: loginRange(params) }).then(normalizeLoginResponse);
+export const getTodayLogins = () => api.get('/attendance/login/today').then(normalizeLoginResponse);
 export const getLoginStreak = (userId) => api.get(`/attendance/login/streak/${userId}`);
 export const getStudentClassAttendanceData = (userId, params) => api.get(`/attendance/student/${userId}/class`, { params });
 

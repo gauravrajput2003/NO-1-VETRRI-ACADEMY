@@ -6,7 +6,7 @@ import { SOCKET_ORIGIN } from '../config/apiOrigin';
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
@@ -17,6 +17,7 @@ export const SocketProvider = ({ children }) => {
       const s = io(SOCKET_ORIGIN, {
         withCredentials: true,
         transports: ['websocket', 'polling'],
+        auth: (callback) => callback({ token: localStorage.getItem('token') }),
       });
 
       socketRef.current = s;
@@ -52,7 +53,7 @@ export const SocketProvider = ({ children }) => {
         setSocket(null);
       };
     }
-  }, [user?._id]);
+  }, [user?._id, token]);
 
   return (
     <SocketContext.Provider value={{ socket, onlineUsers }}>

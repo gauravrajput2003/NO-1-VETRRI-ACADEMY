@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-24T16:25:52.133Z",
+  "results": [
+    {
+      "path": "/",
+      "status": 200,
+      "finalUrl": "https://www.no1vettriacademy.in/",
+      "server": "Vercel"
+    },
+    {
+      "path": "/login/student",
+      "status": 404,
+      "finalUrl": "https://www.no1vettriacademy.in/login/student",
+      "server": "Vercel"
+    },
+    {
+      "path": "/student/dashboard",
+      "status": 404,
+      "finalUrl": "https://www.no1vettriacademy.in/student/dashboard",
+      "server": "Vercel"
+    }
+  ]
+}

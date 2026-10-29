@@ -22,7 +22,7 @@ export default function Sidebar({ links, role }) {
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         {!collapsed && (
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.jpg" alt="Logo" className="h-9 w-9 object-contain" />
+            <img src="/icons/icon-192.png" alt="Logo" className="h-9 w-9 object-contain" />
             <div className="min-w-0">
               <p className="font-display font-bold text-white text-xs leading-tight truncate">No.1 Vettri</p>
               <p className="text-gold text-[10px]">Academy</p>

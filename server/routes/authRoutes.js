@@ -30,6 +30,7 @@ router.post('/login/:role', authLimiter, login);
 
 // POST /api/auth/logout
 router.post('/logout', verifyToken, logout);
+router.post('/logout-all', verifyToken, require('../controllers/authController').logoutAll);
 
 // GET /api/auth/me
 router.get('/me', verifyToken, getMe);

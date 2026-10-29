@@ -32,7 +32,7 @@ export default function TrainingVideos() {
   const [markingDone, setMarkingDone] = useState(false);
   const [showMarkBtn, setShowMarkBtn] = useState(false);
   const videoRef = useRef(null);
-  const progressSaveTimer = useRef(null);
+  const lastProgressSave = useRef({});
 
   useEffect(() => {
     fetchAll();
@@ -54,7 +54,9 @@ export default function TrainingVideos() {
         vids.forEach((v) => {
           map[v._id] = {
             percent: v.progress?.percentWatched || 0,
-            completed: v.progress?.completed || false,
+            completed: v.progress?.isCompleted || false,
+            position: v.progress?.lastWatchPosition || 0,
+            watched: v.progress?.watchDuration || 0,
           };
         });
         setProgress(map);
@@ -69,29 +71,25 @@ export default function TrainingVideos() {
     }
   };
 
-  const handleTimeUpdate = useCallback(() => {
+  const handleTimeUpdate = useCallback(async (force = false) => {
     const video = videoRef.current;
-    if (!video || !selected) return;
-    const pct = (video.currentTime / video.duration) * 100;
+    if (!video || !selected || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    const position = video.currentTime;
+    const watched = Math.max(position, progress[selected._id]?.watched || 0);
+    const pct = Math.min(100, (watched / video.duration) * 100);
     setShowMarkBtn(pct >= 90 && !progress[selected._id]?.completed);
-
-    // Debounce progress save
-    clearTimeout(progressSaveTimer.current);
-    progressSaveTimer.current = setTimeout(async () => {
-      if (pct > (progress[selected._id]?.percent || 0)) {
-        try {
-          await updateVideoProgress(selected._id, {
-            currentTime: video.currentTime,
-            duration: video.duration,
-            percentWatched: Math.floor(pct),
-          });
-          setProgress((p) => ({
-            ...p,
-            [selected._id]: { ...p[selected._id], percent: Math.floor(pct) },
-          }));
-        } catch {}
-      }
-    }, 3000);
+    if (!force && Date.now() - (lastProgressSave.current[selected._id] || 0) < 5000) return;
+    lastProgressSave.current[selected._id] = Date.now();
+    const id = selected._id;
+    try {
+      const { data } = await updateVideoProgress(id, { watchDuration: watched, currentPosition: position });
+      setProgress((previous) => ({ ...previous, [id]: {
+        ...previous[id], percent: Math.floor(pct), watched, position,
+        completed: previous[id]?.completed || Boolean(data.isCompleted),
+      } }));
+      const pending = await getIncompleteMandatoryCount();
+      if (pending.data.success) setMandatoryPending(pending.data.count || 0);
+    } catch { /* Retry at the next playback checkpoint. */ }
   }, [selected, progress]);
 
   const handleMarkComplete = async () => {
@@ -99,9 +97,7 @@ export default function TrainingVideos() {
     setMarkingDone(true);
     try {
       await markVideoComplete(selected._id, {
-        currentTime: videoRef.current?.currentTime,
-        duration: videoRef.current?.duration,
-        percentWatched: 100,
+        watchDuration: videoRef.current?.currentTime || selected.duration,
       });
       setProgress((p) => ({
         ...p,
@@ -110,7 +106,7 @@ export default function TrainingVideos() {
       setVideos((vs) =>
         vs.map((v) =>
           v._id === selected._id
-            ? { ...v, progress: { completed: true, percentWatched: 100 } }
+            ? { ...v, progress: { isCompleted: true, percentWatched: 100 } }
             : v
         )
       );
@@ -265,9 +261,15 @@ export default function TrainingVideos() {
                 <video
                   ref={videoRef}
                   key={selected._id}
-                  src={selected.cloudinaryUrl}
+                  src={selected.playableUrl || selected.videoUrl || selected.cloudinaryUrl}
                   controls
-                  onTimeUpdate={handleTimeUpdate}
+                  onTimeUpdate={() => handleTimeUpdate()}
+                  onPause={() => handleTimeUpdate(true)}
+                  onEnded={() => handleTimeUpdate(true)}
+                  onLoadedMetadata={() => {
+                    const position = progress[selected._id]?.position || 0;
+                    if (videoRef.current && position < videoRef.current.duration) videoRef.current.currentTime = position;
+                  }}
                   className="w-full rounded-xl max-h-[420px]"
                   playsInline
                 />
@@ -277,7 +279,7 @@ export default function TrainingVideos() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <h2 className="text-white text-xl font-semibold">{selected.title}</h2>
-                    <a href={selected.cloudinaryUrl} download target="_blank" rel="noopener noreferrer" className="inline-block mt-1 text-sm text-gold hover:text-yellow-400 hover:underline">
+                    <a href={selected.playableUrl || selected.videoUrl || selected.cloudinaryUrl} download target="_blank" rel="noopener noreferrer" className="inline-block mt-1 text-sm text-gold hover:text-yellow-400 hover:underline">
                       Download Video ↓
                     </a>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -325,7 +327,7 @@ export default function TrainingVideos() {
 
                 <div className="flex items-center gap-4 pt-2 border-t border-white/10 text-xs text-white/40">
                   <span>Duration: {formatDuration(selected.duration)}</span>
-                  <span>Order: #{selected.orderNumber || '—'}</span>
+                  <span>Order: #{selected.order ?? '—'}</span>
                   <span>Progress: {progress[selected._id]?.percent || 0}%</span>
                 </div>
               </div>

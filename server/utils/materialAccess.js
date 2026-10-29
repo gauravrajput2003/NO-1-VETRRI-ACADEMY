@@ -1,7 +1,7 @@
 const isMaterialLockedForStudent = (material, studentId) => {
   return (
-    material.lockedFor.includes(studentId) ||
-    (material.lockedForAll && !material.unlockedFor.includes(studentId))
+    (material.lockedFor || []).some((id) => String(id) === String(studentId)) ||
+    (material.lockedForAll && !(material.unlockedFor || []).some((id) => String(id) === String(studentId)))
   );
 };
 

@@ -108,7 +108,7 @@ function CalendarView({ classes }) {
                 <div key={cls._id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
                   <div>
                     <p className="text-white text-sm font-medium">{cls.subject}</p>
-                    <p className="text-white/40 text-xs">{cls.teacher?.displayName || '—'} · {new Date(cls.scheduledTime || cls.scheduledDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-white/40 text-xs">{(cls.teacherId?.displayName || cls.teacher?.displayName) || '—'} · {cls.scheduledTime || '—'}</p>
                   </div>
                   <StatusBadge status={cls.status} />
                 </div>
@@ -139,7 +139,7 @@ export default function MyClasses() {
     try {
       const { data } = await getSchedules();
       if (data.success) {
-        const all = data.classes || [];
+        const all = (data.schedules || data.classes || []).map((cls) => ({ ...cls, teacher: cls.teacherId || cls.teacher }));
         setClasses(all);
         const recs = all.filter((c) => c.status === 'completed' && c.recordingUrl);
         setRecordings(recs);
@@ -179,7 +179,7 @@ export default function MyClasses() {
   });
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-  const formatTime = (t) => t ? new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+  const formatTime = (t) => t ? (/^\d{1,2}:\d{2}$/.test(t) ? t : new Date(t).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })) : '—';
 
   const attendancePct = attendanceSummary.total ? Math.round((attendanceSummary.attended / attendanceSummary.total) * 100) : 0;
 
@@ -267,7 +267,7 @@ export default function MyClasses() {
                           </div>
                           <div>
                             <p className="text-white font-medium text-sm">{cls.subject}</p>
-                            <p className="text-white/40 text-xs">{cls.teacher?.displayName || '—'} · {formatDate(cls.scheduledDate)} · {formatTime(cls.scheduledTime)}</p>
+                            <p className="text-white/40 text-xs">{(cls.teacherId?.displayName || cls.teacher?.displayName) || '—'} · {formatDate(cls.scheduledDate)} · {formatTime(cls.scheduledTime)}</p>
                           </div>
                         </div>
                         <StatusBadge status={cls.status} />
@@ -319,7 +319,7 @@ export default function MyClasses() {
                   </div>
                   <div className="p-4">
                     <p className="text-white font-semibold text-sm">{cls.subject}</p>
-                    <p className="text-white/40 text-xs mt-1">{cls.teacher?.displayName || '—'}</p>
+                    <p className="text-white/40 text-xs mt-1">{(cls.teacherId?.displayName || cls.teacher?.displayName) || '—'}</p>
                     <p className="text-white/30 text-xs">{formatDate(cls.scheduledDate)}</p>
                     <button
                       onClick={() => setActiveRecording(cls)}

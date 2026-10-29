@@ -274,6 +274,13 @@ const getDownloadUrl = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Material not found.' });
     }
 
+    if (req.user.role === 'student' && !require('../utils/materialAccess').isMaterialAccessibleForStudent(material, req.user).allowed) {
+      return res.status(403).json({ success: false, message: 'This material is not available to your account.' });
+    }
+    if (req.user.role === 'teacher' && String(material.teacher) !== String(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'This material is not assigned to you.' });
+    }
+
     const downloadUrl = await storageService.getDownloadUrl(
       material.fileUrl,
       material.storageType,

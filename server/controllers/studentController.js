@@ -335,6 +335,8 @@ const getMaterialPreviewUrl = async (req, res) => {
     res.status(200).json({ 
       success: true, 
       url: signedUrl, 
+      title: material.title,
+      material: { _id: material._id, title: material.title, totalPages: material.totalPages },
       type: material.type,
       mimeType: material.mimeType,
       storageType: material.storageType,

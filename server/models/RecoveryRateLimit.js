@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const schema = new mongoose.Schema({
   _id: String,
-  attempts: { type: Number, default: 0 },
+  events: { type: [Number], default: [] },
+  allowed: Boolean,
   expiresAt: { type: Date, required: true },
 });
 schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

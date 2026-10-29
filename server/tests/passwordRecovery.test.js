@@ -147,9 +147,14 @@ test('the real User save hook hashes changed passwords and revokes earlier sessi
   const preSave = () => new Promise((resolve, reject) => User.schema.s.hooks.execPre('save', user, [], error => error ? reject(error) : resolve()));
   await preSave(); user.$__reset(); user.isNew = false;
   user.refreshToken = 'synthetic-refresh'; user.password = 'ChangedSynthetic8';
+  user.expoPushToken = 'ExpoPushToken[old]'; user.deviceTokens = ['legacy'];
+  user.recoveryDevices = ['ExpoPushToken[old]']; user.recoveryReadyDevices = ['ExpoPushToken[old]'];
+  user.recoveryRegistrations = [{ token: 'ExpoPushToken[old]', registeredAt: new Date(), tokenVersion: 0 }];
   await preSave();
   assert.equal(user.tokenVersion, 1);
   assert.equal(user.refreshToken, '');
+  assert.equal(user.expoPushToken, null);
+  for (const field of ['deviceTokens', 'recoveryDevices', 'recoveryReadyDevices', 'recoveryRegistrations']) assert.equal(user[field].length, 0, field);
   assert(user.passwordChangedAt instanceof Date);
   assert.equal(await user.matchPassword('ChangedSynthetic8'), true);
   assert.equal(await user.matchPassword('OriginalSynthetic7'), false);

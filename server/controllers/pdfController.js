@@ -345,7 +345,7 @@ const trackClose = async (req, res) => {
     }
 
     const analytics = await PdfAnalytics.findOneAndUpdate(
-      { sessionId },
+      { sessionId, studentId: req.user._id },
       {
         closedAt: new Date(),
         lastPage: lastPage || 1,
@@ -587,6 +587,9 @@ const getSignedPdfUrl = async (req, res) => {
 
     // Check if material is locked for this student
     if (req.user.role === 'student') {
+      if (material.approvalStatus !== 'approved' || (material.grade && material.grade !== 'all' && material.grade !== req.user.grade)) {
+        return res.status(403).json({ success: false, message: 'This material is not available to your account.' });
+      }
       const studentId = req.user._id.toString();
       const isUnlocked = material.unlockedFor.some(
         (id) => id.toString() === studentId
@@ -608,6 +611,9 @@ const getSignedPdfUrl = async (req, res) => {
           message: 'This material is locked for you.',
         });
       }
+    }
+    if (req.user.role === 'teacher' && String(material.teacher) !== String(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'This material is not assigned to you.' });
     }
 
     // Generate signed URL or return existing URL (protected by JWT)

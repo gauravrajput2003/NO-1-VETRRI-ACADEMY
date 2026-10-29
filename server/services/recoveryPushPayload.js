@@ -5,8 +5,7 @@ async function resolveRecoveryPush(delivery, dependencies = {}) {
   const request = await ResetRequest.findById(delivery.recoveryRequestId);
   if (!canCompleteReset(request) || request.revision !== delivery.payload?.data?.revision || !delivery.encryptedPayload) return null;
   const owned = await User.exists({ _id: request.userId, isActive: true, isApproved: { $ne: false },
-    recoveryReadyDevices: delivery.token,
-    $or: [{ recoveryDevices: delivery.token }, { expoPushToken: delivery.token }] });
+    recoveryRegistrations: { $elemMatch: { token: delivery.token, registeredAt: { $lte: new Date() } } } });
   if (!owned) return null;
   const payload = cipher().open(delivery.encryptedPayload, `push:${request._id}:${request.revision}`);
   return { ...payload, ttl: Math.max(1, Math.floor((+new Date(request.tempPasswordExpiresAt) - Date.now()) / 1000)) };

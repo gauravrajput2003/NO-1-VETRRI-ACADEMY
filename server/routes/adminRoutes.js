@@ -96,6 +96,15 @@ router.get('/student-fees', getStudentFeeDirectory);
 router.get('/fees/history/:studentId', getStudentFeeHistory);
 router.put('/fees/:id', updateFeeStatus);
 router.post('/fees/record-payment', recordFeePayment);
+router.post('/fees/:id/reminder', async (req, res) => {
+  try {
+    const fee = await require('../models/FeesRecord').findById(req.params.id);
+    if (!fee) return res.status(404).json({ success: false, message: 'Fee record not found.' });
+    await require('../services/financialNotificationService').notifyFeeRecord({ fee, req });
+    fee.reminderSent = true; fee.reminderSentAt = new Date(); await fee.save();
+    res.json({ success: true });
+  } catch { res.status(500).json({ success: false, message: 'Unable to send reminder.' }); }
+});
 
 // Create fee record
 router.post('/fees', async (req, res) => {
@@ -140,7 +149,9 @@ router.put('/enquiries/:id', updateEnquiryStatus);
 
 // Leave approvals
 router.get('/leaves', getAllLeaves);
+router.get('/socket-rollout', (req, res) => res.json({ success: true, requireAuth: process.env.SOCKET_REQUIRE_AUTH === 'true', totals: req.app.get('socketRollout') || {}, activeConnections: req.app.get('io')?.engine.clientsCount || 0 }));
 router.put('/leaves/:id', updateLeaveStatus);
+router.patch('/leaves/:id/compensation/status', require('../controllers/leaveCompensationController').update);
 
 // Best teacher
 router.get('/best-teacher', getBestTeacher);

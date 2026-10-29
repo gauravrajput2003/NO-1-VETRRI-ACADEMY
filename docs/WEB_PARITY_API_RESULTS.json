@@ -1,0 +1,99 @@
+{
+  "date": "2026-10-24T16:25:34.513Z",
+  "run": "87996e4723",
+  "database": "existing app database, isolated labelled fixtures",
+  "results": [
+    {
+      "name": "candidate backend permits the real HTTPS website origins through CORS",
+      "passed": true
+    },
+    {
+      "name": "admin account edits and teacher permissions persist without changing credentials",
+      "passed": true
+    },
+    {
+      "name": "training watch progress and completion are shared with the mobile API",
+      "passed": true
+    },
+    {
+      "name": "strict socket rollout rejects legacy handshakes while accepting JWT mobile/web clients",
+      "passed": true
+    },
+    {
+      "name": "same credentials retain simultaneous phone/laptop refresh sessions",
+      "passed": true
+    },
+    {
+      "name": "profile saves permitted fields and refuses student identity changes",
+      "passed": true
+    },
+    {
+      "name": "teacher class creation is visible to assigned mobile/web student only",
+      "passed": true
+    },
+    {
+      "name": "teacher starts class, student joins, and attendance persists once",
+      "passed": true
+    },
+    {
+      "name": "attendance APIs enforce own/assigned-user boundaries",
+      "passed": true
+    },
+    {
+      "name": "signed material upload, approval and duplicate confirmation share one record",
+      "passed": true
+    },
+    {
+      "name": "material metadata edits and replacements wait for admin approval",
+      "passed": true
+    },
+    {
+      "name": "PDF page, bookmark and note records are shared across browser/mobile sessions",
+      "passed": true
+    },
+    {
+      "name": "salary configuration, partial payment, correction and teacher slip agree",
+      "passed": true
+    },
+    {
+      "name": "fee records are visible to the same student and generate notifications",
+      "passed": true
+    },
+    {
+      "name": "academic discussion replies, status and permissions agree",
+      "passed": true
+    },
+    {
+      "name": "admin chat persists, reads and rejects unrelated student access",
+      "passed": true
+    },
+    {
+      "name": "targeted announcement inbox and read receipts persist",
+      "passed": true
+    },
+    {
+      "name": "ordinary updates reach the shared mobile/web notification inbox",
+      "passed": true
+    },
+    {
+      "name": "browser push configuration and authenticated rollout diagnostics load",
+      "passed": true
+    },
+    {
+      "name": "exam paper upload, student answer submission and grading use real MongoDB transactions",
+      "passed": true
+    },
+    {
+      "name": "teacher leave approval and compensation completion stay in sync",
+      "passed": true
+    },
+    {
+      "name": "support submission and admin reply are visible to the same student",
+      "passed": true
+    },
+    {
+      "name": "updated JWT sockets and legacy mobile sockets coexist; forged JWTs are rejected",
+      "passed": true
+    }
+  ]
+}

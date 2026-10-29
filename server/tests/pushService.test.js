@@ -6,6 +6,7 @@ const path = require('node:path');
 const { isExpoPushToken } = require('../utils/pushToken');
 
 function loadService(filename, dependencies, globals = {}) {
+  dependencies = { './browserPushService': { sendBrowserNotification: async () => {} }, ...dependencies };
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', filename), 'utf8'), {
     module, exports: module.exports,

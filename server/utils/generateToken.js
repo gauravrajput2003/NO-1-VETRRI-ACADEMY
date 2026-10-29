@@ -3,8 +3,8 @@ const jwt = require('jsonwebtoken');
 /**
  * Generate JWT access token (30 days)
  */
-const generateToken = (id, role, tokenVersion = 0) => {
-  return jwt.sign({ id, role, tokenVersion }, process.env.JWT_SECRET, {
+const generateToken = (id, role, tokenVersion = 0, sessionId) => {
+  return jwt.sign({ id, role, tokenVersion, ...(sessionId ? { sid: String(sessionId) } : {}) }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '30d',
   });
 };
@@ -12,8 +12,8 @@ const generateToken = (id, role, tokenVersion = 0) => {
 /**
  * Generate JWT refresh token (60 days)
  */
-const generateRefreshToken = (id, tokenVersion = 0) => {
-  return jwt.sign({ id, tokenVersion }, process.env.JWT_REFRESH_SECRET, {
+const generateRefreshToken = (id, tokenVersion = 0, sessionId) => {
+  return jwt.sign({ id, tokenVersion, ...(sessionId ? { sid: String(sessionId) } : {}) }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: process.env.JWT_REFRESH_EXPIRE || '60d',
   });
 };

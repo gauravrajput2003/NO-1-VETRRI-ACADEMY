@@ -4,6 +4,9 @@ const LoginLog = require('../models/LoginLog');
 const { generateToken, generateRefreshToken, setCookieToken, clearCookieToken } = require('../utils/generateToken');
 const { sendWelcomeEmail } = require('../utils/email');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const { createHash } = require('node:crypto');
+const UserSession = require('../models/UserSession');
 const Course = require('../models/Course');
 const { isExpoPushToken } = require('../utils/pushToken');
 const { buildLoginLookup } = require('../utils/loginLookup');
@@ -172,14 +175,18 @@ const login = async (req, res) => {
       user.profilePic = User.getDiceBearUrl(user._id);
     }
 
-    const token = generateToken(user._id, user.role, user.tokenVersion || 0);
-    const refreshToken = generateRefreshToken(user._id, user.tokenVersion || 0);
+    const sessionId = new mongoose.Types.ObjectId();
+    const token = generateToken(user._id, user.role, user.tokenVersion || 0, sessionId);
+    const refreshToken = generateRefreshToken(user._id, user.tokenVersion || 0, sessionId);
+    const refreshClaims = jwt.decode(refreshToken);
 
-    user.refreshToken = refreshToken;
     user.isOnline = true;
     const isFirstLogin = user.firstLogin;
     if (user.firstLogin) user.firstLogin = false;
     await user.save({ validateBeforeSave: false });
+    await UserSession.create({ _id: sessionId, userId: user._id,
+      refreshHash: createHash('sha256').update(refreshToken).digest('hex'),
+      expiresAt: new Date(refreshClaims.exp * 1000) });
 
     setCookieToken(res, token);
 
@@ -217,6 +224,20 @@ const forgotPasswordPublic = async (_req, res) => res.status(410).json({
   message: 'Please contact your academy admin for password recovery. Update the app to request a temporary password.',
 });
 
+const logoutAll = async (req, res) => {
+  try {
+    await UserSession.updateMany({ userId: req.user._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+    await User.findByIdAndUpdate(req.user._id, { $inc: { tokenVersion: 1 },
+      $set: { ...require('../utils/recoveryDevices').revokedDeviceFields(), refreshToken: '', isOnline: false } });
+    const sockets = req.app?.get('io')?.sockets?.sockets;
+    if (sockets) for (const socket of sockets.values()) {
+      if (String(socket.authUser?._id || socket.userId) === String(req.user._id)) socket.disconnect(true);
+    }
+    res.clearCookie('token');
+    res.json({ success: true, message: 'All sessions and recovery devices revoked. Sign in again.' });
+  } catch { res.status(503).json({ success: false, message: 'Unable to revoke sessions. Please retry.' }); }
+};
+
 // ─── Logout ───────────────────────────────────────────────────────────────────
 const logout = async (req, res) => {
   try {
@@ -232,7 +253,17 @@ const logout = async (req, res) => {
       await log.save();
     }
 
-    await User.findByIdAndUpdate(req.user._id, { refreshToken: '', isOnline: false, lastSeen: new Date(), expoPushToken: null });
+    if (req.sessionId) {
+      await UserSession.updateOne({ _id: req.sessionId, userId: req.user._id }, { $set: { revokedAt: new Date() } });
+      const sockets = req.app?.get('io')?.sockets?.sockets;
+      if (sockets) for (const socket of sockets.values()) {
+        if (String(socket.authClaims?.sid) === String(req.sessionId)) socket.disconnect(true);
+      }
+      const active = await UserSession.exists({ userId: req.user._id, revokedAt: null, expiresAt: { $gt: new Date() } });
+      if (!active) await User.findByIdAndUpdate(req.user._id, { isOnline: false, lastSeen: new Date() });
+    } else {
+      await User.findByIdAndUpdate(req.user._id, { refreshToken: '', isOnline: false, lastSeen: new Date() });
+    }
     res.status(200).json({ success: true, message: 'Logged out successfully.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -258,13 +289,22 @@ const refreshAccessToken = async (req, res) => {
     }
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findOne({ _id: decoded.id, refreshToken });
+    const user = decoded.sid ? await User.findById(decoded.id)
+      : await User.findOne({ _id: decoded.id, refreshToken });
+
+    if (decoded.sid) {
+      const session = await UserSession.findOne({ _id: decoded.sid, userId: decoded.id,
+        refreshHash: createHash('sha256').update(refreshToken).digest('hex'), revokedAt: null });
+      if (!session || session.expiresAt <= new Date()) {
+        return res.status(401).json({ success: false, message: 'Invalid refresh token.' });
+      }
+    }
 
     if (!user || !user.isActive || (decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
       return res.status(401).json({ success: false, message: 'Invalid refresh token.' });
     }
 
-    const newToken = generateToken(user._id, user.role, user.tokenVersion || 0);
+    const newToken = generateToken(user._id, user.role, user.tokenVersion || 0, decoded.sid);
     setCookieToken(res, newToken);
 
     res.status(200).json({ success: true, token: newToken });
@@ -321,10 +361,15 @@ const savePushToken = async (req, res) => {
     await User.updateMany({ _id: { $ne: req.user._id }, expoPushToken }, { $unset: { expoPushToken: '' } });
     await User.updateMany({ _id: { $ne: req.user._id }, recoveryDevices: expoPushToken }, { $pull: { recoveryDevices: expoPushToken } });
     await User.updateMany({ _id: { $ne: req.user._id }, recoveryReadyDevices: expoPushToken }, { $pull: { recoveryReadyDevices: expoPushToken } });
-    await User.findByIdAndUpdate(req.user._id, { $set: { expoPushToken }, $addToSet: { recoveryDevices: expoPushToken } });
-    if (req.body.recoveryChannelReady === true) {
-      await User.findByIdAndUpdate(req.user._id, { $addToSet: { recoveryReadyDevices: expoPushToken } });
-    }
+    await User.updateMany({ _id: { $ne: req.user._id }, 'recoveryRegistrations.token': expoPushToken }, { $pull: { recoveryRegistrations: { token: expoPushToken } } });
+    // Version predicate prevents a request authenticated before revocation from re-enrolling.
+    const saved = await User.findOneAndUpdate({ _id: req.user._id, tokenVersion: req.user.tokenVersion || 0 }, [
+      { $set: { expoPushToken, recoveryRegistrations: { $concatArrays: [
+        { $filter: { input: { $ifNull: ['$recoveryRegistrations', []] }, as: 'device', cond: { $ne: ['$$device.token', expoPushToken] } } },
+        [{ token: expoPushToken, registeredAt: new Date(), tokenVersion: req.user.tokenVersion || 0 }],
+      ] } } },
+    ], { new: true });
+    if (!saved) return res.status(401).json({ success: false, message: 'Session revoked. Sign in again.' });
 
     res.json({ success: true, message: 'Push token saved' });
   } catch (error) {
@@ -333,6 +378,7 @@ const savePushToken = async (req, res) => {
 };
 
 module.exports = {
+  logoutAll,
   register,
   login,
   logout,

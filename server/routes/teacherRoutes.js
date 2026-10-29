@@ -68,5 +68,6 @@ router.get('/salary/:teacherId/:monthYear/slip', downloadSalarySlip);
 // Leave
 router.post('/leave', applyLeave);
 router.get('/leave', getTeacherLeaves);
+router.patch('/leaves/:id/compensation/status', require('../controllers/leaveCompensationController').update);
 
 module.exports = router;

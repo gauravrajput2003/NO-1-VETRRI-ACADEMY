@@ -1,6 +1,8 @@
+import NotificationsInbox from '../common/NotificationsInbox';
+import AnnouncementsInbox from '../common/AnnouncementsInbox';
 import Exams from '../academic/Exams';
 import AcademicReports from '../academic/Reports';
-import { useState, useEffect } from 'react';
+import { lazy, useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '../../components/Sidebar';
@@ -25,6 +27,15 @@ import Leave from './Leave';
 import Fees from './Fees';
 import Profile from './Profile';
 import VettriAIPage from '../common/VettriAIPage';
+import AdminDeskChat from '../common/AdminDeskChat';
+const PdfReader = lazy(() => import('./PdfReader'));
+import Support from '../common/Support';
+import Downloads from '../common/Downloads';
+import Doubts from '../common/Doubts';
+import TrainingVideos from '../teacher/TrainingVideos';
+import TopPerformers from './TopPerformers';
+import ReadingLibrary from './ReadingLibrary';
+import PortalNotFound from '../../components/PortalNotFound';
 
 const LINKS = [
   { href: '/student/exams', label: 'Exam Management', icon: FiBook },
@@ -32,12 +43,21 @@ const LINKS = [
   { href: '/student/dashboard', label: 'Dashboard', icon: FiHome },
   { href: '/student/classes', label: 'My Classes', icon: FiCalendar },
   { href: '/student/materials', label: 'Study Materials', icon: FiBook },
+  { href: '/student/bookmarks', label: 'My Bookmarks', icon: FiBook },
+  { href: '/student/notes', label: 'My Notes', icon: FiBook },
+  { href: '/student/downloads', label: 'Download Center', icon: FiBook },
+  { href: '/student/training', label: 'Training Videos', icon: FiBook },
+  { href: '/student/top-performers', label: 'Top Performers', icon: FiBarChart2 },
   { href: '/student/progress', label: 'Exam Progress', icon: FiBarChart2 },
   { href: '/student/attendance', label: 'Attendance', icon: FiList },
   { href: '/student/chat', label: 'Chat', icon: FiMessageCircle },
+  { href: '/student/support', label: 'Help Center', icon: FiMessageCircle },
+  { href: '/student/doubts', label: 'Discussions', icon: FiMessageCircle },
   { href: '/student/leave', label: 'Leave', icon: FiClock },
   { href: '/student/fees', label: 'Fees', icon: FiDollarSign },
   { href: '/student/profile', label: 'Profile', icon: FiUser },
+  { href: '/student/notifications', label: 'Notifications', icon: FiBook },
+  { href: '/student/announcements', label: 'Announcements', icon: FiBook },
 ];
 
 // Mobile bottom nav for student
@@ -129,14 +149,26 @@ export default function StudentDashboard() {
             <Route path="dashboard" element={<DashboardHome />} />
             <Route path="classes" element={<MyClasses />} />
             <Route path="materials" element={<StudyMaterials />} />
+            <Route path="downloads" element={<Downloads />} />
+            <Route path="training" element={<TrainingVideos />} />
+            <Route path="top-performers" element={<TopPerformers />} />
+            <Route path="materials/pdf/:id" element={<PdfReader />} />
+            <Route path="bookmarks" element={<ReadingLibrary />} />
+            <Route path="notes" element={<ReadingLibrary kind="notes" />} />
             <Route path="progress" element={<ExamProgress onScoresSeen={() => setNotifCount(0)} />} />
             <Route path="scores" element={<ExamProgress onScoresSeen={() => setNotifCount(0)} />} />
             <Route path="attendance" element={<Attendance />} />
-            <Route path="chat" element={<Chat />} />
+            <Route path="chat" element={<AdminDeskChat />} />
+            <Route path="support" element={<Support />} />
+            <Route path="doubts" element={<Doubts />} />
             <Route path="ai" element={<VettriAIPage />} />
             <Route path="leave" element={<Leave />} />
             <Route path="fees" element={<Fees />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="notifications" element={<NotificationsInbox />} />
+<Route path="announcements" element={<AnnouncementsInbox />} />
+<Route path="settings" element={<Navigate to="/student/profile" replace />} />
+<Route path="*" element={<PortalNotFound />} />
           </Routes>
         </div>
       </main>

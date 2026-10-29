@@ -5,17 +5,19 @@ const ResetRequest = require('../models/ResetRequest');
 const User = require('../models/User');
 const { recordRecoveryAttempt } = require('../middleware/passwordRecoveryLimits');
 const policy = require('../utils/passwordRecovery');
+const { recoveryReadiness } = require('../utils/recoveryDevices');
 
 const noStore = res => res.set('Cache-Control', 'no-store');
 const waitUntil = async (start) => {
-  const delay = 700 + randomInt(80) - (Date.now() - start);
+  const delay = 1000 + randomInt(40) - (Date.now() - start);
   if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
 };
 async function request(req, res) {
   const start = Date.now();
   noStore(res);
   try {
-    if (await recordRecoveryAttempt(req)) await service.request(req.body || {});
+    const account = await service.resolveAccount(req.body?.identifier);
+    if (await recordRecoveryAttempt(req, policy.RESET_REQUESTS_PER_HOUR, 'request', account?._id)) await service.request(req.body || {}, account);
   } catch (error) { console.error('[Recovery] Request unavailable:', error.name); }
   await waitUntil(start);
   // Neither existence, role, throttling nor account status are disclosed publicly.
@@ -25,7 +27,10 @@ async function complete(req, res) {
   const start = Date.now();
   noStore(res);
   let success = false;
-  try { if (await recordRecoveryAttempt(req, 30, 'complete')) success = await service.complete(req.body || {}); }
+  try {
+    const account = await service.resolveAccount(req.body?.identifier);
+    if (await recordRecoveryAttempt(req, 30, 'complete', account?._id)) success = await service.complete(req.body || {});
+  }
   catch (error) { console.error('[Recovery] Completion unavailable:', error.name); }
   await waitUntil(start);
   res.status(success ? 200 : 400).json({ success, message: success ? 'Password updated. Please sign in.' : policy.RECOVERY_FAILURE_MESSAGE });
@@ -57,7 +62,7 @@ async function list(req, res) {
     }
     const [records, total, pendingCount] = await Promise.all([
       ResetRequest.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit)
-        .populate('userId', 'name role grade subjects mobile email profilePic expoPushToken +recoveryDevices +recoveryReadyDevices').lean(),
+        .populate('userId', 'name role grade subjects mobile email profilePic tokenVersion +recoveryRegistrations').lean(),
       ResetRequest.countDocuments(filter), ResetRequest.countDocuments({ status: 'pending' }),
     ]);
     const requests = records.map(record => ({ ...service.summary(record),
@@ -65,7 +70,8 @@ async function list(req, res) {
       user: record.userId ? { _id: record.userId._id, name: record.userId.name, role: record.userId.role,
         grade: record.userId.grade, subjects: record.userId.subjects, mobile: record.userId.mobile,
         email: record.userId.email, profilePic: record.userId.profilePic } : null,
-      hasVerifiedDevice: Boolean(record.userId?.recoveryReadyDevices?.some(token => token === record.userId?.expoPushToken || record.userId?.recoveryDevices?.includes(token))),
+      hasVerifiedDevice: recoveryReadiness(record.userId).ready,
+      deviceReadinessReason: recoveryReadiness(record.userId).reason,
     }));
     res.json({ success: true, requests, total, page, pages: Math.ceil(total / limit), pendingCount });
   } catch { res.status(503).json({ success: false, message: 'Unable to load password requests. Please retry.' }); }

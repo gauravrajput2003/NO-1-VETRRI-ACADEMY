@@ -12,7 +12,7 @@ function fixture() {
   const data = { User: [], ResetRequest: [], ChatMessage: [], PushDelivery: [] };
   const uid = '012345678901234567890123', admin = { _id: '012345678901234567890124', role: 'admin', name: 'Admin', isActive: true };
   const token = 'ExponentPushToken[verified-device]';
-  data.User.push({ _id: uid, role: 'student', name: 'Student', email: 'student@example.invalid', mobile: '9876543210', isActive: true, isApproved: true, recoveryDevices: [token], recoveryReadyDevices: [token], tokenVersion: 0, refreshToken: 'old-refresh' }, admin);
+  data.User.push({ _id: uid, role: 'student', name: 'Student', email: 'student@example.invalid', mobile: '9876543210', isActive: true, isApproved: true, recoveryDevices: [token], recoveryReadyDevices: [token], recoveryRegistrations: [{ token, registeredAt: new Date(clock), tokenVersion: 0 }], tokenVersion: 0, refreshToken: 'old-refresh' }, admin);
   function matches(row, filter) {
     return Object.entries(filter).every(([key, value]) => {
       if (key === '$or') return value.some((entry) => matches(row, entry));
@@ -53,12 +53,12 @@ function fixture() {
       bulkWrite: async (operations) => { for (const op of operations) await models[name].findOneAndUpdate(op.updateOne.filter, op.updateOne.update, { upsert: true }); },
     };
   }
-  data.User[0].save = async function () { this.password = await bcrypt.hash(this.password, 4); this.tokenVersion++; this.refreshToken = ''; };
+  data.User[0].save = async function () { this.password = await bcrypt.hash(this.password, 4); this.tokenVersion++; this.refreshToken = ''; Object.assign(this, require('../utils/recoveryDevices').revokedDeviceFields()); };
   const cipher = createRecoveryCipher(randomBytes(32).toString('base64'));
   const service = createPasswordRecoveryService({ ...models, bcrypt, cipher: () => cipher, now: () => new Date(clock),
     transaction: (fn) => { const result = tail.then(() => fn({})); tail = result.catch(() => {}); return result; },
-    createTextMessage: async ({ message, recoveryCiphertext, recoveryRequestId, receiverId }) => {
-      const record = { _id: `chat-${++sequence}`, receiverId, message, recoveryCiphertext, recoveryRequestId };
+    createTextMessage: async ({ message, recoveryCiphertext, recoveryRequestId, receiverId, credentialType, expiresAt, recoveryStatus }) => {
+      const record = { _id: `chat-${++sequence}`, receiverId, message, recoveryCiphertext, recoveryRequestId, credentialType, expiresAt, recoveryStatus };
       data.ChatMessage.push(record); return record;
     }, publishTextMessage: async () => {},
   });
@@ -177,13 +177,36 @@ test('concurrent completion consumes once and only the recipient can decrypt cha
   assert.equal(f.user.tokenVersion, 1);
 });
 
-test('legacy devices without the private recovery channel cannot receive a password', async () => {
+test('legacy devices without a timestamped server registration cannot receive a password', async () => {
   const f = fixture(), { request, password } = await prepared(f);
-  f.user.recoveryReadyDevices = [];
+  f.user.recoveryRegistrations = [];
   await assert.rejects(() => f.service.send(request._id, f.admin, { password, channels: ['push', 'chat'] }), e => e.status === 409);
   assert.equal(f.data.PushDelivery.length, 0);
   await f.service.send(request._id, f.admin, { password, channels: ['copy'], identityVerified: true });
   assert.equal(request.status, 'sent');
+});
+
+test('no-device chat-only activation requires explicit acknowledgement and does not start time before it', async () => {
+  const f = fixture(), { request, password } = await prepared(f);
+  f.user.recoveryRegistrations = [];
+  await assert.rejects(() => f.service.send(request._id, f.admin, { password, channels: ['chat'] }), e => e.status === 409);
+  assert.equal(request.sentAt, undefined); assert.equal(f.data.ChatMessage.length, 0);
+  await f.service.send(request._id, f.admin, { password, channels: ['chat'], acknowledgeChatOnly: true });
+  assert.equal(+request.tempPasswordExpiresAt, +f.now() + 86400000);
+  assert.equal(f.data.ChatMessage[0].credentialType, 'password_recovery');
+  assert.equal(f.data.ChatMessage[0].recoveryStatus, 'sent');
+  assert.equal(+f.data.ChatMessage[0].expiresAt, +request.tempPasswordExpiresAt);
+});
+
+test('completion removes enrolled devices and push tokens and chat reader returns terminal status', async () => {
+  const f = fixture(), { request, password } = await prepared(f);
+  f.user.expoPushToken = f.token; f.user.deviceTokens = ['legacy'];
+  await f.service.send(request._id, f.admin, { password, channels: ['push', 'chat'] });
+  assert.equal(await f.service.complete({ identifier: f.user.email, tempPassword: password, newPassword: 'NewPrivate789', confirmPassword: 'NewPrivate789' }), true);
+  assert.equal(f.user.expoPushToken, null); assert.equal(f.user.recoveryRegistrations.length, 0);
+  assert.equal(f.user.recoveryDevices.length, 0); assert.equal(f.user.deviceTokens.length, 0);
+  const [message] = await f.service.readRecoveryMessages(f.data.ChatMessage, f.user);
+  assert.equal(message.recoveryStatus, 'used'); assert.equal(message.message.includes(password), false);
 });
 
 test('regenerating an expired request refreshes pending lifetime without changing its original request date', async () => {

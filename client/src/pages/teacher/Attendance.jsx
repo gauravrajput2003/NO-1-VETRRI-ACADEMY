@@ -88,6 +88,8 @@ export default function TeacherAttendance() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [classFilter, setClassFilter] = useState('');
+  const [classOptions, setClassOptions] = useState([]);
+  useEffect(() => { api.get('/classes/schedule').then(({data}) => setClassOptions(data.schedules || data.classes || [])).catch(() => toast.error('Unable to load classes')); }, []);
   const [manualModal, setManualModal] = useState(null);
 
   useEffect(() => { if (tab === 'login') loadLogin(); }, [tab, month, year]);
@@ -108,14 +110,15 @@ export default function TeacherAttendance() {
   const loadStudentAttendance = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/attendance/class/teacher-students', { params: classFilter ? { class: classFilter } : {} });
-      if (data.success) setStudentAttendance(data.attendance || []);
+      if (!classFilter) { setStudentAttendance([]); return; }
+      const { data } = await api.get(`/classes/${classFilter}/attendance`);
+      if (data.success) setStudentAttendance((data.attendance || []).map((record) => ({ ...record, student: record.studentId, duration: record.durationPresent })));
     } catch {}
     finally { setLoading(false); }
   };
 
   const handleManualSave = async ({ studentId, status, reason }) => {
-    await manualAttendance({ studentId, status, reason, date: new Date().toISOString() });
+    await manualAttendance({ classId: classFilter, studentId, status, reason });
     toast.success('Attendance marked');
     loadStudentAttendance();
   };
@@ -229,10 +232,8 @@ export default function TeacherAttendance() {
             colorRows
           >
             <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="input-field py-1.5 text-xs">
-              <option value="">All Classes</option>
-              {['4th','5th','6th','7th','8th','9th','10th','11th','12th'].map((g) => (
-                <option key={g} value={g}>{g} Grade</option>
-              ))}
+              <option value="">Select a scheduled class</option>
+              {classOptions.map((cls) => <option key={cls._id} value={cls._id}>{cls.subject} · {cls.grade} · {new Date(cls.scheduledDate).toLocaleDateString("en-IN")}</option>)}
             </select>
           </AttendanceExportBar>
 
@@ -254,6 +255,8 @@ export default function TeacherAttendance() {
                         <td><StatusBadge status={a.status} /></td>
                         <td>
                           <button
+                            disabled={user.role !== "admin"}
+                            title={user.role !== "admin" ? "Manual class corrections require an admin" : "Correct attendance"}
                             onClick={() => setManualModal(a.student)}
                             className="text-xs border border-gold/30 text-gold px-2.5 py-1 rounded-lg hover:bg-gold/10 transition-all"
                           >

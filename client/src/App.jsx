@@ -1,61 +1,25 @@
-import AcademicExams from './pages/academic/Exams';
-import AcademicReports from './pages/academic/Reports';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import NotificationAcknowledgement from './components/NotificationAcknowledgement';
 
 // ─── Public pages ──────────────────────────────────────────────────────────────
-import Landing from './pages/Landing';
+const Landing = lazy(() => import('./pages/Landing'));
 import StudentLogin from './pages/auth/StudentLogin';
 import TeacherLogin from './pages/auth/TeacherLogin';
 import AdminLogin from './pages/auth/AdminLogin';
+import Login from './pages/auth/Login';
 import StudentSignup from './pages/auth/StudentSignup';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+import ForcedPasswordChange from './pages/auth/ForcedPasswordChange';
 
-// ─── Student Dashboard shell ───────────────────────────────────────────────────
-import StudentDashboard from './pages/student/Dashboard';
-import StudentDashboardHome from './pages/student/DashboardHome';
-import StudentClasses from './pages/student/MyClasses';
-import StudentMaterials from './pages/student/StudyMaterials';
-import StudentProgress from './pages/student/ExamProgress';
-import StudentAttendance from './pages/student/Attendance';
-import StudentChat from './pages/student/Chat';
-import StudentLeave from './pages/student/Leave';
-import StudentFees from './pages/student/Fees';
-import StudentProfile from './pages/student/Profile';
-
-// ─── Teacher Dashboard shell ───────────────────────────────────────────────────
-import TeacherDashboard from './pages/teacher/Dashboard';
-import TeacherDashboardHome from './pages/teacher/DashboardHome';
-import TeacherLiveClass from './pages/teacher/LiveClass';
-import TeacherTraining from './pages/teacher/TrainingVideos';
-import TeacherStudents from './pages/teacher/MyStudents';
-import TeacherMaterials from './pages/teacher/StudyMaterials';
-import TeacherScores from './pages/teacher/ExamScores';
-import TeacherAttendance from './pages/teacher/Attendance';
-import TeacherChat from './pages/teacher/Chat';
-import TeacherLeave from './pages/teacher/Leave';
-import TeacherGrading from './pages/teacher/MonthlyGrading';
-import TeacherProfile from './pages/teacher/Profile';
-
-// ─── Admin Dashboard shell ─────────────────────────────────────────────────────
-import AdminDashboard from './pages/admin/Dashboard';
-import AdminDashboardHome from './pages/admin/DashboardHome';
-import AdminStudents from './pages/admin/Students';
-import AdminTeachers from './pages/admin/Teachers';
-import AdminClassScheduler from './pages/admin/ClassScheduler';
-import AdminLiveMonitor from './pages/admin/LiveMonitor';
-import AdminTrainingVideos from './pages/admin/TrainingVideos';
-import AdminAnnouncements from './pages/admin/Announcements';
-import AdminDemoBookings from './pages/admin/DemoBookings';
-import AdminChatLogs from './pages/admin/ChatLogs';
-import AdminTeacherPermissions from './pages/admin/TeacherPermissions';
-import AdminLoginLogs from './pages/admin/LoginLogs';
-import AdminFees from './pages/admin/Fees';
-import AdminLeave from './pages/admin/LeaveApprovals';
-import AdminBestTeacher from './pages/admin/BestTeacher';
-import AdminEnquiries from './pages/admin/Enquiries';
+const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
+const TeacherDashboard = lazy(() => import('./pages/teacher/Dashboard'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 
 // ─── 404 page ─────────────────────────────────────────────────────────────────
 function NotFound() {
@@ -73,7 +37,7 @@ function NotFound() {
 
 // ─── Protected Route ──────────────────────────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionError, fetchMe } = useAuth();
 
   if (loading) {
     return (
@@ -86,10 +50,14 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     );
   }
 
+  if (sessionError) return <div className="min-h-screen bg-[#0A1628] text-white flex flex-col gap-4 items-center justify-center p-6"><p role="alert">{sessionError}</p><button className="btn-primary" onClick={fetchMe}>Retry connection</button></div>;
+
   if (!user) {
     const loginPath = allowedRole ? `/login/${allowedRole}` : '/login/student';
     return <Navigate to={loginPath} replace />;
   }
+
+  if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
 
   if (allowedRole && user.role !== allowedRole) {
     const roleHome = { student: '/student/dashboard', teacher: '/teacher/dashboard', admin: '/admin/dashboard' };
@@ -102,14 +70,16 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 // ─── PWA Install Banner ───────────────────────────────────────────────────────
 function PWABanner() {
   const { user } = useAuth();
-  const [deferredPrompt, setDeferredPrompt] = window.__pwaPrompt
-    ? [window.__pwaPrompt, () => {}]
-    : [null, () => {}];
-  const [show, setShow] = window.__showPWA !== undefined
-    ? [window.__showPWA, (v) => { window.__showPWA = v; }]
-    : [false, () => {}];
+  const [deferredPrompt, setDeferredPrompt] = useState(window.__pwaPrompt);
+  const [show, setShow] = useState(Boolean(window.__showPWA));
 
-  if (!show || !deferredPrompt || user?.role !== 'student') return null;
+  useEffect(() => {
+    const ready = () => { setDeferredPrompt(window.__pwaPrompt); setShow(Boolean(window.__showPWA)); };
+    window.addEventListener('pwa-ready', ready);
+    return () => window.removeEventListener('pwa-ready', ready);
+  }, []);
+
+  if (!show || !deferredPrompt || !user) return null;
 
   return (
     <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50">
@@ -144,10 +114,14 @@ function AppRoutes() {
     <Routes>
       {/* ── Public ── */}
       <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/login/student" element={<StudentLogin />} />
       <Route path="/login/teacher" element={<TeacherLogin />} />
       <Route path="/login/admin" element={<AdminLogin />} />
       <Route path="/signup" element={<StudentSignup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/change-password" element={<ForcedPasswordChange />} />
 
       {/* ── Student ── */}
       <Route
@@ -157,20 +131,7 @@ function AppRoutes() {
             <StudentDashboard />
           </ProtectedRoute>
         }
-      >
-        <Route path="exams" element={<AcademicExams />} />
-<Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<StudentDashboardHome />} />
-        <Route path="classes" element={<StudentClasses />} />
-        <Route path="materials" element={<StudentMaterials />} />
-        <Route path="progress" element={<StudentProgress />} />
-        <Route path="scores" element={<StudentProgress />} />
-        <Route path="attendance" element={<StudentAttendance />} />
-        <Route path="chat" element={<StudentChat />} />
-        <Route path="leave" element={<StudentLeave />} />
-        <Route path="fees" element={<StudentFees />} />
-        <Route path="profile" element={<StudentProfile />} />
-      </Route>
+      />
 
       {/* ── Teacher ── */}
       <Route
@@ -180,23 +141,7 @@ function AppRoutes() {
             <TeacherDashboard />
           </ProtectedRoute>
         }
-      >
-        <Route path="exams" element={<AcademicExams />} />
-<Route path="teacher-performance" element={<AcademicReports />} />
-<Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<TeacherDashboardHome />} />
-        <Route path="live-class" element={<TeacherLiveClass />} />
-        <Route path="training" element={<TeacherTraining />} />
-        <Route path="students" element={<TeacherStudents />} />
-        <Route path="materials" element={<TeacherMaterials />} />
-        <Route path="scores" element={<TeacherScores />} />
-        <Route path="attendance" element={<TeacherAttendance />} />
-        <Route path="chat" element={<TeacherChat />} />
-        <Route path="leave" element={<TeacherLeave />} />
-        <Route path="grading" element={<TeacherGrading />} />
-        <Route path="report" element={<TeacherGrading />} />
-        <Route path="profile" element={<TeacherProfile />} />
-      </Route>
+      />
 
       {/* ── Admin ── */}
       <Route
@@ -206,31 +151,7 @@ function AppRoutes() {
             <AdminDashboard />
           </ProtectedRoute>
         }
-      >
-        <Route path="exams" element={<AcademicExams />} />
-<Route path="teacher-performance" element={<AcademicReports />} />
-<Route path="class-marks" element={<AcademicReports mode="marks" />} />
-<Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<AdminDashboardHome />} />
-        <Route path="students" element={<AdminStudents />} />
-        <Route path="teachers" element={<AdminTeachers />} />
-        <Route path="classes" element={<AdminClassScheduler />} />
-        <Route path="live-monitor" element={<AdminLiveMonitor />} />
-        <Route path="training" element={<AdminTrainingVideos />} />
-        <Route path="announcements" element={<AdminAnnouncements />} />
-        <Route path="demo-bookings" element={<AdminDemoBookings />} />
-        <Route path="chat-logs" element={<AdminChatLogs />} />
-        <Route path="permissions" element={<AdminTeacherPermissions />} />
-        <Route path="login-logs" element={<AdminLoginLogs />} />
-        <Route path="fees" element={<AdminFees />} />
-        <Route path="leave" element={<AdminLeave />} />
-        <Route path="best-teacher" element={<AdminBestTeacher />} />
-        <Route path="enquiries" element={<AdminEnquiries />} />
-        {/* Legacy routes */}
-        <Route path="admissions" element={<AdminEnquiries />} />
-        <Route path="leaves" element={<AdminLeave />} />
-        <Route path="courses" element={<AdminStudents />} />
-      </Route>
+      />
 
       {/* ── 404 ── */}
       <Route path="*" element={<NotFound />} />
@@ -244,8 +165,9 @@ export default function App() {
     <AuthProvider>
       <SocketProvider>
         <BrowserRouter>
+          <NotificationAcknowledgement />
           <ErrorBoundary>
-            <AppRoutes />
+            <Suspense fallback={<div className="min-h-screen bg-[#0A1628] text-white flex items-center justify-center" role="status">Loading portal…</div>}><AppRoutes /></Suspense>
             <PWABanner />
           </ErrorBoundary>
           <Toaster

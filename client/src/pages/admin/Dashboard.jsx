@@ -1,6 +1,9 @@
+import NotificationsInbox from '../common/NotificationsInbox';
+import Profile from '../student/Profile';
+import Downloads from '../common/Downloads';
 import Exams from '../academic/Exams';
 import AcademicReports from '../academic/Reports';
-import { useEffect } from 'react';
+import { lazy, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import NotificationBell from '../../components/NotificationBell';
@@ -30,6 +33,15 @@ import TeacherGrading from './TeacherGrading';
 import Enquiries from './Enquiries';
 import Admissions from './Admissions';
 import Courses from './Courses';
+import PasswordRequests from './PasswordRequests';
+import MaterialReview from './MaterialReview';
+import AdminMessages from './Messages';
+import Support from '../common/Support';
+import Doubts from '../common/Doubts';
+import PortalNotFound from '../../components/PortalNotFound';
+import SalaryManagement from './SalaryManagement';
+import MaterialLibrary from './MaterialLibrary';
+const PdfReader = lazy(() => import('../student/PdfReader'));
 
 const LINKS = [
   { href: '/admin/exams', label: 'Exam Management', icon: FiBook },
@@ -37,6 +49,9 @@ const LINKS = [
   { href: '/admin/class-marks', label: 'Class Marks & Toppers', icon: FiGrid },
 
   { href: '/admin/dashboard', label: 'Dashboard', icon: FiHome },
+  { href: '/admin/notifications', label: 'Notifications', icon: FiBook },
+  { href: '/admin/profile', label: 'Profile', icon: FiUser },
+  { href: '/admin/downloads', label: 'Download Center', icon: FiBook },
   { href: '/admin/students', label: 'Students', icon: FiUsers },
   { href: '/admin/teachers', label: 'Teachers', icon: FiUserCheck },
   { href: '/admin/classes', label: 'Class Scheduler', icon: FiVideo },
@@ -45,8 +60,15 @@ const LINKS = [
   { href: '/admin/announcements', label: 'Announcements', icon: FiMail },
   { href: '/admin/demo-bookings', label: 'Demo Bookings', icon: FiCalendar },
   { href: '/admin/fees', label: 'Fees', icon: FiDollarSign },
+  { href: '/admin/salaries', label: 'Teacher Salaries', icon: FiDollarSign },
   { href: '/admin/leave', label: 'Leave Approvals', icon: FiClock },
   { href: '/admin/chat-logs', label: 'Chat Logs', icon: FiShield },
+  { href: '/admin/messages', label: 'Messages', icon: FiMail },
+  { href: '/admin/support', label: 'Help Center', icon: FiMail },
+  { href: '/admin/doubts', label: 'Discussions', icon: FiMail },
+  { href: '/admin/password-requests', label: 'Password Requests', icon: FiShield },
+  { href: '/admin/material-review', label: 'Material Review', icon: FiBook },
+  { href: '/admin/library', label: 'Material Library', icon: FiBook },
   { href: '/admin/permissions', label: 'Permissions', icon: FiSettings },
   { href: '/admin/login-logs', label: 'Login Logs', icon: FiGrid },
   { href: '/admin/grading', label: 'Teacher Grading', icon: FiAward },
@@ -148,9 +170,18 @@ export default function AdminDashboard() {
             <Route path="announcements" element={<Announcements />} />
             <Route path="demo-bookings" element={<DemoBookings />} />
             <Route path="chat-logs" element={<ChatLogs />} />
+            <Route path="messages" element={<AdminMessages />} />
+            <Route path="support" element={<Support />} />
+            <Route path="doubts" element={<Doubts />} />
+            <Route path="password-requests" element={<PasswordRequests />} />
+            <Route path="material-review" element={<MaterialReview />} />
+            <Route path="library" element={<MaterialLibrary />} />
+            <Route path="materials/pdf/:id" element={<PdfReader />} />
             <Route path="permissions" element={<TeacherPermissions />} />
             <Route path="login-logs" element={<LoginLogs />} />
             <Route path="fees" element={<Fees />} />
+            <Route path="salaries" element={<SalaryManagement />} />
+            <Route path="salary" element={<Navigate to="/admin/salaries" replace />} />
             <Route path="leave" element={<LeaveApprovals />} />
             <Route path="grading" element={<TeacherGrading />} />
             <Route path="enquiries" element={<Enquiries />} />
@@ -158,6 +189,11 @@ export default function AdminDashboard() {
             <Route path="admissions" element={<Admissions />} />
             <Route path="leaves" element={<LeaveApprovals />} />
             <Route path="courses" element={<Courses />} />
+            <Route path="notifications" element={<NotificationsInbox />} />
+<Route path="profile" element={<Profile />} />
+<Route path="downloads" element={<Downloads />} />
+<Route path="settings" element={<Navigate to="/admin/profile" replace />} />
+<Route path="*" element={<PortalNotFound />} />
           </Routes>
         </div>
       </main>

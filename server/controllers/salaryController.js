@@ -352,23 +352,7 @@ const processSalary = async (req, res) => {
     });
 
     const io = req.app.get('io');
-    await notificationService.sendNotification({
-      recipientId: teacher._id,
-      senderId: req.user?._id,
-      type: 'salary_paid',
-      title: 'Salary Processed',
-      message: `Your salary payment for ${context.monthYear} of ₹${newlyPaying} has been processed. Total Paid: ₹${totalPaid}/${breakdown.netSalary}.`,
-      link: '/teacher/salary',
-      referenceId: transaction._id,
-      referenceType: 'SalaryTransaction',
-      data: {
-        monthYear: context.monthYear,
-        netSalary: breakdown.netSalary,
-        salaryTransactionId: transaction._id.toString(),
-        type: 'salary_paid',
-      },
-      io,
-    }).catch((notifErr) => console.error('[Salary] Notification failed:', notifErr.message));
+    await notifySalaryRecord({ transaction, req, action: 'processed' });
 
     io?.to(`user:${teacher._id}`).emit('salary:processed', { salaryTransactionId: transaction._id, monthYear: context.monthYear, netSalary: breakdown.netSalary });
 
@@ -380,65 +364,22 @@ const processSalary = async (req, res) => {
 
 const processAllSalaries = async (req, res) => {
   try {
-    const { month, year, salaryDate } = req.body;
-    const context = getMonthContext(month, year);
+    const context = getMonthContext(req.body.month, req.body.year);
     const teachers = await User.find({ role: 'teacher', isActive: true });
-    let processed = 0;
-    let failed = 0;
-    const now = new Date();
-    const salDate = salaryDate ? new Date(salaryDate) : now;
-
+    let processed = 0, failed = 0, skipped = 0;
     for (const teacher of teachers) {
-      try {
-        const existing = await SalaryTransaction.findOne({ teacherId: teacher._id, monthYear: context.monthYear });
-        if (existing?.paymentStatus === 'paid') continue;
-
-        const breakdown = buildSalaryBreakdown(teacher, req.body);
-        const slipUrl = createSlipUrl(teacher._id, context.monthYear);
-        const transaction = existing || new SalaryTransaction({ teacherId: teacher._id, teacherName: teacher.displayName || teacher.name, teacherEmail: teacher.email || '', month: context.month, year: context.year, monthYear: context.monthYear });
-
-        transaction.teacherName = teacher.displayName || teacher.name;
-        transaction.teacherEmail = teacher.email || '';
-        transaction.groupTuitionSalary = breakdown.groupTuitionSalary;
-        transaction.individualTuitionSalary = breakdown.individualTuitionSalary;
-        transaction.hourlyTuitionSalary = breakdown.hourlyTuitionSalary;
-        transaction.weeklyTuitionSalary = breakdown.weeklyTuitionSalary;
-        transaction.baseSalary = breakdown.baseSalary;
-        transaction.performanceBonus = breakdown.performanceBonus;
-        transaction.specialAllowance = breakdown.specialAllowance;
-        transaction.grossSalary = breakdown.grossSalary;
-        transaction.providentFund = breakdown.providentFund;
-        transaction.taxDeduction = breakdown.taxDeduction;
-        transaction.otherDeductions = breakdown.otherDeductions;
-        transaction.attendanceDeductionAmount = breakdown.attendanceDeductionAmount;
-        transaction.totalDeductions = breakdown.totalDeductions;
-        transaction.netSalary = breakdown.netSalary;
-        transaction.paymentStatus = 'paid';
-        transaction.paidDate = now;
-        transaction.paidAmount = breakdown.netSalary;
-        transaction.paymentMethod = teacher.salary?.paymentMode || 'bank_transfer';
-        transaction.processingDate = now;
-        transaction.salaryDate = salDate;
-        transaction.processedBy = req.user?._id || null;
-        transaction.processedByName = req.user?.name || req.user?.displayName || '';
-        transaction.processedAt = now;
-        transaction.salarySlipGenerated = true;
-        transaction.salarySlipUrl = slipUrl;
-        transaction.notes = 'Bulk salary processing';
-        await transaction.save();
-        await upsertTeacherSalaryHistory(teacher, { ...transaction.toObject(), salarySlipUrl: slipUrl });
-
-        await notifySalaryRecord({ transaction, req, action: 'processed' });
-        processed += 1;
-      } catch (innerError) {
-        failed += 1;
-      }
+      const existing = await SalaryTransaction.findOne({ teacherId: teacher._id, monthYear: context.monthYear });
+      const breakdown = buildSalaryBreakdown(teacher);
+      const remaining = Math.max(0, breakdown.netSalary - (existing?.paidAmount || 0));
+      if (!remaining) { skipped++; continue; }
+      let status = 200;
+      const result = { status(code) { status = code; return this; }, json(body) { if (status < 400 && body.success) processed++; else failed++; } };
+      await processSalary({ ...req, body: { teacherId: teacher._id, month: context.month, year: context.year,
+        payingAmount: remaining, paymentMethod: teacher.salary?.paymentMode || 'bank_transfer', salaryDate: req.body.salaryDate,
+        notes: 'Bulk salary processing' } }, result);
     }
-
-    res.status(200).json({ success: true, processed, failed });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+    return res.json({ success: failed === 0, processed, failed, skipped });
+  } catch { return res.status(500).json({ success: false, message: 'Unable to process payroll.' }); }
 };
 
 const getSalaryReports = async (req, res) => {
@@ -525,6 +466,9 @@ const downloadSalarySlip = async (req, res) => {
   try {
     const { monthYear } = req.params;
     const teacherId = req.params.teacherId || req.user._id;
+      if (req.user.role === 'teacher' && String(teacherId) !== String(req.user._id)) {
+        return res.status(403).json({ success: false, message: 'You can only download your own salary slip.' });
+      }
     const teacher = await User.findById(teacherId).select('-password -refreshToken');
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found.' });

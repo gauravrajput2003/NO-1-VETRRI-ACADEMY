@@ -39,6 +39,10 @@ function loginHarness({ storedMobile = '+91 98765 43210', passwordMatches = true
   };
   const { login } = load('controllers/authController.js', {
     '../models/User': model, '../utils/loginLookup': { buildLoginLookup },
+    '../models/UserSession': { create: async () => {} },
+    'mongoose': { Types: { ObjectId: class { toString() { return 'session-1'; } } } },
+    'node:crypto': require('node:crypto'),
+    'jsonwebtoken': { decode: () => ({ exp: Math.floor(Date.now() / 1000) + 3600 }) },
     '../utils/generateToken': {
       generateToken: () => { calls.tokens++; return 'access-token'; },
       generateRefreshToken: () => 'refresh-token', setCookieToken() {},

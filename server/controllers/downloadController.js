@@ -90,6 +90,9 @@ const getDownloadableResources = async (req, res) => {
 
     // Only show materials that are accessible
     if (req.user.role === 'student') {
+      if (grade && grade !== req.user.grade) return res.status(403).json({ success: false, message: 'Only your class resources are available.' });
+      filter.approvalStatus = 'approved';
+      filter.grade = { $in: [req.user.grade, 'all', '', null] };
       filter.$or = [
         { lockedForAll: false },
         { unlockedFor: req.user._id },
@@ -98,7 +101,7 @@ const getDownloadableResources = async (req, res) => {
       filter.lockedFor = { $ne: req.user._id };
     }
 
-    if (grade) filter.grade = grade;
+    if (grade && req.user.role !== 'student') filter.grade = grade;
     if (subject) filter.subject = { $regex: subject, $options: 'i' };
     if (type) filter.type = type;
 

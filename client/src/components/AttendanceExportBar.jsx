@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { FiPrinter, FiFileText, FiDownload } from 'react-icons/fi';
 import { RiFileExcel2Line } from 'react-icons/ri';
-import { exportToPDF, exportToExcel, triggerPrint } from '../utils/exportUtils';
+import toast from 'react-hot-toast';
 
 export default function AttendanceExportBar({
   // Data for export
@@ -25,19 +25,21 @@ export default function AttendanceExportBar({
   const handlePDF = async () => {
     if (!rows.length) return;
     setPdfLoading(true);
-    setTimeout(() => {
+    try {
+      const { exportToPDF } = await import('../utils/exportUtils');
       exportToPDF({ rows, columns, title, dateRange, generatedBy, filename, colorRows });
-      setPdfLoading(false);
-    }, 100);
+    } catch { toast.error('Unable to generate PDF'); }
+    finally { setPdfLoading(false); }
   };
 
-  const handleExcel = () => {
+  const handleExcel = async () => {
     if (!rows.length) return;
     setExcelLoading(true);
-    setTimeout(() => {
+    try {
+      const { exportToExcel } = await import('../utils/exportUtils');
       exportToExcel({ rows, filename });
-      setExcelLoading(false);
-    }, 100);
+    } catch { toast.error('Unable to export Excel'); }
+    finally { setExcelLoading(false); }
   };
 
   return (
@@ -48,7 +50,7 @@ export default function AttendanceExportBar({
       {/* Right: Export buttons */}
       <div className="flex items-center gap-2">
         <button
-          onClick={triggerPrint}
+          onClick={() => window.print()}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-white/20 text-white/70 hover:text-white hover:border-white/40 rounded-lg transition-all"
           title="Print this table"
         >

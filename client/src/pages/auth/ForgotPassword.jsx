@@ -1,19 +1,21 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
+  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
       setSubmitting(true);
-      const { data } = await api.post('/auth/password/forgot', { email });
+      const { data } = await api.post('/auth/password-reset/request', { identifier: email.trim() });
       if (data.success) {
-        toast.success('If your email exists, a reset link has been sent.');
+        toast.success('Request submitted. Contact the academy admin for a temporary password.');
+        navigate(`/reset-password?identifier=${encodeURIComponent(email.trim())}`);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to send reset link.');
@@ -25,21 +27,21 @@ export default function ForgotPassword() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <Link to="/login" style={styles.back}>Back</Link>
+        <Link to="/login/student" style={styles.back}>Back</Link>
         <h1 style={styles.title}>Forgot Password?</h1>
-        <p style={styles.sub}>Enter your email to receive a reset link.</p>
+        <p style={styles.sub}>Enter your registered phone or email. The academy admin will help you obtain a temporary password.</p>
 
         <form onSubmit={onSubmit} style={styles.form}>
           <input
-            type="email"
+            type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
+            placeholder="Registered phone or email"
             style={styles.input}
             required
           />
           <button type="submit" disabled={submitting} style={styles.btn}>
-            {submitting ? 'Sending...' : 'Send Reset Link'}
+            {submitting ? 'Submitting...' : 'Request Temporary Password'}
           </button>
         </form>
 

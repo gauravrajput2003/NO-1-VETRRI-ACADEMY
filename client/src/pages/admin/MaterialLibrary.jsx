@@ -1,0 +1,32 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import api from '../../services/api';
+import { performDirectUploadFlow } from '../../services/directUpload';
+export default function MaterialLibrary() {
+  const [items, setItems] = useState([]), [folders, setFolders] = useState([]), [students, setStudents] = useState([]);
+  const [grade, setGrade] = useState(''), [student, setStudent] = useState(''), [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ title: '', subject: '', grade: '', description: '', lockedForAll: true });
+  const [busy, setBusy] = useState(false), [progress, setProgress] = useState(0);
+  const file = useRef(null);
+  const load = async () => { try { const [materials, groups] = await Promise.all([api.get('/admin/materials'), api.get('/admin/folders')]); setItems(materials.data.materials || []); setFolders(groups.data.folders || []); } catch { toast.error('Unable to load library'); } };
+  useEffect(() => { load(); api.get('/admin/students', { params: { limit: 1000 } }).then(({ data }) => setStudents(data.students || [])).catch(() => {}); }, []);
+  const action = async (task) => { setBusy(true); try { await task(); await load(); } catch (error) { toast.error(error.response?.data?.message || error.message || 'Unable to update library'); } finally { setBusy(false); } };
+  const save = async (event) => {
+    event.preventDefault(); const selectedFile = file.current?.files?.[0];
+    if (!editing && !selectedFile) return toast.error('Select a material file');
+    await action(async () => {
+      if (selectedFile) await performDirectUploadFlow(selectedFile, { ...form, ...(editing ? { materialId: editing } : {}) }, 'cloudinary', setProgress);
+      else await api.put(`/admin/materials/${editing}`, form);
+      setEditing(null); setForm({ title: '', subject: '', grade: '', description: '', lockedForAll: true }); file.current.value = ''; toast.success('Material saved');
+    });
+  };
+  return <section className="text-white space-y-5"><h1 className="text-2xl font-bold">Material Library</h1>
+    <form onSubmit={save} className="glass-card p-4 space-y-3"><h2 className="font-bold">{editing ? 'Edit / replace material' : 'Upload material'}</h2><div className="grid md:grid-cols-3 gap-3">{['title', 'subject', 'grade'].map((key) => <label key={key}>{key}<input required={key !== 'grade'} className="input-field" value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}</div><label>Description<textarea className="input-field" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><label className="flex gap-2"><input type="checkbox" checked={form.lockedForAll} onChange={(event) => setForm({ ...form, lockedForAll: event.target.checked })} />Locked by default</label><input ref={file} type="file" className="input-field" accept=".pdf,.ppt,.pptx,.doc,.docx,.mp4,.jpg,.jpeg,.png" /><button disabled={busy} className="btn-primary">{busy ? `Saving ${progress}%` : 'Save material'}</button>{editing && <button type="button" className="ml-3" onClick={() => { setEditing(null); setForm({ title: '', subject: '', grade: '', description: '', lockedForAll: true }); file.current.value = ''; }}>Cancel</button>}</form>
+    <section className="glass-card p-4 flex flex-wrap gap-3 items-center"><label>Folder<select className="input-field" value={grade} onChange={(event) => setGrade(event.target.value)}><option value="">All folders</option>{folders.map((folder) => <option key={folder._id} value={folder.grade}>{folder.name}</option>)}</select></label>
+      <button className="text-gold" onClick={() => { const name = window.prompt('Folder name'); const nextGrade = name && window.prompt('Class / grade for the folder'); if (name && nextGrade) action(() => api.post('/admin/folders', { name, grade: nextGrade })); }}>Create folder</button>
+      {grade && <><button className="text-gold" onClick={() => { const folder = folders.find((item) => item.grade === grade); const name = window.prompt('Rename folder', folder.name); if (name) action(() => api.put(`/admin/folders/${folder._id}`, { name, grade, order: folder.order, isActive: folder.isActive })); }}>Rename folder</button><button className="text-red-300" onClick={() => { const folder = folders.find((item) => item.grade === grade); if (window.confirm('Delete this empty folder?')) action(async () => { await api.delete(`/admin/folders/${folder._id}`); setGrade(''); }); }}>Delete empty folder</button></>}
+      <label>Student access<select className="input-field" value={student} onChange={(event) => setStudent(event.target.value)}><option value="">Select student</option>{students.filter((item) => !grade || item.grade === grade).map((item) => <option key={item._id} value={item._id}>{item.name} · {item.grade}</option>)}</select></label></section>
+    {items.filter((item) => !grade || item.grade === grade).map((item) => <article key={item._id} className="glass-card p-4 space-y-2"><h2 className="font-bold">{item.title}</h2><p className="text-white/50">{item.subject} · {item.grade} · {item.approvalStatus}</p><div className="flex flex-wrap gap-4 text-sm"><button className="text-gold" onClick={() => { setEditing(item._id); setForm({ title: item.title, subject: item.subject, grade: item.grade || '', description: item.description || '', lockedForAll: item.lockedForAll }); }}>Edit / replace</button>{item.type === 'pdf' && <Link className="text-gold" to={`/admin/materials/pdf/${item._id}`}>Read PDF</Link>}<button className="text-gold" onClick={async () => { const popup = window.open('', '_blank'); if (popup) popup.opener = null; try { const { data } = await api.get(`/admin/materials/${item._id}/preview`); if (popup) popup.location.href = data.url; } catch { popup?.close(); toast.error('Preview unavailable'); } }}>Preview</button><button className="text-red-300" onClick={() => { if (window.confirm(`Delete "${item.title}"?`)) action(() => api.delete(`/admin/materials/${item._id}`)); }}>Delete material</button>{student && <><button className="text-green-300" onClick={() => action(() => api.put(`/admin/materials/${item._id}/lock`, { studentId: student, unlock: true }))}>Unlock student</button><button className="text-red-300" onClick={() => action(() => api.put(`/admin/materials/${item._id}/lock`, { studentId: student, unlock: false }))}>Lock student</button></>}</div></article>)}
+  </section>;
+}

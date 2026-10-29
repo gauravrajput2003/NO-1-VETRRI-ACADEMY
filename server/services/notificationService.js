@@ -2,6 +2,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { sendPushNotifications } = require('./pushService');
 const { errorCrit } = require('../utils/logger');
+const { sendBrowserNotification } = require('./browserPushService');
 
 /** 
  * Sends a notification via MongoDB, Socket.io, and Expo Push.
@@ -57,7 +58,10 @@ const sendNotification = async ({
       }
     }
 
-    const user = await User.findById(recipientId).select('expoPushToken isActive');
+    const user = await User.findById(recipientId).select('expoPushToken isActive tokenVersion role');
+    if (user && user.isActive !== false) {
+      await sendBrowserNotification(user, notification).catch(() => {});
+    }
     if (user && user.isActive !== false && user.expoPushToken) {
       await sendPushNotifications([user.expoPushToken], {
         title,

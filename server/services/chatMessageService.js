@@ -6,7 +6,7 @@ const { notifyChatMessage } = require('./chatNotificationService');
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 
 // HTTP messages and admin-assisted recovery share this authorization boundary.
-async function createTextMessage({ sender, receiverId, message, session, recoveryRequestId, recoveryCiphertext }) {
+async function createTextMessage({ sender, receiverId, message, session, recoveryRequestId, recoveryCiphertext, credentialType, expiresAt, recoveryStatus }) {
   if (!sender || !['admin', 'student', 'teacher'].includes(sender.role) || !receiverId
     || typeof message !== 'string' || !message.trim() || message.length > 5000) throw fail('Invalid message details.');
   const receiver = await User.findById(receiverId).session(session || null);
@@ -22,7 +22,7 @@ async function createTextMessage({ sender, receiverId, message, session, recover
     senderId: sender._id, senderRole: sender.role, senderDisplayName: sender.displayName || sender.name,
     receiverId, conversationId, message: message.trim(), messageType: 'text',
     sender: sender._id, receiver: receiverId, roomId: conversationId,
-    ...(recoveryRequestId ? { recoveryRequestId, recoveryCiphertext } : {}),
+    ...(recoveryRequestId ? { recoveryRequestId, recoveryCiphertext, credentialType, expiresAt, recoveryStatus } : {}),
   }], { session });
   await Conversation.findOneAndUpdate({ conversationId }, {
     $setOnInsert: { conversationId, participants: [sender._id, receiverId] },
