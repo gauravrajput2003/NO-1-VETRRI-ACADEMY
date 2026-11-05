@@ -4,9 +4,7 @@ import Exams from '../academic/Exams';
 import AcademicReports from '../academic/Reports';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import PortalNotFound from '../../components/PortalNotFound';
-import Sidebar from '../../components/Sidebar';
-import NotificationBell from '../../components/NotificationBell';
-import VettriAIButton from '../../components/VettriAIButton';
+import PortalShell from '../../design-system/PortalShell';
 import { useAuth } from '../../context/AuthContext';
 import {
   FiHome, FiUsers, FiVideo, FiBook, FiBarChart2,
@@ -62,28 +60,8 @@ const LINKS = [
 export default function TeacherDashboard() {
   const { user } = useAuth();
 
-  return (
-    <div className="min-h-screen bg-[#0A1628] flex">
-      <Sidebar links={LINKS} role="teacher" />
-
-      <main className="flex-1 overflow-auto min-h-screen pt-[72px] md:pt-0">
-        {/* Top bar */}
-        <div className="fixed md:sticky top-0 left-0 right-0 md:left-auto md:right-auto z-40 bg-[#0A1628]/90 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex items-center justify-between no-print">
-          <div className="ml-10 md:ml-0">
-            <h2 className="text-white font-display font-semibold text-lg">Teacher Portal</h2>
-            <p className="text-white/40 text-xs">{user?.qualification || user?.name}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <VettriAIButton />
-            <NotificationBell />
-            <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 font-bold text-sm">
-              {user?.name?.[0]?.toUpperCase() || 'T'}
-            </div>
-          </div>
-        </div>
-
-        {/* Print header (hidden on screen) */}
-        <div className="print-header px-6 pt-4">
+  return <PortalShell role="teacher" links={LINKS} >
+    <div className="print-header px-6 pt-4">
           <h1>No.1 Vettri Academy</h1>
           <p>Tamil Nadu | +91 9047758389</p>
           <div className="print-meta">
@@ -91,9 +69,7 @@ export default function TeacherDashboard() {
             <span>Generated: {new Date().toLocaleString('en-IN')}</span>
           </div>
         </div>
-
-        <div className="p-6">
-          <Routes>
+    <Routes>
             <Route path="exams" element={<Exams />} />
             <Route path="teacher-performance" element={<AcademicReports />} />
 
@@ -123,8 +99,5 @@ export default function TeacherDashboard() {
 <Route path="settings" element={<Navigate to="/teacher/profile" replace />} />
 <Route path="*" element={<PortalNotFound />} />
           </Routes>
-        </div>
-      </main>
-    </div>
-  );
+  </PortalShell>;
 }

@@ -2,11 +2,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { FiCamera, FiSave, FiLock, FiUser, FiEye, FiEyeOff } from 'react-icons/fi';
 import { getProfile, updateProfile, changePassword, updateAvatar } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { Badge, PageHeader } from '../../design-system/components';
+import './profile.css';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name required'),
@@ -41,6 +43,7 @@ function getStrength(pw) {
 }
 
 export default function TeacherProfile() {
+  const reducedMotion = useReducedMotion();
   const { user, updateUser, logout } = useAuth();
   const [profilePic, setProfilePic] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -150,39 +153,31 @@ export default function TeacherProfile() {
   const strength = getStrength(newPw);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="font-display font-bold text-2xl text-white">My Profile</h1>
-        <p className="text-white/40 text-sm mt-1">Manage your personal information and security</p>
-      </div>
+    <div className="va-profile-page">
+      <PageHeader title="My Profile" subtitle="Your teaching profile, account details and security in one place." />
+      <div className="va-profile-layout">
+      <aside className="va-profile-summary va-card">
+        <div className="va-profile-identity">
+          <img src={avatarSrc} alt="Your profile" className="va-profile-photo" />
+          <div><Badge tone="teal">Teacher</Badge><h2>{user?.displayName || user?.name || 'Your profile'}</h2><p className="va-secondary">{watch('subjects') || 'Teaching profile'}</p></div>
+        </div>
+        <label className="va-profile-upload"><FiCamera size={18} /><span>{uploading ? 'Uploading photo…' : 'Change profile photo'}</span><input type="file" accept="image/*" aria-label="Change profile photo" disabled={uploading} onChange={handleAvatarChange} /></label>
+        <p className="va-small va-secondary">Choose an image under 5 MB.</p>
+        <nav className="va-profile-shortcuts" aria-label="Profile sections"><a href="#teaching-profile"><FiUser size={18} /> Profile details</a><a href="#profile-security"><FiLock size={18} /> Password & security</a></nav>
+        <div className="va-profile-account-note"><FiLock size={18} /><p>Your name, email and mobile number are managed by the academy. Contact admin to update them.</p></div>
+      </aside>
+      <div className="va-profile-content">
 
       {/* Profile Card */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={reducedMotion ? false : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6"
+        className="va-card va-profile-details" id="teaching-profile"
       >
-        {/* Avatar */}
-        <div className="flex justify-center mb-6">
-          <div className="relative group">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gold/30 bg-navy">
-              {uploading ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-                </div>
-              ) : (
-                <img src={avatarSrc} alt="Avatar" className="w-full h-full object-cover" />
-              )}
-            </div>
-            <label className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-              <FiCamera className="text-white" size={20} />
-              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-            </label>
-          </div>
-        </div>
+        <header className="va-profile-card-heading"><span className="va-icon-chip va-tone-teal"><FiUser size={20} /></span><div><h2>Profile details</h2><p className="va-secondary va-small">Help students get to know their teacher.</p></div></header>
 
         <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="va-profile-fields">
             <div>
               <label className="input-label">Display Name *</label>
               <input {...register('name')} readOnly={user.role !== 'admin'} aria-description="Contact admin to change account identity" className="input-field" placeholder="Your name" />
@@ -228,7 +223,7 @@ export default function TeacherProfile() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-gold text-navy font-semibold py-3 rounded-xl hover:bg-yellow-400 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            className="va-profile-save va-button va-button--primary"
           >
             {saving ? (
               <div className="w-5 h-5 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
@@ -242,10 +237,10 @@ export default function TeacherProfile() {
 
       {/* Password Card */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={reducedMotion ? false : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6"
+        className="va-card va-profile-security" id="profile-security"
       >
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 bg-gold/10 rounded-xl flex items-center justify-center">
@@ -258,6 +253,7 @@ export default function TeacherProfile() {
         </div>
 
         <form onSubmit={handlePwSubmit(onPwSubmit)} className="space-y-4">
+          <div className="va-profile-password-fields">
           <div>
             <label className="input-label">Current Password</label>
             <div className="relative">
@@ -267,7 +263,7 @@ export default function TeacherProfile() {
                 className="input-field pr-10"
                 placeholder="••••••••"
               />
-              <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+              <button type="button" aria-label={showCurrent ? 'Hide current password' : 'Show current password'} onClick={() => setShowCurrent(!showCurrent)} className="va-profile-eye absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
                 {showCurrent ? <FiEyeOff size={16} /> : <FiEye size={16} />}
               </button>
             </div>
@@ -278,13 +274,12 @@ export default function TeacherProfile() {
             <label className="input-label">New Password</label>
             <div className="relative">
               <input
-                {...regPw('newPassword')}
+                {...regPw('newPassword', { onChange: (e) => setNewPw(e.target.value) })}
                 type={showNew ? 'text' : 'password'}
                 className="input-field pr-10"
                 placeholder="Min 8 characters"
-                onChange={(e) => setNewPw(e.target.value)}
               />
-              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+              <button type="button" aria-label={showNew ? 'Hide new password' : 'Show new password'} onClick={() => setShowNew(!showNew)} className="va-profile-eye absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
                 {showNew ? <FiEyeOff size={16} /> : <FiEye size={16} />}
               </button>
             </div>
@@ -308,17 +303,18 @@ export default function TeacherProfile() {
                 className="input-field pr-10"
                 placeholder="••••••••"
               />
-              <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+              <button type="button" aria-label={showConfirm ? 'Hide password confirmation' : 'Show password confirmation'} onClick={() => setShowConfirm(!showConfirm)} className="va-profile-eye absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
                 {showConfirm ? <FiEyeOff size={16} /> : <FiEye size={16} />}
               </button>
             </div>
             {pwErrors.confirmPassword && <p className="text-red-400 text-xs mt-1">{pwErrors.confirmPassword.message}</p>}
           </div>
+          </div>
 
           <button
             type="submit"
             disabled={pwLoading}
-            className="w-full border border-gold/50 text-gold font-semibold py-3 rounded-xl hover:bg-gold hover:text-navy transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            className="va-button va-button--ghost va-profile-save"
           >
             {pwLoading ? (
               <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
@@ -329,6 +325,8 @@ export default function TeacherProfile() {
           </button>
         </form>
       </motion.div>
+      </div>
+      </div>
     </div>
   );
 }

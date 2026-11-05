@@ -11,17 +11,18 @@ import {
 } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import UploadProgress from '../../components/UploadProgress';
+import { Avatar, Badge, EmptyState, Modal, Skeleton } from '../../design-system/components';
 
 // ─── Help Guide ───────────────────────────────────────────────────────────────
 function HelpGuide() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="glass-card rounded-xl border border-white/10 mt-4">
+    <div className="va-help-guide glass-card rounded-xl border border-white/10 mt-4">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-5 py-4 text-left"
       >
-        <span className="text-white font-semibold text-sm">❓ How to conduct a class?</span>
+        <span className="text-white font-semibold text-sm"> How to conduct a class?</span>
         {open ? <FiChevronUp className="text-gold" /> : <FiChevronDown className="text-gold" />}
       </button>
       <AnimatePresence>
@@ -34,7 +35,7 @@ function HelpGuide() {
           >
             <div className="px-5 py-5 grid md:grid-cols-2 gap-6 text-xs text-white/70 leading-relaxed">
               <div>
-                <h4 className="text-gold font-semibold text-sm mb-3">🔴 LIVE CLASS</h4>
+                <h4 className="text-gold font-semibold text-sm mb-3"> LIVE CLASS</h4>
                 <div className="space-y-3">
                   <div>
                     <p className="font-semibold text-white/90 mb-1">Option A — Google Meet (up to 60 min, free):</p>
@@ -57,7 +58,7 @@ function HelpGuide() {
                 </div>
               </div>
               <div>
-                <h4 className="text-gold font-semibold text-sm mb-3">📹 RECORDING (OBS Studio)</h4>
+                <h4 className="text-gold font-semibold text-sm mb-3"> RECORDING (OBS Studio)</h4>
                 <ol className="list-decimal pl-4 space-y-1">
                   <li>Download OBS Studio from <span className="text-gold">obsproject.com</span> (free, one time)</li>
                   <li>Open OBS before starting your class</li>
@@ -67,7 +68,7 @@ function HelpGuide() {
                   <li>File saves automatically on your computer</li>
                   <li>Come back to dashboard → Upload Recording → Select file</li>
                   <li>Wait for upload to complete (do not close browser)</li>
-                  <li>Students will see recording automatically ✅</li>
+                  <li>Students will see recording automatically </li>
                 </ol>
               </div>
             </div>
@@ -90,49 +91,7 @@ function AttendanceModal({ classId, onClose }) {
     });
   }, [classId]);
 
-  const statusColor = { present: 'text-green-400', late: 'text-amber-400', absent: 'text-red-400' };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-navy border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h3 className="text-white font-semibold">Class Attendance</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white">✕</button>
-        </div>
-        <div className="overflow-y-auto flex-1 p-4 space-y-2">
-          {loading ? (
-            <p className="text-center text-white/40 py-8">Loading...</p>
-          ) : attendance.length === 0 ? (
-            <p className="text-center text-white/40 py-8">No attendance records yet.</p>
-          ) : (
-            attendance.map((rec) => (
-              <div key={rec._id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
-                <img
-                  src={rec.studentId?.profilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${rec.studentId?._id}`}
-                  alt=""
-                  className="w-8 h-8 rounded-full"
-                />
-                <div className="flex-1">
-                  <p className="text-white text-sm font-medium">{rec.studentId?.displayName || rec.studentId?.name}</p>
-                  <p className="text-white/40 text-xs">{rec.studentId?.grade}</p>
-                </div>
-                <span className={`text-xs font-semibold capitalize ${statusColor[rec.status] || 'text-white/40'}`}>
-                  {rec.status}
-                </span>
-                {rec.joinTime && (
-                  <span className="text-xs text-white/30">{new Date(rec.joinTime).toLocaleTimeString('en-IN')}</span>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </motion.div>
-    </div>
-  );
+  return <Modal open title="Class Attendance" onClose={onClose}><div className="va-attendance-list">{loading ? <Skeleton /> : attendance.length === 0 ? <EmptyState title="No attendance records yet." /> : attendance.map((record) => <div className="va-attendance-row" key={record._id}><div className="va-person-cell"><Avatar name={record.studentId?.displayName || record.studentId?.name || 'Student'} src={record.studentId?.profilePic} /><div><strong>{record.studentId?.displayName || record.studentId?.name}</strong><span className="va-secondary va-small">{record.studentId?.grade}</span></div></div><Badge tone={record.status === 'absent' ? 'pink' : record.status === 'late' ? 'gold' : 'teal'}>{record.status}</Badge>{record.joinTime && <span className="va-secondary va-small">{new Date(record.joinTime).toLocaleTimeString('en-IN')}</span>}</div>)}</div></Modal>;
 }
 
 // ─── Upload Recording Panel ───────────────────────────────────────────────────
@@ -281,7 +240,7 @@ function TeacherClassCard({ cls, onUpdate }) {
     try {
       await goLive(cls._id, { meetLink, meetLinkType });
       setStatus('live');
-      toast.success('🔴 Class is now LIVE! Students can join.');
+      toast.success(' Class is now LIVE! Students can join.');
       onUpdate?.();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to go live');
@@ -315,7 +274,7 @@ function TeacherClassCard({ cls, onUpdate }) {
   return (
     <motion.div
       layout
-      className={`glass-card rounded-2xl p-5 border transition-all duration-300 ${
+      className={`va-live-class-card glass-card rounded-2xl p-5 border transition-all duration-300 ${
         status === 'live'
           ? 'border-red-500/40 shadow-lg shadow-red-500/10'
           : status === 'completed'
@@ -326,9 +285,9 @@ function TeacherClassCard({ cls, onUpdate }) {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="bg-gold/20 text-gold text-xs font-bold px-2 py-0.5 rounded-full">{cls.course}</span>
-            <span className="text-white/40 text-xs">Grade {cls.grade}</span>
+          <div className="va-class-tags">
+            <Badge tone="gold">{cls.course || 'NA'}</Badge>
+            <Badge tone="teal">Grade {cls.grade}</Badge>
           </div>
           <h3 className="text-white font-bold text-lg">{cls.subject}</h3>
           <p className="text-white/50 text-sm mt-0.5">
@@ -359,7 +318,7 @@ function TeacherClassCard({ cls, onUpdate }) {
       {status === 'scheduled' && (
         <div className="space-y-3 p-4 bg-white/5 rounded-xl border border-white/10">
           <p className="text-white/70 text-xs font-medium">
-            📝 Step 1: Create a meeting link (Google Meet or Jitsi) and paste it below
+             Step 1: Create a meeting link (Google Meet or Jitsi) and paste it below
           </p>
 
           <select
@@ -397,7 +356,7 @@ function TeacherClassCard({ cls, onUpdate }) {
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
-            {isGoingLive ? 'Going Live...' : '🔴 GO LIVE'}
+            {isGoingLive ? 'Going Live...' : ' GO LIVE'}
           </button>
         </div>
       )}
@@ -406,7 +365,7 @@ function TeacherClassCard({ cls, onUpdate }) {
       {status === 'live' && (
         <div className="space-y-3">
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-center">
-            <p className="text-red-300 text-sm font-semibold">🔴 Class is Live · {liveCount} student{liveCount !== 1 ? 's' : ''} joined</p>
+            <p className="text-red-300 text-sm font-semibold"> Class is Live · {liveCount} student{liveCount !== 1 ? 's' : ''} joined</p>
             <p className="text-white/40 text-xs mt-0.5">Students can see "JOIN NOW" on their dashboard</p>
           </div>
           {!showConfirmEnd ? (
@@ -419,7 +378,7 @@ function TeacherClassCard({ cls, onUpdate }) {
             </button>
           ) : (
             <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-2">
-              <p className="text-white/60 text-xs text-center">⚠️ Are you sure you want to end the class?</p>
+              <p className="text-white/60 text-xs text-center"> Are you sure you want to end the class?</p>
               <div className="flex gap-2">
                 <button onClick={() => setShowConfirmEnd(false)} className="flex-1 py-2 rounded-lg text-sm border border-white/20 text-white/40 hover:text-white">Cancel</button>
                 <button onClick={handleEndClass} disabled={isEnding} className="flex-1 py-2 rounded-lg text-sm bg-red-600 text-white font-semibold hover:bg-red-500 disabled:opacity-40">
@@ -433,7 +392,7 @@ function TeacherClassCard({ cls, onUpdate }) {
 
       {/* Post-class: upload + attendance */}
       {status === 'completed' && (
-        <div className="space-y-3">
+        <div className="va-class-actions space-y-3">
           {!cls.recordingUrl && (
             <>
               <button
@@ -441,7 +400,7 @@ function TeacherClassCard({ cls, onUpdate }) {
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm border border-gold/30 text-gold hover:bg-gold/10 transition-all"
               >
                 <FiUploadCloud size={16} />
-                📹 Upload Recording
+                 Upload Recording
               </button>
               {showUpload && <UploadRecordingPanel classId={cls._id} onSuccess={() => setShowUpload(false)} />}
             </>
@@ -449,7 +408,7 @@ function TeacherClassCard({ cls, onUpdate }) {
           {cls.recordingUrl && (
             <div className="flex items-center gap-2 p-2.5 bg-green-500/10 rounded-lg border border-green-500/20">
               <FiCheckCircle className="text-green-400" size={16} />
-              <p className="text-green-300 text-xs font-semibold">Recording available for students ✅</p>
+              <p className="text-green-300 text-xs font-semibold">Recording available for students </p>
             </div>
           )}
           <button
@@ -457,7 +416,7 @@ function TeacherClassCard({ cls, onUpdate }) {
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-all"
           >
             <FiBarChart2 size={16} />
-            📊 View Attendance
+             View Attendance
           </button>
         </div>
       )}
@@ -468,7 +427,7 @@ function TeacherClassCard({ cls, onUpdate }) {
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
-export default function TeacherLiveClass() {
+export default function TeacherLiveClass({ embedded = false }) {
   const [todayClasses, setTodayClasses] = useState([]);
   const [upcomingClasses, setUpcomingClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -497,18 +456,18 @@ export default function TeacherLiveClass() {
   useEffect(() => { fetchClasses(); }, []);
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className={embedded ? 'va-embedded-classes space-y-6' : 'space-y-6'}>
+      {!embedded && <div>
         <h1 className="text-2xl font-display font-bold text-white">Live Classes</h1>
         <p className="text-white/50 text-sm mt-1">Manage your live sessions and recording uploads</p>
-      </div>
+      </div>}
 
       {/* Today's Classes */}
       <section>
-        <h2 className="text-white font-semibold mb-3 flex items-center gap-2">
+        {!embedded && <h2 className="text-white font-semibold mb-3 flex items-center gap-2">
           <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           Today's Classes
-        </h2>
+        </h2>}
         {loading ? (
           <div className="grid gap-4">{[1,2].map(i => <div key={i} className="h-48 rounded-2xl bg-white/5 animate-pulse" />)}</div>
         ) : todayClasses.length === 0 ? (
@@ -529,7 +488,7 @@ export default function TeacherLiveClass() {
       {/* Upcoming */}
       {upcomingClasses.length > 0 && (
         <section>
-          <h2 className="text-white font-semibold mb-3">📅 Upcoming Classes (Next 7 Days)</h2>
+          <h2 className="text-white font-semibold mb-3"> Upcoming Classes (Next 7 Days)</h2>
           <div className="grid gap-3">
             {upcomingClasses.slice(0, 5).map((cls) => (
               <div key={cls._id} className="glass-card rounded-xl p-4 border border-white/10 flex items-center gap-4">

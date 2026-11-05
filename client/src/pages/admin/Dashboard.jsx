@@ -1,3 +1,4 @@
+import { CalendarDays, Home, Monitor, Settings2, Users } from 'lucide-react';
 import NotificationsInbox from '../common/NotificationsInbox';
 import Profile from '../student/Profile';
 import Downloads from '../common/Downloads';
@@ -5,8 +6,7 @@ import Exams from '../academic/Exams';
 import AcademicReports from '../academic/Reports';
 import { lazy, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import Sidebar from '../../components/Sidebar';
-import NotificationBell from '../../components/NotificationBell';
+import PortalShell from '../../design-system/PortalShell';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import {
@@ -83,6 +83,8 @@ const MOBILE_NAV = [
   { href: '/admin/fees', label: 'More', icon: '⚙️' },
 ];
 
+const mobileIcon = { '/admin/dashboard': Home, '/admin/students': Users, '/admin/live-monitor': Monitor, '/admin/classes': CalendarDays, '/admin/fees': Settings2 };
+
 function MobileNav() {
   const location = useLocation();
   return (
@@ -93,7 +95,7 @@ function MobileNav() {
           return (
             <Link key={item.href} to={item.href}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${isActive ? 'text-gold' : 'text-white/40'}`}>
-              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="text-lg leading-none">{(() => { const ItemIcon = mobileIcon[item.href]; return <ItemIcon size={18} strokeWidth={1.7} aria-hidden="true" />; })()}</span>
               <span className="text-[9px] font-medium">{item.label}</span>
               {isActive && <span className="w-1 h-1 bg-gold rounded-full" />}
             </Link>
@@ -125,27 +127,8 @@ export default function AdminDashboard() {
     socket.emit('admin:join-monitor');
   }, [socket]);
 
-  return (
-    <div className="min-h-screen bg-[#0A1628] flex">
-      <Sidebar links={LINKS} role="admin" />
-
-      <main className="flex-1 overflow-auto min-h-screen pt-[72px] md:pt-0 pb-16 md:pb-0">
-        {/* Top bar */}
-        <div className="fixed md:sticky top-0 left-0 right-0 md:left-auto md:right-auto z-40 bg-[#0A1628]/90 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex items-center justify-between no-print">
-          <div className="ml-10 md:ml-0">
-            <h2 className="text-white font-display font-semibold text-lg">Admin Panel</h2>
-            <p className="text-gold text-xs">🛡️ Super Admin · No.1 Vettri Academy</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold/40 flex items-center justify-center text-gold font-bold text-sm">
-              {user?.name?.[0]?.toUpperCase() || 'A'}
-            </div>
-          </div>
-        </div>
-
-        {/* Print header */}
-        <div className="print-header px-6 pt-4">
+  return <PortalShell role="admin" links={LINKS} mobileNav={<MobileNav />} >
+    <div className="print-header px-6 pt-4">
           <h1>No.1 Vettri Academy — Admin Report</h1>
           <p>Tamil Nadu | +91 9047758389</p>
           <div className="print-meta">
@@ -153,9 +136,7 @@ export default function AdminDashboard() {
             <span>Date: {new Date().toLocaleString('en-IN')}</span>
           </div>
         </div>
-
-        <div className="p-4 md:p-6">
-          <Routes>
+    <Routes>
             <Route path="exams" element={<Exams />} />
             <Route path="teacher-performance" element={<AcademicReports />} />
             <Route path="class-marks" element={<AcademicReports mode="marks" />} />
@@ -195,10 +176,5 @@ export default function AdminDashboard() {
 <Route path="settings" element={<Navigate to="/admin/profile" replace />} />
 <Route path="*" element={<PortalNotFound />} />
           </Routes>
-        </div>
-      </main>
-
-      <MobileNav />
-    </div>
-  );
+  </PortalShell>;
 }

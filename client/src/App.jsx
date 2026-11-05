@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { Button, InstallCard, Skeleton } from './design-system/components';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationAcknowledgement from './components/NotificationAcknowledgement';
 
@@ -41,16 +42,16 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A1628] flex items-center justify-center">
+      <div className="va-theme va-session-loading">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 border-4 border-gold/30 border-t-gold rounded-full animate-spin" />
-          <p className="text-white/60 text-sm font-medium">Loading...</p>
+          <Skeleton label="Loading your academy" />
+          <p>Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (sessionError) return <div className="min-h-screen bg-[#0A1628] text-white flex flex-col gap-4 items-center justify-center p-6"><p role="alert">{sessionError}</p><button className="btn-primary" onClick={fetchMe}>Retry connection</button></div>;
+  if (sessionError) return <div className="va-theme va-session-loading"><p role="alert">{sessionError}</p><Button onClick={fetchMe}>Retry connection</Button></div>;
 
   if (!user) {
     const loginPath = allowedRole ? `/login/${allowedRole}` : '/login/student';
@@ -81,31 +82,7 @@ function PWABanner() {
 
   if (!show || !deferredPrompt || !user) return null;
 
-  return (
-    <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50">
-      <div className="bg-[#0F1F35] border border-gold/30 rounded-2xl p-4 shadow-2xl flex items-center gap-3">
-        <span className="text-2xl flex-shrink-0">📱</span>
-        <div className="flex-1 min-w-0">
-          <p className="text-white text-sm font-semibold">Add to Home Screen</p>
-          <p className="text-white/50 text-xs">Quick access to Vettri Academy</p>
-        </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <button
-            onClick={() => { setShow(false); localStorage.setItem('pwa-dismissed', 'true'); }}
-            className="text-white/30 hover:text-white/60 text-xs px-2 py-1"
-          >
-            Later
-          </button>
-          <button
-            onClick={() => { deferredPrompt?.prompt(); setShow(false); }}
-            className="bg-gold text-navy font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-yellow-400 transition-all"
-          >
-            Install
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="va-theme va-floating-install"><InstallCard onDismiss={() => { setShow(false); localStorage.setItem('pwa-dismissed', 'true'); }} onInstall={() => { deferredPrompt?.prompt(); setShow(false); }} /></div>;
 }
 
 // ─── App Routes ───────────────────────────────────────────────────────────────
@@ -167,21 +144,21 @@ export default function App() {
         <BrowserRouter>
           <NotificationAcknowledgement />
           <ErrorBoundary>
-            <Suspense fallback={<div className="min-h-screen bg-[#0A1628] text-white flex items-center justify-center" role="status">Loading portal…</div>}><AppRoutes /></Suspense>
+            <Suspense fallback={<div className="va-theme va-session-loading"><Skeleton label="Loading portal" /></div>}><AppRoutes /></Suspense>
             <PWABanner />
           </ErrorBoundary>
           <Toaster
             position="top-right"
             toastOptions={{
               style: {
-                background: '#0A1628',
-                color: '#fff',
-                border: '1px solid rgba(245,166,35,0.3)',
-                borderRadius: '12px',
-                fontFamily: 'Inter, sans-serif',
+                background: 'var(--va-white)',
+                color: 'var(--va-text)',
+                border: '1px solid var(--va-border)',
+                borderRadius: 'var(--va-radius-control)',
+                fontFamily: 'var(--va-font-body)',
               },
-              success: { iconTheme: { primary: '#F5A623', secondary: '#0A1628' } },
-              error: { iconTheme: { primary: '#ef4444', secondary: '#0A1628' } },
+              success: { iconTheme: { primary: 'var(--va-teal-700)', secondary: 'var(--va-white)' } },
+              error: { iconTheme: { primary: 'var(--va-pink-600)', secondary: 'var(--va-white)' } },
             }}
           />
         </BrowserRouter>

@@ -8,6 +8,12 @@ export default {
   theme: {
     extend: {
       colors: {
+        academy: {
+          teal: { 900: 'var(--va-teal-900)', 700: 'var(--va-teal-700)', 600: 'var(--va-teal-600)', 100: 'var(--va-teal-100)' },
+          gold: { 400: 'var(--va-gold-400)', 500: 'var(--va-gold-500)', 200: 'var(--va-gold-200)', text: 'var(--va-gold-text)' },
+          pink: { 600: 'var(--va-pink-600)', 500: 'var(--va-pink-500)', 100: 'var(--va-pink-100)' },
+          ivory: 'var(--va-ivory)', card: 'var(--va-white)', border: 'var(--va-border)', ink: 'var(--va-text)', muted: 'var(--va-text-secondary)',
+        },
         navy: {
           50: '#e6eaf2',
           100: '#b3bfd9',
@@ -36,6 +42,8 @@ export default {
         },
       },
       fontFamily: {
+        editorial: ['Fraunces', 'Georgia', 'serif'],
+        academy: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Outfit', 'Inter', 'sans-serif'],
       },

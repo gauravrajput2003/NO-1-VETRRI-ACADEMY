@@ -1,0 +1,59 @@
+.va-preview-body { margin: 0; }
+.va-preview-stack { display: grid; gap: var(--va-space-5); }
+.va-preview-review-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--va-space-4); padding-bottom: var(--va-space-6); border-bottom: 1px solid var(--va-border); margin-bottom: var(--va-space-2); }
+.va-preview-review-bar > span { display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-3); color: var(--va-text-secondary); font-size: var(--va-font-xs); }
+.va-review-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--va-teal-700); }
+.va-preview-stack > .va-page-header { margin-bottom: var(--va-space-1); }
+.va-preview-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: var(--va-space-5); }
+.va-preview-panels { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: var(--va-space-5); align-items: stretch; }
+.va-preview-panels--balanced { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.va-hero-note { width: 240px; display: grid; gap: var(--va-space-3); }
+.va-hero-note__icon { display: grid; place-items: center; width: var(--va-space-11); height: var(--va-space-11); border: 1px solid var(--va-sidebar-border); border-radius: 50%; color: var(--va-gold-200); }
+.va-hero-note > .va-eyebrow { margin: 0; font-size: 9px; }
+.va-hero-note p { font: 500 var(--va-font-xl)/1.25 var(--va-font-heading); }
+.va-hero-note__rule { width: var(--va-space-10); height: 1px; margin-top: var(--va-space-2); background: var(--va-gold-400); }
+.va-lesson { display: flex; align-items: flex-start; gap: var(--va-space-5); padding-block: var(--va-space-2); }
+.va-lesson__time { min-width: 76px; display: grid; gap: var(--va-space-1); }
+.va-lesson__time strong { font: 500 var(--va-font-xl)/1.2 var(--va-font-heading); }
+.va-lesson__time span { font-size: var(--va-font-xs); color: var(--va-text-secondary); }
+.va-lesson__body { flex: 1; min-width: 0; }
+.va-lesson__body .va-actions { gap: var(--va-space-2); }
+.va-lesson__body h3 { font-size: var(--va-font-lg); margin-top: var(--va-space-4); }
+.va-lesson__body > .va-secondary { margin-top: var(--va-space-2); }
+.va-lesson-actions { display: flex; flex-wrap: wrap; gap: var(--va-space-2); margin-top: var(--va-space-6); }
+.va-lesson-actions .va-button { padding-inline: var(--va-space-3); font-size: var(--va-font-xs); }
+.va-panel-divider { height: 1px; background: var(--va-border); margin-block: var(--va-space-6); }
+.va-lesson--quiet .va-lesson__time strong { font-size: var(--va-font-lg); }
+.va-lesson--quiet h3 { font-size: var(--va-font-md); margin-top: var(--va-space-3); }
+.va-person-cell { display: flex; align-items: center; gap: var(--va-space-3); }
+.va-person-cell > div { display: grid; gap: var(--va-space-1); }
+.va-person-cell strong { font-weight: 600; }
+.va-table-progress { min-width: 136px; }
+.va-growth { display: flex; align-items: center; gap: var(--va-space-6); padding-block: var(--va-space-4); }
+.va-growth .va-progress-ring { flex-shrink: 0; }
+.va-growth__title { font-weight: 600; font-size: var(--va-font-base); margin-bottom: var(--va-space-2) !important; }
+.va-growth__bar { margin-top: var(--va-space-5); }
+.va-form-stack { display: grid; gap: var(--va-space-5); }
+.va-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--va-space-4); }
+.va-component-group { display: grid; gap: var(--va-space-5); }
+.va-component-group > .va-panel-divider { margin-block: var(--va-space-1); }
+.va-brand-specimen { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--va-space-10); padding-block: var(--va-space-5); }
+.va-brand-specimen h2 { font-size: var(--va-font-display); margin: var(--va-space-4) 0; }
+.va-brand-specimen .va-eyebrow { color: var(--va-text-secondary); }
+.va-swatches { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--va-space-5); }
+.va-swatches > div { display: grid; align-content: start; gap: var(--va-space-2); }
+.va-swatches strong { font-size: var(--va-font-sm); }
+.va-swatches small { color: var(--va-text-secondary); font-size: var(--va-font-xs); }
+.va-swatch { height: var(--va-space-16); border-radius: var(--va-radius-control); border: 1px solid var(--va-border); }
+.va-swatch--teal { background: var(--va-teal-900); }
+.va-swatch--ivory { background: var(--va-ivory); }
+.va-swatch--gold { background: var(--va-gold-400); }
+.va-swatch--pink { background: var(--va-pink-100); }
+.va-review-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--va-space-3); border-top: 1px solid var(--va-border); padding-top: var(--va-space-7); margin-top: var(--va-space-4); font-size: var(--va-font-xs); color: var(--va-text-secondary); }
+.va-review-footer > span:first-child { color: var(--va-teal-900); font-family: var(--va-font-heading); font-size: var(--va-font-md); }
+.va-floating-toast { position: fixed; bottom: var(--va-space-6); right: var(--va-space-6); width: min(420px,calc(100% - var(--va-space-12))); z-index: var(--va-z-toast); }
+.va-floating-install { position: fixed; bottom: var(--va-space-6); right: var(--va-space-6); width: min(540px,calc(100% - var(--va-space-12))); z-index: var(--va-z-popover); }
+@media(max-width:1199px) { .va-hero-note { display: none; } .va-preview-panels { grid-template-columns: minmax(0,1fr); } .va-preview-panels--balanced { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:999px) { .va-preview-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:759px) { .va-preview-review-bar { align-items: flex-start; flex-direction: column; } .va-preview-panels--balanced { grid-template-columns: minmax(0,1fr); } .va-brand-specimen { grid-template-columns: minmax(0,1fr); } }
+@media(max-width:559px) { .va-preview-stats { grid-template-columns: minmax(0,1fr); } .va-lesson { gap: var(--va-space-3); } .va-lesson__time { min-width: 60px; } .va-lesson__time strong { font-size: var(--va-font-lg); } .va-lesson__body h3 { font-size: var(--va-font-md); } .va-lesson-actions .va-button { flex: 1; } .va-growth { flex-direction: column; text-align: center; } .va-form-grid { grid-template-columns: minmax(0,1fr); } .va-hero-note { display: none; } }

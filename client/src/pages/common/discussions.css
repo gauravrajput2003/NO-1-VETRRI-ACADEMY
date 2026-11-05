@@ -1,0 +1,34 @@
+.va-discussions { display: grid; gap: var(--va-space-5); }
+.va-discussion-create .input-field { display: block; width: 100%; min-height: 44px; background: var(--va-white); color: var(--va-text); border: 1px solid var(--va-input-border); border-radius: 12px; padding: 12px; }
+.va-discussion-create label > input { margin-top: 8px; }
+.va-discussion-create .text-gold { color: var(--va-teal-700); }
+.va-discussions .va-page-header { margin-bottom: 0; }
+.va-discussions-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.va-discussion-workspace { display: grid; grid-template-columns: 300px minmax(0,1fr); gap: 20px; align-items: start; }
+.va-discussion-inbox { padding: 0; overflow: hidden; }
+.va-discussion-inbox > header { display: flex; align-items: center; gap: 10px; padding: 20px; border-bottom: 1px solid var(--va-border); color: var(--va-teal-700); }
+.va-discussion-inbox h2 { flex: 1; font-size: 20px; }
+.va-discussion-threads { max-height: 62vh; overflow: auto; padding: 10px; }
+.va-discussion-thread { display: grid; gap: 10px; width: 100%; padding: 16px; text-align: left; border: 1px solid transparent; border-radius: 14px; margin-bottom: 6px; background: transparent; }
+.va-discussion-thread:hover { background: var(--va-ivory); }
+.va-discussion-thread.is-selected { background: var(--va-teal-100); border-color: var(--va-teal-600); }
+.va-discussion-thread__title { font-weight: 600; overflow-wrap: anywhere; }
+.va-discussion-thread__meta { display: flex; justify-content: space-between; gap: 8px; color: var(--va-text-secondary); font-size: 11px; text-transform: capitalize; }
+.va-discussion-inbox footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-top: 1px solid var(--va-border); font-size: 12px; }
+.va-discussion-detail { display: grid; gap: 20px; min-height: 480px; min-width: 0; }
+.va-discussion-detail__heading { display: flex; justify-content: space-between; gap: 16px; }
+.va-discussion-detail__heading h2 { margin-top: 12px; overflow-wrap: anywhere; }
+.va-discussion-question { white-space: pre-wrap; overflow-wrap: anywhere; padding: 18px; background: var(--va-ivory); border-radius: 12px; }
+.va-discussion-messages { display: grid; gap: 20px; }
+.va-discussion-message { display: flex; align-items: start; gap: 12px; padding-top: 16px; border-top: 1px solid var(--va-border); }
+.va-discussion-message > div { min-width: 0; flex: 1; }
+.va-discussion-message strong { font-size: 12px; color: var(--va-teal-700); }
+.va-discussion-message p { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.va-discussion-detail :is(img,audio) { max-width: 100%; }
+.va-discussion-composer { display: grid; gap: 12px; padding-top: 18px; border-top: 1px solid var(--va-border); }
+.va-discussion-composer > div { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.va-discussion-composer .va-button { margin-left: auto; }
+.va-discussion-attachment { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--va-teal-700); cursor: pointer; font-size: 12px; }
+.va-discussion-attachment input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.va-discussion-attachment:focus-within { outline: 2px solid var(--va-teal-700); outline-offset: 3px; }
+@media(max-width:900px) { .va-discussion-workspace { grid-template-columns: minmax(0,1fr); } .va-discussion-threads { max-height: 250px; } .va-discussions-toolbar { align-items: stretch; flex-direction: column; } }

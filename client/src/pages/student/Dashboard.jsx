@@ -1,3 +1,4 @@
+import { BookOpen, CalendarDays, Home, MessageCircle, UserRound } from 'lucide-react';
 import NotificationsInbox from '../common/NotificationsInbox';
 import AnnouncementsInbox from '../common/AnnouncementsInbox';
 import Exams from '../academic/Exams';
@@ -5,9 +6,7 @@ import AcademicReports from '../academic/Reports';
 import { lazy, useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import Sidebar from '../../components/Sidebar';
-import NotificationBell from '../../components/NotificationBell';
-import VettriAIButton from '../../components/VettriAIButton';
+import PortalShell from '../../design-system/PortalShell';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import toast from 'react-hot-toast';
@@ -69,6 +68,8 @@ const MOBILE_NAV = [
   { href: '/student/profile', label: 'Profile', icon: '👤' },
 ];
 
+const mobileIcon = { '/student/dashboard': Home, '/student/classes': CalendarDays, '/student/chat': MessageCircle, '/student/materials': BookOpen, '/student/profile': UserRound };
+
 function MobileNav() {
   const location = useLocation();
   return (
@@ -79,7 +80,7 @@ function MobileNav() {
           return (
             <Link key={item.href} to={item.href}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${isActive ? 'text-gold' : 'text-white/40'}`}>
-              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="text-lg leading-none">{(() => { const ItemIcon = mobileIcon[item.href]; return <ItemIcon size={18} strokeWidth={1.7} aria-hidden="true" />; })()}</span>
               <span className="text-[9px] font-medium">{item.label}</span>
               {isActive && <span className="w-1 h-1 bg-gold rounded-full" />}
             </Link>
@@ -111,28 +112,8 @@ export default function StudentDashboard() {
       : l
   );
 
-  return (
-    <div className="min-h-screen bg-[#0A1628] flex">
-      <Sidebar links={sidebarLinks} role="student" />
-
-      <main className="flex-1 overflow-auto min-h-screen pt-[72px] md:pt-0 pb-16 md:pb-0">
-        {/* Top header */}
-        <div className="fixed md:sticky top-0 left-0 right-0 md:left-auto md:right-auto z-40 bg-[#0A1628]/90 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex items-center justify-between no-print">
-          <div className="ml-10 md:ml-0">
-            <h2 className="text-white font-display font-semibold text-lg">Student Portal</h2>
-            <p className="text-white/40 text-xs">{user?.grade} {user?.board ? `· ${user.board}` : ''}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <VettriAIButton />
-            <NotificationBell />
-            <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center text-gold font-bold text-sm">
-              {user?.name?.[0]?.toUpperCase() || 'S'}
-            </div>
-          </div>
-        </div>
-
-        {/* Print header */}
-        <div className="print-header px-6 pt-4">
+  return <PortalShell role="student" links={sidebarLinks} mobileNav={<MobileNav />} >
+    <div className="print-header px-6 pt-4">
           <h1>No.1 Vettri Academy</h1>
           <p>Tamil Nadu | +91 9047758389</p>
           <div className="print-meta">
@@ -140,9 +121,7 @@ export default function StudentDashboard() {
             <span>Generated: {new Date().toLocaleString('en-IN')}</span>
           </div>
         </div>
-
-        <div className="p-4 md:p-6">
-          <Routes>
+    <Routes>
             <Route path="exams" element={<Exams />} />
 
             <Route index element={<Navigate to="dashboard" replace />} />
@@ -170,11 +149,5 @@ export default function StudentDashboard() {
 <Route path="settings" element={<Navigate to="/student/profile" replace />} />
 <Route path="*" element={<PortalNotFound />} />
           </Routes>
-        </div>
-      </main>
-
-      {/* Mobile bottom nav */}
-      <MobileNav />
-    </div>
-  );
+  </PortalShell>;
 }

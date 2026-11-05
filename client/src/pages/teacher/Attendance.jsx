@@ -6,6 +6,7 @@ import { getMyLoginLogs, getStudentClassAttendanceData, manualAttendance } from 
 import api from '../../services/api';
 import AttendanceExportBar from '../../components/AttendanceExportBar';
 import { useAuth } from '../../context/AuthContext';
+import { loginSessionDisplay, loginDurationSummary, formatAttendanceDuration } from '../../utils/loginAttendance';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const YEARS = [2024, 2025, 2026, 2027];
@@ -82,6 +83,11 @@ export default function TeacherAttendance() {
   const { user } = useAuth();
   const [tab, setTab] = useState('login');
   const [loginLogs, setLoginLogs] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
   const [studentAttendance, setStudentAttendance] = useState([]);
   const [loginStats, setLoginStats] = useState({ days: 0, avgDuration: 0, streak: 0 });
   const [month, setMonth] = useState(new Date().getMonth());
@@ -123,17 +129,14 @@ export default function TeacherAttendance() {
     loadStudentAttendance();
   };
 
-  const formatDuration = (mins) => {
-    if (!mins) return '—';
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  };
+  const formatDuration = formatAttendanceDuration;
+  const displayedLogs = loginLogs.map((log) => loginSessionDisplay(log, now));
+  const durationSummary = loginDurationSummary(displayedLogs);
 
-  const loginRows = loginLogs.map((l) => ({
+  const loginRows = displayedLogs.map((l) => ({
     Date: new Date(l.loginTime).toLocaleDateString('en-IN'),
     'Login Time': new Date(l.loginTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    'Logout Time': l.logoutTime ? new Date(l.logoutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
+    'Logout Time': l.logoutTime ? new Date(l.logoutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : l.ongoing ? 'Active' : 'Not recorded',
     Duration: formatDuration(l.duration),
     Device: l.device || '—',
   }));
@@ -168,7 +171,7 @@ export default function TeacherAttendance() {
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: 'Days Logged In', value: loginStats.days, icon: FiCalendar, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-              { label: 'Avg Duration', value: formatDuration(loginStats.avgDuration), icon: FiClock, color: 'text-green-400', bg: 'bg-green-500/10' },
+              { label: 'Avg Duration', value: formatDuration(durationSummary.average), icon: FiClock, color: 'text-green-400', bg: 'bg-green-500/10' },
               { label: 'Current Streak 🔥', value: `${loginStats.streak} days`, icon: FiUser, color: 'text-gold', bg: 'bg-gold/10' },
             ].map((s) => (
               <div key={s.label} className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-5">
@@ -180,6 +183,8 @@ export default function TeacherAttendance() {
               </div>
             ))}
           </div>
+
+          <p className="text-white/40 text-xs">Today’s active session includes elapsed time and updates every minute.{durationSummary.missing > 0 && ` ${durationSummary.missing} login records have no saved duration and are excluded from the average.`}</p>
 
           {/* Export Bar */}
           <AttendanceExportBar
@@ -205,11 +210,11 @@ export default function TeacherAttendance() {
                   {loading ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />) :
                     loginLogs.length === 0 ? (
                       <tr><td colSpan={5} className="text-center py-10 text-white/30">No login history found</td></tr>
-                    ) : loginLogs.map((l, i) => (
+                    ) : displayedLogs.map((l, i) => (
                       <tr key={i} className="hover:bg-white/5 transition-colors">
                         <td>{new Date(l.loginTime).toLocaleDateString('en-IN')}</td>
                         <td>{new Date(l.loginTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td>{l.logoutTime ? new Date(l.logoutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : <span className="text-green-400 text-xs">Active</span>}</td>
+                        <td>{l.logoutTime ? new Date(l.logoutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : <span className={`text-xs ${l.ongoing ? 'text-green-400' : 'text-white/40'}`}>{l.ongoing ? 'Active' : 'Not recorded'}</span>}</td>
                         <td>{formatDuration(l.duration)}</td>
                         <td className="text-white/40 flex items-center gap-1.5"><FiMonitor size={12} /> {l.device || '—'}</td>
                       </tr>

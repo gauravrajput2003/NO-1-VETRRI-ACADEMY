@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => {
     proxy.on('proxyReqWs', (request) => request.removeHeader('origin'));
   };
   return {
+  build: {
+    rollupOptions: {
+      input: {
+        app: path.resolve(process.cwd(), 'index.html'),
+        designSystem: path.resolve(process.cwd(), 'design-system.html'),
+      },
+    },
+  },
   plugins: [react()],
   resolve: {
     alias: {

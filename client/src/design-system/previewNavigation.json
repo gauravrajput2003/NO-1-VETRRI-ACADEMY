@@ -1,0 +1,276 @@
+{
+  "teacher": [
+    {
+      "href": "/teacher/exams",
+      "label": "Exam Management"
+    },
+    {
+      "href": "/teacher/teacher-performance",
+      "label": "My Performance"
+    },
+    {
+      "href": "/teacher/dashboard",
+      "label": "Dashboard"
+    },
+    {
+      "href": "/teacher/live-class",
+      "label": "Live Class"
+    },
+    {
+      "href": "/teacher/schedule",
+      "label": "Class Scheduler"
+    },
+    {
+      "href": "/teacher/training",
+      "label": "Training"
+    },
+    {
+      "href": "/teacher/students",
+      "label": "My Students"
+    },
+    {
+      "href": "/teacher/materials",
+      "label": "Study Materials"
+    },
+    {
+      "href": "/teacher/pdf-analytics",
+      "label": "PDF Analytics"
+    },
+    {
+      "href": "/teacher/salary",
+      "label": "My Salary"
+    },
+    {
+      "href": "/teacher/downloads",
+      "label": "Download Center"
+    },
+    {
+      "href": "/teacher/scores",
+      "label": "Exam Scores"
+    },
+    {
+      "href": "/teacher/attendance",
+      "label": "Attendance"
+    },
+    {
+      "href": "/teacher/chat",
+      "label": "Chat"
+    },
+    {
+      "href": "/teacher/support",
+      "label": "Help Center"
+    },
+    {
+      "href": "/teacher/doubts",
+      "label": "Discussions"
+    },
+    {
+      "href": "/teacher/leave",
+      "label": "Leave"
+    },
+    {
+      "href": "/teacher/grading",
+      "label": "Monthly Grading"
+    },
+    {
+      "href": "/teacher/profile",
+      "label": "Profile"
+    },
+    {
+      "href": "/teacher/notifications",
+      "label": "Notifications"
+    },
+    {
+      "href": "/teacher/announcements",
+      "label": "Announcements"
+    }
+  ],
+  "student": [
+    {
+      "href": "/student/exams",
+      "label": "Exam Management"
+    },
+    {
+      "href": "/student/dashboard",
+      "label": "Dashboard"
+    },
+    {
+      "href": "/student/classes",
+      "label": "My Classes"
+    },
+    {
+      "href": "/student/materials",
+      "label": "Study Materials"
+    },
+    {
+      "href": "/student/bookmarks",
+      "label": "My Bookmarks"
+    },
+    {
+      "href": "/student/notes",
+      "label": "My Notes"
+    },
+    {
+      "href": "/student/downloads",
+      "label": "Download Center"
+    },
+    {
+      "href": "/student/training",
+      "label": "Training Videos"
+    },
+    {
+      "href": "/student/top-performers",
+      "label": "Top Performers"
+    },
+    {
+      "href": "/student/progress",
+      "label": "Exam Progress"
+    },
+    {
+      "href": "/student/attendance",
+      "label": "Attendance"
+    },
+    {
+      "href": "/student/chat",
+      "label": "Chat"
+    },
+    {
+      "href": "/student/support",
+      "label": "Help Center"
+    },
+    {
+      "href": "/student/doubts",
+      "label": "Discussions"
+    },
+    {
+      "href": "/student/leave",
+      "label": "Leave"
+    },
+    {
+      "href": "/student/fees",
+      "label": "Fees"
+    },
+    {
+      "href": "/student/profile",
+      "label": "Profile"
+    },
+    {
+      "href": "/student/notifications",
+      "label": "Notifications"
+    },
+    {
+      "href": "/student/announcements",
+      "label": "Announcements"
+    }
+  ],
+  "admin": [
+    {
+      "href": "/admin/exams",
+      "label": "Exam Management"
+    },
+    {
+      "href": "/admin/teacher-performance",
+      "label": "Teacher Performance"
+    },
+    {
+      "href": "/admin/class-marks",
+      "label": "Class Marks & Toppers"
+    },
+    {
+      "href": "/admin/dashboard",
+      "label": "Dashboard"
+    },
+    {
+      "href": "/admin/notifications",
+      "label": "Notifications"
+    },
+    {
+      "href": "/admin/profile",
+      "label": "Profile"
+    },
+    {
+      "href": "/admin/downloads",
+      "label": "Download Center"
+    },
+    {
+      "href": "/admin/students",
+      "label": "Students"
+    },
+    {
+      "href": "/admin/teachers",
+      "label": "Teachers"
+    },
+    {
+      "href": "/admin/classes",
+      "label": "Class Scheduler"
+    },
+    {
+      "href": "/admin/live-monitor",
+      "label": "Live Monitor"
+    },
+    {
+      "href": "/admin/training",
+      "label": "Training Videos"
+    },
+    {
+      "href": "/admin/announcements",
+      "label": "Announcements"
+    },
+    {
+      "href": "/admin/demo-bookings",
+      "label": "Demo Bookings"
+    },
+    {
+      "href": "/admin/fees",
+      "label": "Fees"
+    },
+    {
+      "href": "/admin/salaries",
+      "label": "Teacher Salaries"
+    },
+    {
+      "href": "/admin/leave",
+      "label": "Leave Approvals"
+    },
+    {
+      "href": "/admin/chat-logs",
+      "label": "Chat Logs"
+    },
+    {
+      "href": "/admin/messages",
+      "label": "Messages"
+    },
+    {
+      "href": "/admin/support",
+      "label": "Help Center"
+    },
+    {
+      "href": "/admin/doubts",
+      "label": "Discussions"
+    },
+    {
+      "href": "/admin/password-requests",
+      "label": "Password Requests"
+    },
+    {
+      "href": "/admin/material-review",
+      "label": "Material Review"
+    },
+    {
+      "href": "/admin/library",
+      "label": "Material Library"
+    },
+    {
+      "href": "/admin/permissions",
+      "label": "Permissions"
+    },
+    {
+      "href": "/admin/login-logs",
+      "label": "Login Logs"
+    },
+    {
+      "href": "/admin/grading",
+      "label": "Teacher Grading"
+    }
+  ]
+}

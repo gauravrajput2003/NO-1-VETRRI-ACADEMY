@@ -1,0 +1,29 @@
+.va-profile-page { container-type: inline-size; }
+.va-profile-layout { display: grid; grid-template-columns: clamp(220px,25%,320px) minmax(0,1fr); gap: clamp(16px,2cqi,28px); align-items: start; }
+.va-profile-layout > *, .va-profile-content > *, .va-profile-fields > *, .va-profile-password-fields > * { min-width: 0; }
+.va-profile-summary { display: grid; gap: 16px; padding: clamp(20px,2cqi,28px); }
+.va-profile-identity { display: grid; gap: 18px; }
+.va-profile-identity h2 { font-size: 23px; margin-block: 12px 8px; overflow-wrap: anywhere; }
+.va-profile-identity p { overflow-wrap: anywhere; }
+.va-profile-photo { width: 88px; height: 88px; object-fit: cover; border-radius: 50%; border: 3px solid var(--va-teal-100); background: var(--va-teal-100); }
+.va-profile-upload { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px; border: 1px solid var(--va-input-border); border-radius: 12px; font-size: 12px; color: var(--va-teal-700); cursor: pointer; }
+.va-profile-upload input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.va-profile-upload:focus-within { outline: 2px solid var(--va-teal-700); outline-offset: 3px; }
+.va-profile-shortcuts { display: grid; gap: 6px; padding-block: 14px; border-block: 1px solid var(--va-border); }
+.va-profile-shortcuts a { display: flex; gap: 10px; align-items: center; min-height: 44px; font-size: 13px; color: var(--va-teal-700); }
+.va-profile-account-note { display: flex; align-items: flex-start; gap: 10px; color: var(--va-text-secondary); font-size: 12px; }
+.va-profile-account-note svg { flex-shrink: 0; margin-top: 4px; }
+.va-profile-content { container-type: inline-size; display: grid; gap: 24px; }
+.va-profile-details, .va-profile-security { padding: clamp(20px,3cqi,32px); scroll-margin-top: 108px; }
+.va-profile-card-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.va-profile-card-heading h2 { font-size: 22px; margin-bottom: 4px; }
+.va-profile-fields, .va-profile-password-fields { display: grid; grid-template-columns: minmax(0,1fr); gap: 18px; }
+.va-profile-details input[readonly] { background: var(--va-ivory); color: var(--va-text-secondary); }
+.va-profile-page .input-field { width: 100%; min-width: 0; }
+.va-profile-page .va-profile-save { min-width: 160px; margin-left: auto; display: flex; }
+.va-profile-eye { width: 44px; right: 0; display: grid; place-items: center; }
+.va-profile-security input { padding-right: 48px; }
+@container (min-width:580px) { .va-profile-fields, .va-profile-password-fields { grid-template-columns: repeat(2,minmax(0,1fr)); } .va-profile-password-fields > :first-child { grid-column: 1 / -1; } }
+@container (min-width:1100px) { .va-profile-fields, .va-profile-password-fields { grid-template-columns: repeat(3,minmax(0,1fr)); } .va-profile-password-fields > :first-child { grid-column: auto; } }
+@container (max-width:800px) { .va-profile-layout { grid-template-columns: minmax(0,1fr); } .va-profile-identity { grid-template-columns: auto minmax(0,1fr); align-items: center; } .va-profile-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@container (max-width:400px) { .va-profile-identity { grid-template-columns: minmax(0,1fr); } .va-profile-shortcuts { grid-template-columns: minmax(0,1fr); } .va-profile-page .va-profile-save { width: 100%; } }

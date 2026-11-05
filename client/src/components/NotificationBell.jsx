@@ -6,6 +6,8 @@ import { getNotifications, getNotificationUnreadCount, markAllNotificationsRead,
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import BrowserPushControl from './BrowserPushControl';
+import { Bell, BookOpen, CalendarDays, Check, CircleAlert, FileText, MessageCircle, Video, Wallet } from 'lucide-react';
+import { IconButton, NotificationPanel } from '../design-system/components';
 
 import { notificationDestination as destination } from '../utils/notificationDestination';
 
@@ -21,7 +23,7 @@ const typeIcons = {
   class_cancelled: '🚫',
 };
 
-export default function NotificationBell() {
+export default function NotificationBell({ variant = 'default' }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -33,6 +35,9 @@ export default function NotificationBell() {
   useEffect(() => {
     fetchNotifications();
     fetchUnreadCount();
+    const refresh = () => { fetchNotifications(); fetchUnreadCount(); };
+    window.addEventListener('academy-notifications-updated', refresh);
+    return () => window.removeEventListener('academy-notifications-updated', refresh);
   }, []);
 
   // Real-time
@@ -78,6 +83,7 @@ export default function NotificationBell() {
     await markAllNotificationsRead();
     setUnreadCount(0);
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    window.dispatchEvent(new Event('academy-notifications-updated'));
   };
 
   const handleClick = async (notif) => {
@@ -85,6 +91,7 @@ export default function NotificationBell() {
       await markNotificationRead(notif._id);
       setUnreadCount((c) => Math.max(0, c - 1));
       setNotifications((prev) => prev.map((n) => n._id === notif._id ? { ...n, isRead: true } : n));
+      window.dispatchEvent(new Event('academy-notifications-updated'));
     }
     if (notif.link) navigate(destination(notif.link, user?.role || 'student'));
     setOpen(false);
@@ -97,6 +104,18 @@ export default function NotificationBell() {
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
   };
+
+  if (variant === 'academy' || variant === 'panel') {
+    const icons = { class_starting: CalendarDays, new_score: FileText, recording_available: Video,
+      material_unlocked: BookOpen, leave_approved: Check, leave_rejected: CircleAlert, fee_reminder: Wallet, new_message: MessageCircle, class_cancelled: CircleAlert };
+    const readable = (value) => String(value || '').replace(/\p{Extended_Pictographic}|\uFE0F/gu, '').trim();
+    const panel = <NotificationPanel compact items={notifications.map((notification) => ({
+      id: notification._id, title: readable(notification.title), description: readable(notification.message), time: timeAgo(notification.createdAt),
+      read: notification.isRead, icon: icons[notification.type] || Bell, tone: notification.type === 'fee_reminder' ? 'gold' : notification.type === 'new_message' ? 'pink' : 'teal',
+    }))} onReadAll={unreadCount > 0 ? handleMarkAllRead : undefined} onSelect={(item) => handleClick(notifications.find((notification) => notification._id === item.id))} />;
+    if (variant === 'panel') return panel;
+    return <div className="va-notification-widget no-print" ref={dropdownRef}><span className="va-bell"><IconButton icon={Bell} label="Notifications" id="notification-bell" aria-expanded={open} onClick={() => setOpen(!open)} />{unreadCount > 0 && <span>{unreadCount > 9 ? '9+' : unreadCount}</span>}</span>{open && <div className="va-notification-popover">{panel}<BrowserPushControl /></div>}</div>;
+  }
 
   return (
     <div className="relative no-print" ref={dropdownRef}>
