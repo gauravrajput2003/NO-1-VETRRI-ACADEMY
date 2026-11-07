@@ -1,3 +1,5 @@
+import DashboardMotion from '../../design-system/DashboardMotion';
+import { StatCard } from '../../design-system/components';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -12,18 +14,6 @@ import CountdownTimer from '../../components/CountdownTimer';
 import VideoPlayer from '../../components/VideoPlayer';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-
-function StatCard({ label, value, icon: Icon, color, bg, loading }) {
-  return (
-    <motion.div whileHover={{ y: -4 }} className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-5 hover:border-gold/30 transition-all">
-      <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center mb-3`}>
-        <Icon className={color} size={20} />
-      </div>
-      <p className={`text-3xl font-display font-bold ${color}`}>{loading ? '—' : value}</p>
-      <p className="text-white/50 text-sm mt-1">{label}</p>
-    </motion.div>
-  );
-}
 
 function MedalIcon({ rank }) {
   if (rank === 1) return <span className="text-2xl">🥇</span>;
@@ -154,7 +144,7 @@ export default function StudentDashboardHome() {
       bg: 'bg-purple-500/10',
     },
     {
-      label: 'Current Streak 🔥',
+      label: 'Current Streak',
       value: dashStats?.currentStreak ? `${dashStats.currentStreak} days` : '—',
       icon: ({ className, size }) => <span className={className} style={{ fontSize: size }}>🔥</span>,
       color: 'text-gold',
@@ -176,11 +166,10 @@ export default function StudentDashboardHome() {
   };
 
   return (
-    <div className="space-y-6">
+    <DashboardMotion>
       {/* Greeting */}
-      <div>
-        <h1 className="font-display font-bold text-2xl text-white">
-          Welcome back, {user?.displayName || user?.name?.split(' ')[0] || 'Student'}! 👋
+      <div className="va-dashboard-heading"><h1>
+          Welcome back, {user?.displayName || user?.name?.split(' ')[0] || 'Student'}
         </h1>
         <p className="text-white/40 text-sm mt-1">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -188,8 +177,8 @@ export default function StudentDashboardHome() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => <StatCard key={s.label} {...s} loading={loading} />)}
+      <div className="va-dashboard-stats">
+        {stats.map((s, index) => <StatCard key={s.label} {...s} tone={["teal", "pink", "gold"][index % 3]} loading={loading} linkComponent={Link} />)}
       </div>
 
       {/* Announcements */}
@@ -200,7 +189,7 @@ export default function StudentDashboardHome() {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`bg-[#0F1F35] rounded-2xl border-2 p-6 transition-all duration-500 ${
+          className={`va-card border-2 transition-all duration-500 ${
             classStatus === 'live'
               ? 'border-green-500 shadow-lg shadow-green-500/20'
               : classStatus === 'completed'
@@ -292,9 +281,9 @@ export default function StudentDashboardHome() {
       )}
 
       {/* Leaderboard + Scores */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-dashboard-reveal>
         {/* Weekly Leaderboard */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <h3 className="text-white font-semibold mb-4">🏆 Weekly Leaderboard</h3>
           {loading ? (
             <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 bg-white/5 rounded-xl animate-pulse" />)}</div>
@@ -338,7 +327,7 @@ export default function StudentDashboardHome() {
         </div>
 
         {/* Recent Scores */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold">Recent Exam Scores</h3>
             <Link to="/student/scores" className="text-gold text-xs hover:underline">View All →</Link>
@@ -370,7 +359,7 @@ export default function StudentDashboardHome() {
       </div>
 
       {/* Upcoming Classes */}
-      <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+      <div className="va-card">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-white font-semibold flex items-center gap-2">
             <FiCalendar className="text-gold" size={16} /> Upcoming Classes
@@ -393,6 +382,6 @@ export default function StudentDashboardHome() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardMotion>
   );
 }

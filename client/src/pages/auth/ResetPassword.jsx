@@ -28,7 +28,7 @@ export default function ResetPassword() {
       const { data } = await api.post('/auth/password-reset/complete', { identifier: identifier.trim(), tempPassword: tempPassword.trim(), newPassword: password, confirmPassword });
       if (data.success) {
         toast.success('Password reset successful.');
-        navigate('/login/student', { replace: true });
+        navigate('/login', { replace: true });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Reset failed.');
@@ -40,7 +40,7 @@ export default function ResetPassword() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <Link to="/login/student" style={styles.back}>Back to Login</Link>
+        <Link to="/login" style={styles.back}>Back to Login</Link>
         <h1 style={styles.title}>Reset Password</h1>
         <p style={styles.sub}>Enter the temporary password received from the academy admin, then choose a new password.</p>
 

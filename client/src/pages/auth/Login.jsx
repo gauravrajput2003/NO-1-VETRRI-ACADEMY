@@ -4,6 +4,8 @@ import { FiArrowLeft, FiArrowRight, FiEye, FiEyeOff, FiLock, FiUser } from 'reac
 import { useAuth } from '../../context/AuthContext';
 import { getLoginErrorMessage } from '../../utils/loginErrors';
 import AdmissionFormModal from '../../components/AdmissionFormModal';
+import academyLogo from '../../assets/academy-logo.png';
+import loginIllustration from '../../assets/login-illustration.png';
 import './Login.css';
 
 export default function Login() {
@@ -31,16 +33,13 @@ export default function Login() {
   };
 
   return <main className="academy-login">
-    <div className="academy-login__blob academy-login__blob--gold" aria-hidden="true" />
-    <div className="academy-login__blob academy-login__blob--pink" aria-hidden="true" />
+    <div className="academy-login__art" aria-hidden="true"><img src={loginIllustration} alt="" /></div>
     <div className="academy-login__content">
       <Link to="/" className="academy-login__back" aria-label="Back to website"><FiArrowLeft size={20} /></Link>
       <header className="academy-login__hero">
-        <div className="academy-login__mark" aria-hidden="true">
-          <svg width="70" height="70" viewBox="0 0 24 24"><defs><linearGradient id="login-cap" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#FFC93C" /><stop offset="100%" stopColor="#FF3D8E" /></linearGradient></defs><path d="M2 8L12 3L22 8L12 13L2 8Z" fill="url(#login-cap)" /><circle cx="20.5" cy="14" r="1.4" fill="#FFC93C" /></svg>
-        </div>
-        <h1>Welcome Back</h1>
-        <p>Sign in to continue your learning journey</p>
+        <img className="academy-login__mark" src={academyLogo} alt="No.1 Vettri Academy" width="88" height="88" />
+        <h1>Sign in</h1>
+        <p>Use your academy account to continue.</p>
       </header>
       <form className="academy-login__card" onSubmit={submit} onChange={() => error && setError('')} aria-label="Academy sign in">
         <label className="academy-login__field">

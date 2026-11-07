@@ -27,7 +27,7 @@ export default function ForgotPassword() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <Link to="/login/student" style={styles.back}>Back</Link>
+        <Link to="/login" style={styles.back}>Back</Link>
         <h1 style={styles.title}>Forgot Password?</h1>
         <p style={styles.sub}>Enter your registered phone or email. The academy admin will help you obtain a temporary password.</p>
 

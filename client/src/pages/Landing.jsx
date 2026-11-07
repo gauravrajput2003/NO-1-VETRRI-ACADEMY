@@ -170,7 +170,7 @@ function ParticleCanvas({ disabled = false }) {
 }
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
-function Navbar({ loggedIn }) {
+function Navbar({ user }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -222,7 +222,7 @@ function Navbar({ loggedIn }) {
 
         <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
           <Link
-            to="/login/student"
+            to="/login"
             className="rounded-lg border-2 border-teal-700 px-3.5 py-2.5 font-jakarta text-[14px] font-bold text-teal-800 transition-colors hover:bg-teal-50 sm:rounded-xl sm:px-5 sm:text-[15px]"
           >
             Login
@@ -255,11 +255,11 @@ function Navbar({ loggedIn }) {
               📅 Book Free Demo
             </a>
             <Link
-              to={loggedIn ? '/student/dashboard' : '/login/student'}
+              to={user ? `/${user.role}/dashboard` : '/login'}
               onClick={() => setMenuOpen(false)}
               className="rounded-xl border-2 border-teal-700 py-3.5 text-center text-[16px] font-extrabold text-teal-800"
             >
-              {loggedIn ? 'Go to Dashboard' : 'Login'}
+              {user ? 'Go to Dashboard' : 'Login'}
             </Link>
           </motion.div>
         )}
@@ -469,7 +469,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-teal-50 via-emerald-50/60 to-teal-100/70 font-jakarta text-indigo-950">
-      <Navbar loggedIn={!!user} />
+      <Navbar user={user} />
       <motion.div
         style={{ scaleX: progressScaleX }}
         className="fixed left-0 right-0 top-[76px] z-50 h-[3px] origin-left bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600 sm:top-20"
@@ -1013,7 +1013,7 @@ export default function Landing() {
             <p className="text-[14px] text-white/40">© 2024 No.1 Vettri Academy. All rights reserved.</p>
             <div className="flex items-center gap-7">
               {['Login', 'Sign Up', 'Privacy'].map(l => (
-                <Link key={l} to={l === 'Login' ? '/login/student' : l === 'Sign Up' ? '/signup' : '#'} className="text-[14px] font-medium text-white/40 hover:text-amber-400">
+                <Link key={l} to={l === 'Login' ? '/login' : l === 'Sign Up' ? '/signup' : '#'} className="text-[14px] font-medium text-white/40 hover:text-amber-400">
                   {l}
                 </Link>
               ))}

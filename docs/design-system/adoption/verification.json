@@ -1,0 +1,110 @@
+{
+  "date": "2026-10-29",
+  "scope": "Actual portal components, isolated mocked API responses; no production records changed",
+  "checks": [
+    {
+      "name": "Teacher shell preserves 21 navigation entries",
+      "passed": true
+    },
+    {
+      "name": "Ivory portal surface",
+      "passed": true
+    },
+    {
+      "name": "Desktop has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "Hero scheduler keeps existing route",
+      "passed": true
+    },
+    {
+      "name": "Student counter opens existing My Students route",
+      "passed": true
+    },
+    {
+      "name": "Missing courses show NA",
+      "passed": true
+    },
+    {
+      "name": "Admission column stays removed",
+      "passed": true
+    },
+    {
+      "name": "All 15 learners remain available through pagination",
+      "passed": true
+    },
+    {
+      "name": "Student search works",
+      "passed": true
+    },
+    {
+      "name": "Existing recording upload panel still opens",
+      "passed": true
+    },
+    {
+      "name": "Existing attendance API is used",
+      "passed": true
+    },
+    {
+      "name": "Attendance modal closes with Escape",
+      "passed": true
+    },
+    {
+      "name": "Notification read action keeps existing endpoint",
+      "passed": true
+    },
+    {
+      "name": "Mobile has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "Mobile stats stack into one column",
+      "passed": true
+    },
+    {
+      "name": "Mobile drawer opens",
+      "passed": true
+    },
+    {
+      "name": "student shell preserves all menu items",
+      "passed": true
+    },
+    {
+      "name": "student shell retains role navigation",
+      "passed": true
+    },
+    {
+      "name": "admin shell preserves all menu items",
+      "passed": true
+    },
+    {
+      "name": "admin shell retains role navigation",
+      "passed": true
+    },
+    {
+      "name": "Admin page search points at existing Fees route",
+      "passed": true
+    },
+    {
+      "name": "Laptop layout has no horizontal overflow",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "apiPaths": [
+    "GET /auth/me",
+    "GET /notifications",
+    "GET /notifications/unread-count",
+    "GET /announcements/active",
+    "GET /classes/today",
+    "GET /classes/upcoming",
+    "GET /teacher/dashboard",
+    "GET /teacher/students",
+    "GET /training-videos/incomplete-mandatory",
+    "GET /teacher/scores/recent",
+    "GET /teacher/grading/10/2026",
+    "GET /classes/visual-class/attendance",
+    "PATCH /notifications/read-all"
+  ]
+}

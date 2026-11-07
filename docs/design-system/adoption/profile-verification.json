@@ -1,0 +1,61 @@
+{
+  "layouts": [
+    {
+      "width": 1920,
+      "overflow": false,
+      "layout": "320px 1236px",
+      "fields": "378px 378px 378px"
+    },
+    {
+      "width": 1600,
+      "overflow": false,
+      "layout": "316px 922.734px",
+      "fields": "423.688px 423.703px"
+    },
+    {
+      "width": 1366,
+      "overflow": false,
+      "layout": "259.844px 758.75px",
+      "fields": "346.625px 346.625px"
+    },
+    {
+      "width": 1024,
+      "overflow": false,
+      "layout": "711.062px",
+      "fields": "324.203px 324.203px"
+    },
+    {
+      "width": 820,
+      "overflow": false,
+      "layout": "787.219px",
+      "fields": "360px 360px"
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "layout": "358px",
+      "fields": "316px"
+    },
+    {
+      "width": 320,
+      "overflow": false,
+      "layout": "288px",
+      "fields": "246px"
+    }
+  ],
+  "errors": [],
+  "saveProfilePayload": [
+    {
+      "path": "/profile",
+      "body": "{\"bio\":\"Helping students understand physics.\",\"subjects\":[\"Physics\"],\"qualification\":\"M.Sc Physics\",\"experienceYears\":4}"
+    }
+  ],
+  "checks": [
+    "seven screen sizes without horizontal overflow",
+    "three/two/one field columns",
+    "profile save retains identity exclusions",
+    "password mismatch prevents submission",
+    "password visibility toggle"
+  ],
+  "fixtureData": true
+}

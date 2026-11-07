@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowDownToLine, ArrowRight, Bell, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, GraduationCap, Inbox, LogOut, Menu, PanelLeftClose, Search, X } from 'lucide-react';
 import './tokens.css';
 import './components.css';
+import academyLogo from '../assets/academy-logo.png';
 
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 export const Icon = ({ as: Component, ...props }) => <Component size={18} strokeWidth={1.7} aria-hidden="true" {...props} />;
@@ -39,7 +40,7 @@ export function Badge({ children, tone = 'gold', dot = false, className }) {
 export const StatusPill = Badge;
 
 export function BrandMark() {
-  return <span className="va-brand__mark" role="img" aria-label="No.1 Vettri Academy"><img src="/icons/icon-192.png" alt="" /></span>;
+  return <span className="va-brand__mark" role="img" aria-label="No.1 Vettri Academy"><img src={academyLogo} alt="" /></span>;
 }
 
 export function Avatar({ name = 'Academy member', src, size = 'md', tone = 'teal', className }) {

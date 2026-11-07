@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import StudentLoginDetails, { copyLoginText } from '../../components/StudentLoginDetails';
 import { normalizeLoginMobile } from '../../utils/loginCredentials';
 import api from '../../services/api';
@@ -9,6 +9,12 @@ export default function Students() {
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const request = useRef(0);
+  const pageSize = 20;
   const [loading, setLoading] = useState(true);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -44,14 +50,22 @@ export default function Students() {
   });
 
   const fetchStudents = async () => {
+    const id = ++request.current;
     setLoading(true);
+    setLoadError(false);
     try {
-      const { data } = await api.get(`/admin/students${search ? `?search=${search}` : ''}`);
-      if (data.success) setStudents(data.students || []);
+      const { data } = await api.get('/admin/students', { params: { page, limit: pageSize, search: search.trim() || undefined } });
+      if (id !== request.current) return;
+      if (!data.success) throw new Error('Student list request failed');
+      const count = data.pagination?.total ?? data.students?.length ?? 0;
+      const lastPage = Math.max(1, Math.ceil(count / pageSize));
+      if (page > lastPage) { setPage(lastPage); return; }
+      setTotal(count);
+      setStudents(data.students || []);
     } catch {
-      toast.error('Failed to load students');
+      if (id === request.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (id === request.current) setLoading(false);
     }
   };
 
@@ -70,8 +84,8 @@ export default function Students() {
     const t = setTimeout(() => {
       fetchStudents();
     }, 300);
-    return () => clearTimeout(t);
-  }, [search]);
+    return () => { clearTimeout(t); request.current += 1; };
+  }, [search, page, revision]);
 
   // Handle Add Student
   const handleAddSubmit = async (e) => {
@@ -103,7 +117,7 @@ export default function Students() {
         setShowPassword(false);
         setShowAddModal(false);
         setAddForm({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
-        fetchStudents();
+        setRevision(value => value + 1);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create student');
@@ -127,7 +141,7 @@ export default function Students() {
         setEditForm({});
         setShowPassword(false);
         setEditStudent(null);
-        fetchStudents();
+        setRevision(value => value + 1);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update student');
@@ -145,7 +159,7 @@ export default function Students() {
       const { data } = await api.delete(`/admin/students/${student._id}`);
       if (data.success) {
         toast.success('Student deleted');
-        fetchStudents();
+        setRevision(value => value + 1);
       }
     } catch {
       toast.error('Failed to delete student');
@@ -167,14 +181,10 @@ export default function Students() {
     });
   };
 
-  // Stats
-  const totalStudents = students.length;
-  const pendingFees = Math.floor(totalStudents * 0.2);
-  const todayAttendance = totalStudents > 0 ? '92%' : '0%';
-  const newAdmissions = Math.floor(totalStudents * 0.05);
+  const pages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] p-4 md:p-8 font-sans text-[#111827] pb-32">
+    <div className="pb-8">
       {loginDetails && <StudentLoginDetails details={loginDetails} onClose={() => setLoginDetails(null)} />}
       <style>{`
         @keyframes fadeUp {
@@ -193,13 +203,16 @@ export default function Students() {
             width: 400px !important;
           }
         }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-fade-up { animation: none; opacity: 1; }
+        }
       `}</style>
 
       {/* PAGE HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 animate-fade-up" style={{ animationDelay: '0ms' }}>
         <div>
           <h1 className="text-[30px] font-bold flex items-center gap-3 tracking-tight">
-            <span className="text-2xl">👨‍🎓</span> Students
+            Students
           </h1>
           <p className="text-[#6B7280] text-[15px] mt-1 font-medium">Manage student accounts, teacher assignments, and academic records.</p>
         </div>
@@ -222,31 +235,7 @@ export default function Students() {
         </div>
       </div>
 
-      {/* STATISTICS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-        {[
-          { label: 'Total Students', value: totalStudents, icon: <FiUsers size={22} />, color: '#20C7C9', bg: 'rgba(32, 199, 201, 0.12)', grad: 'from-[#20C7C9]/10 to-transparent', trend: '+12% this month' },
-          { label: 'Pending Fees', value: pendingFees, icon: <FiCreditCard size={22} />, color: '#F6C453', bg: 'rgba(246, 196, 83, 0.12)', grad: 'from-[#F6C453]/10 to-transparent', trend: 'Needs attention' },
-          { label: 'Today\'s Attendance', value: todayAttendance, icon: <FiCheckCircle size={22} />, color: '#20C7C9', bg: 'rgba(32, 199, 201, 0.12)', grad: 'from-[#20C7C9]/10 to-transparent', trend: 'Consistent' },
-          { label: 'New Admissions', value: newAdmissions, icon: <FiUserPlus size={22} />, color: '#FF4F8B', bg: 'rgba(255, 79, 139, 0.12)', grad: 'from-[#FF4F8B]/10 to-transparent', trend: '+5 this week' },
-        ].map((stat, i) => (
-          <div key={i} className={`bg-white rounded-[20px] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#E5E7EB] hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all duration-200 cursor-default animate-fade-up bg-gradient-to-br ${stat.grad}`} style={{ animationDelay: `${(i+1)*100}ms` }}>
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-[#6B7280] text-[14px] font-medium mb-1.5">{stat.label}</p>
-                <h3 className="text-[28px] font-bold text-[#111827] leading-none">{stat.value}</h3>
-              </div>
-              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: stat.bg, color: stat.color }}>
-                {stat.icon}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 mt-4">
-              <FiTrendingUp size={14} className="text-[#20C7C9]" />
-              <p className="text-[#6B7280] text-[13px] font-medium">{stat.trend}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="va-card mb-5"><p className="va-eyebrow">{search.trim() ? "Matching students" : "Total students"}</p><p className="va-stat__value" aria-live="polite">{loading || loadError ? "—" : total}</p></div>
 
       {/* SEARCH AREA */}
       <div className="bg-white p-4 rounded-[20px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] mb-8 flex flex-col lg:flex-row gap-4 items-center justify-between border border-[#E5E7EB] animate-fade-up" style={{ animationDelay: '500ms' }}>
@@ -254,7 +243,8 @@ export default function Students() {
           <FiSearch className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ${isSearchFocused ? 'text-[#20C7C9]' : 'text-[#6B7280]'}`} size={18} />
           <input 
             value={search} 
-            onChange={e => setSearch(e.target.value)} 
+            onChange={e => { setLoading(true); setSearch(e.target.value); setPage(1); }}
+            aria-label="Search students"
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
             placeholder="Search students by name, mobile or email..." 
@@ -265,7 +255,9 @@ export default function Students() {
 
       {/* STUDENT LIST */}
       <div className="flex flex-col gap-[20px]">
-        {students.map((s, idx) => (
+        {loading && <p role="status">Loading students…</p>}
+        {!loading && loadError && <div role="alert">Could not load students. <button type="button" onClick={fetchStudents}>Try again</button></div>}
+        {!loading && !loadError && students.map((s, idx) => (
           <div key={s._id} className="group bg-white rounded-[20px] p-[20px] border border-[#E5E7EB] shadow-[0_8px_30px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:border-[#FF4F8B] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all duration-200 flex flex-col lg:flex-row items-center justify-between gap-6 animate-fade-up" style={{ animationDelay: `${600 + (idx * 50)}ms` }}>
             
             {/* LEFT */}
@@ -324,7 +316,7 @@ export default function Students() {
             </div>
           </div>
         ))}
-        {!loading && students.length === 0 && (
+        {!loading && !loadError && students.length === 0 && (
           <div className="text-center py-16 bg-white rounded-[20px] border border-[#E5E7EB] shadow-sm animate-fade-up">
             <div className="w-16 h-16 bg-[#F5F7FB] rounded-full flex items-center justify-center mx-auto mb-4">
               <FiSearch size={24} className="text-[#6B7280]" />
@@ -334,6 +326,17 @@ export default function Students() {
           </div>
         )}
       </div>
+
+      {!loading && !loadError && total > 0 && (
+        <nav className="va-card flex flex-wrap items-center justify-between gap-3 mt-5" aria-label="Student pages">
+          <p>Showing {(page - 1) * pageSize + 1}–{(page - 1) * pageSize + students.length} of {total} students</p>
+          <div className="flex items-center gap-3">
+            <button className="va-button va-button--ghost" disabled={page <= 1} onClick={() => { setLoading(true); setPage(page - 1); }}>Previous</button>
+            <span>Page {page} of {pages}</span>
+            <button className="va-button va-button--ghost" disabled={page >= pages} onClick={() => { setLoading(true); setPage(page + 1); }}>Next</button>
+          </div>
+        </nav>
+      )}
 
       {/* ─── ADD STUDENT MODAL ─── */}
       {showAddModal && (

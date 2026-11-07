@@ -224,7 +224,7 @@ export default function AdminAnnouncements() {
       </div>
 
       {/* Create Form */}
-      <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+      <div className="va-card">
         <h3 className="text-white font-semibold text-lg mb-5 flex items-center gap-2">
           <FiPlus className="text-gold" size={18} /> Post Announcement
         </h3>
@@ -367,7 +367,7 @@ export default function AdminAnnouncements() {
       </div>
 
       {/* Announcements Table */}
-      <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] overflow-hidden">
+      <div className="va-card overflow-hidden">
         <div className="p-5 border-b border-white/10">
           <h3 className="text-white font-semibold text-lg">Active Announcements ({announcements.length})</h3>
         </div>

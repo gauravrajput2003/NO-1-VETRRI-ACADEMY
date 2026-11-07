@@ -1,5 +1,6 @@
+import DashboardMotion from '../../design-system/DashboardMotion';
+import { StatCard } from '../../design-system/components';
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -10,20 +11,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { getAdminStats, getDemoBookings, getAllLeaves } from '../../services/api';
 import api from '../../services/api';
 import AnnouncementBanner from '../../components/AnnouncementBanner';
-
-function StatCard({ label, value, icon: Icon, color, bg, href, loading }) {
-  const inner = (
-    <motion.div whileHover={{ y: -4 }}
-      className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-5 hover:border-gold/30 transition-all cursor-pointer">
-      <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center mb-3`}>
-        <Icon className={color} size={20} />
-      </div>
-      <p className={`text-3xl font-display font-bold ${color}`}>{loading ? '—' : value}</p>
-      <p className="text-white/50 text-sm mt-1">{label}</p>
-    </motion.div>
-  );
-  return href ? <Link to={href}>{inner}</Link> : inner;
-}
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload?.length) {
@@ -121,9 +108,8 @@ export default function AdminDashboardHome() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display font-bold text-2xl text-white">Admin Dashboard</h1>
+    <DashboardMotion>
+      <div className="va-dashboard-heading"><h1>Admin Dashboard</h1>
         <p className="text-white/40 text-sm mt-1">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
@@ -133,14 +119,14 @@ export default function AdminDashboardHome() {
       <AnnouncementBanner />
 
       {/* 6 Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {statCards.map((s) => <StatCard key={s.label} {...s} loading={loading} />)}
+      <div className="va-dashboard-stats va-admin-overview-stats">
+        {statCards.map((s, index) => <StatCard key={s.label} {...s} tone={["teal", "pink", "gold"][index % 3]} loading={loading} linkComponent={Link} />)}
       </div>
 
       {/* Live Monitor Preview + Best Teacher */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-dashboard-reveal>
         {/* Live Monitor Mini */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold flex items-center gap-2">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -170,7 +156,7 @@ export default function AdminDashboardHome() {
         </div>
 
         {/* Best Teacher */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
             <FiAward className="text-gold" size={18} /> Best Teacher of the Month
           </h3>
@@ -201,9 +187,9 @@ export default function AdminDashboardHome() {
       </div>
 
       {/* Revenue Chart + Enquiries */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-dashboard-reveal>
         {/* Weekly Revenue Chart */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold flex items-center gap-2">
               <FiDollarSign className="text-gold" size={16} /> Weekly Revenue
@@ -227,7 +213,7 @@ export default function AdminDashboardHome() {
         </div>
 
         {/* Recent Enquiries */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold">Recent Enquiries</h3>
             <Link to="/admin/enquiries" className="text-gold text-xs hover:underline">View All →</Link>
@@ -262,9 +248,9 @@ export default function AdminDashboardHome() {
       </div>
 
       {/* Pending Actions + Quick Announcement */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-dashboard-reveal>
         {/* Pending Actions */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <h3 className="text-white font-semibold mb-4">⚡ Pending Actions</h3>
           <div className="space-y-3">
             {[
@@ -284,7 +270,7 @@ export default function AdminDashboardHome() {
         </div>
 
         {/* Quick Announcement */}
-        <div className="bg-[#0F1F35] rounded-2xl border border-[#1E3A5F] p-6">
+        <div className="va-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold">📢 Quick Announcement</h3>
             <Link to="/admin/announcements" className="text-gold text-xs hover:underline">Full Page →</Link>
@@ -322,6 +308,6 @@ export default function AdminDashboardHome() {
           </form>
         </div>
       </div>
-    </div>
+    </DashboardMotion>
   );
 }

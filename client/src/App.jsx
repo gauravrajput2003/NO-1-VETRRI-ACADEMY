@@ -9,9 +9,6 @@ import NotificationAcknowledgement from './components/NotificationAcknowledgemen
 
 // ─── Public pages ──────────────────────────────────────────────────────────────
 const Landing = lazy(() => import('./pages/Landing'));
-import StudentLogin from './pages/auth/StudentLogin';
-import TeacherLogin from './pages/auth/TeacherLogin';
-import AdminLogin from './pages/auth/AdminLogin';
 import Login from './pages/auth/Login';
 import StudentSignup from './pages/auth/StudentSignup';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -54,8 +51,7 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   if (sessionError) return <div className="va-theme va-session-loading"><p role="alert">{sessionError}</p><Button onClick={fetchMe}>Retry connection</Button></div>;
 
   if (!user) {
-    const loginPath = allowedRole ? `/login/${allowedRole}` : '/login/student';
-    return <Navigate to={loginPath} replace />;
+    return <Navigate to="/login" replace />;
   }
 
   if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
@@ -92,9 +88,9 @@ function AppRoutes() {
       {/* ── Public ── */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/login/student" element={<StudentLogin />} />
-      <Route path="/login/teacher" element={<TeacherLogin />} />
-      <Route path="/login/admin" element={<AdminLogin />} />
+      <Route path="/login/student" element={<Navigate to="/login" replace />} />
+      <Route path="/login/teacher" element={<Navigate to="/login" replace />} />
+      <Route path="/login/admin" element={<Navigate to="/login" replace />} />
       <Route path="/signup" element={<StudentSignup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />

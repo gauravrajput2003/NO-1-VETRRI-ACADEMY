@@ -12,7 +12,7 @@ export default function ForcedPasswordChange() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   if (loading) return null;
-  if (!user) return <Navigate to="/login/student" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   if (!user.mustChangePassword) return <Navigate to={`/${user.role}/dashboard`} replace />;
   const submit = async (event) => {
     event.preventDefault();
@@ -21,7 +21,7 @@ export default function ForcedPasswordChange() {
     try {
       await changePassword({ currentPassword, newPassword });
       await logout();
-      navigate(`/login/${user.role}`, { replace: true });
+      navigate(`/login`, { replace: true });
       toast.success('Password changed. Sign in with the new password.');
     } catch (error) { toast.error(error.response?.data?.message || 'Unable to change password'); }
     finally { setBusy(false); }
