@@ -35,12 +35,36 @@ function SkeletonRow() {
   );
 }
 
+async function fetchDashboardStats({ signal }) {
+  try {
+    return (await api.get('/admin/dashboard-stats', { signal })).data.stats;
+  } catch (error) {
+    if (error.response?.status !== 404) throw error;
+  }
+
+  // Older Render releases expose the original stats route.
+  const { data } = await api.get('/admin/stats', { signal });
+  if (!data.stats) throw new Error('Dashboard stats are missing');
+  const stats = data.stats;
+  if (stats.pendingDemos != null && stats.classesToday != null) return stats;
+
+  const [demos, classes] = await Promise.allSettled([
+    stats.pendingDemos == null && api.get('/demo', { params: { status: 'pending', limit: 1 }, signal }),
+    stats.classesToday == null && api.get('/classes/live-monitor', { signal }),
+  ]);
+  return {
+    ...stats,
+    pendingDemos: stats.pendingDemos ?? demos.value?.data?.total,
+    classesToday: stats.classesToday ?? classes.value?.data?.classes?.filter(item => item.status !== 'cancelled').length,
+  };
+}
+
 export default function AdminDashboardHome() {
   const { user } = useAuth();
   const userId = user._id;
   const statsQuery = useQuery({
     queryKey: ['dashboard-stats', userId],
-    queryFn: async ({ signal }) => (await api.get('/admin/dashboard-stats', { signal })).data.stats,
+    queryFn: fetchDashboardStats,
   });
   const liveQuery = useQuery({
     queryKey: ['dashboard-live', userId],
@@ -88,8 +112,8 @@ export default function AdminDashboardHome() {
   const statCards = [
     { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: FiUsers, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/admin/students' },
     { label: 'Total Teachers', value: stats?.totalTeachers ?? 0, icon: FiUsers, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/admin/teachers' },
-    { label: 'Classes Today', value: stats?.classesToday ?? 0, icon: FiVideo, color: 'text-green-400', bg: 'bg-green-500/10', href: '/admin/live-monitor' },
-    { label: 'Pending Demos', value: stats?.pendingDemos, icon: FiCalendar, color: 'text-yellow-400', bg: 'bg-yellow-500/10', href: '/admin/demo-bookings' },
+    { label: 'Classes Today', value: stats?.classesToday ?? 'Unavailable', icon: FiVideo, color: 'text-green-400', bg: 'bg-green-500/10', href: '/admin/live-monitor' },
+    { label: 'Pending Demos', value: stats?.pendingDemos ?? 'Unavailable', icon: FiCalendar, color: 'text-yellow-400', bg: 'bg-yellow-500/10', href: '/admin/demo-bookings' },
     { label: 'Pending Leaves', value: stats?.pendingLeaves, icon: FiFileText, color: 'text-red-400', bg: 'bg-red-500/10', href: '/admin/leave' },
   ];
 
