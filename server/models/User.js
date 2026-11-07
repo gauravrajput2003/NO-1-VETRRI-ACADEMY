@@ -182,4 +182,7 @@ userSchema.methods.toSafeJSON = function (requestingRole) {
   return obj;
 };
 
+userSchema.index({ role: 1, createdAt: -1, _id: -1 });
+userSchema.index({ role: 1, isActive: 1 });
+
 module.exports = mongoose.model('User', userSchema);

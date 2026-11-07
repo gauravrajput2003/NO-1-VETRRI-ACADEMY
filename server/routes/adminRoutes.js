@@ -75,6 +75,7 @@ router.post('/password-resets/:id/reject', recovery.reject);
 
 // Stats
 router.get('/stats', getAdminStats);
+router.get('/dashboard-stats', getAdminStats);
 
 // Students
 router.get('/students', getAllStudents);

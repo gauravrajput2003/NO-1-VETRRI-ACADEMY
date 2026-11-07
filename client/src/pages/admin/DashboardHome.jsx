@@ -1,6 +1,8 @@
 import DashboardMotion from '../../design-system/DashboardMotion';
-import { StatCard } from '../../design-system/components';
-import { useEffect, useState } from 'react';
+import { Skeleton, StatCard } from '../../design-system/components';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -8,7 +10,6 @@ import {
   FiArrowRight, FiFileText, FiLink, FiAward,
 } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getAdminStats, getDemoBookings, getAllLeaves } from '../../services/api';
 import api from '../../services/api';
 import AnnouncementBanner from '../../components/AnnouncementBanner';
 
@@ -35,53 +36,38 @@ function SkeletonRow() {
 }
 
 export default function AdminDashboardHome() {
-  const [stats, setStats] = useState(null);
-  const [liveMini, setLiveMini] = useState([]);
-  const [bestTeacher, setBestTeacher] = useState(null);
-  const [recentEnquiries, setRecentEnquiries] = useState([]);
-  const [revenueChart, setRevenueChart] = useState([]);
-  const [pendingLeaves, setPendingLeaves] = useState(0);
-  const [pendingDemos, setPendingDemos] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  // Quick announcement form
+  const { user } = useAuth();
+  const userId = user._id;
+  const statsQuery = useQuery({
+    queryKey: ['dashboard-stats', userId],
+    queryFn: async ({ signal }) => (await api.get('/admin/dashboard-stats', { signal })).data.stats,
+  });
+  const liveQuery = useQuery({
+    queryKey: ['dashboard-live', userId],
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get('/classes/live-monitor', { params: { liveOnly: true }, signal });
+      return (data.classes ?? []).filter(item => item.status === 'live').slice(0, 5);
+    },
+  });
+  const teacherQuery = useQuery({
+    queryKey: ['dashboard-best-teacher', userId],
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get('/admin/best-teacher', { signal });
+      const best = data.gradings?.[0];
+      return best?.teacher ? { ...best.teacher, score: best.totalScore } : null;
+    },
+  });
+  const enquiriesQuery = useQuery({
+    queryKey: ['dashboard-enquiries', userId],
+    queryFn: async ({ signal }) => (await api.get('/enquiries', { params: { limit: 5 }, signal })).data.enquiries ?? [],
+  });
+  const stats = statsQuery.data;
+  const liveMini = liveQuery.data ?? [];
+  const bestTeacher = teacherQuery.data;
+  const recentEnquiries = enquiriesQuery.data ?? [];
+  const revenueChart = stats?.weeklyRevenue ?? [];
   const [annForm, setAnnForm] = useState({ title: '', content: '', targetRole: 'all' });
   const [annPosting, setAnnPosting] = useState(false);
-
-  useEffect(() => { fetchAll(); }, []);
-
-  const fetchAll = async () => {
-    setLoading(true);
-    try {
-      const [statsRes, demosRes, leavesRes] = await Promise.all([
-        getAdminStats(),
-        getDemoBookings({ status: 'pending' }),
-        getAllLeaves(),
-      ]);
-      if (statsRes.data.success) setStats(statsRes.data.stats);
-      if (demosRes.data.success) setPendingDemos(demosRes.data.bookings?.length || 0);
-      if (leavesRes.data.success) setPendingLeaves(leavesRes.data.leaves?.filter((l) => l.status === 'pending').length || 0);
-    } catch {}
-
-    try {
-      const [btRes, enquiriesRes, revenueRes, liveRes] = await Promise.all([
-        api.get('/teacher-grading/best-teacher'),
-        api.get('/enquiries', { params: { limit: 5 } }),
-        api.get('/fees/weekly-summary'),
-        api.get('/classes/live-monitor', { params: { liveOnly: true } }),
-      ]);
-      if (btRes.data.success) setBestTeacher(btRes.data.teacher);
-      if (enquiriesRes.data.success) setRecentEnquiries(enquiriesRes.data.enquiries || []);
-      if (revenueRes.data.success) setRevenueChart(revenueRes.data.weekly || []);
-      if (liveRes.data.success) {
-        const allRows = liveRes.data.attendance || [];
-        const live = allRows.filter((r) => r.classStatus === 'live');
-        setLiveMini(live.slice(0, 5));
-      }
-    } catch {}
-
-    setLoading(false);
-  };
 
   const handleQuickAnn = async (e) => {
     e.preventDefault();
@@ -103,8 +89,8 @@ export default function AdminDashboardHome() {
     { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: FiUsers, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/admin/students' },
     { label: 'Total Teachers', value: stats?.totalTeachers ?? 0, icon: FiUsers, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/admin/teachers' },
     { label: 'Classes Today', value: stats?.classesToday ?? 0, icon: FiVideo, color: 'text-green-400', bg: 'bg-green-500/10', href: '/admin/live-monitor' },
-    { label: 'Pending Demos', value: pendingDemos, icon: FiCalendar, color: 'text-yellow-400', bg: 'bg-yellow-500/10', href: '/admin/demo-bookings' },
-    { label: 'Pending Leaves', value: pendingLeaves, icon: FiFileText, color: 'text-red-400', bg: 'bg-red-500/10', href: '/admin/leave' },
+    { label: 'Pending Demos', value: stats?.pendingDemos, icon: FiCalendar, color: 'text-yellow-400', bg: 'bg-yellow-500/10', href: '/admin/demo-bookings' },
+    { label: 'Pending Leaves', value: stats?.pendingLeaves, icon: FiFileText, color: 'text-red-400', bg: 'bg-red-500/10', href: '/admin/leave' },
   ];
 
   return (
@@ -120,7 +106,16 @@ export default function AdminDashboardHome() {
 
       {/* 6 Stats */}
       <div className="va-dashboard-stats va-admin-overview-stats">
-        {statCards.map((s, index) => <StatCard key={s.label} {...s} tone={["teal", "pink", "gold"][index % 3]} loading={loading} linkComponent={Link} />)}
+        {statCards.map((card, index) => stats ? (
+          <StatCard key={card.label} {...card} tone={['teal', 'pink', 'gold'][index % 3]} linkComponent={Link} />
+        ) : (
+          <div className="va-card" key={card.label}>
+            <p className="va-secondary">{card.label}</p>
+            {statsQuery.isError ? (
+              <div><p>Couldn't load</p><button type="button" className="va-button va-button--ghost" onClick={() => statsQuery.refetch()}>Retry</button></div>
+            ) : <Skeleton lines={2} label={`Loading ${card.label}`} />}
+          </div>
+        ))}
       </div>
 
       {/* Live Monitor Preview + Best Teacher */}
@@ -136,17 +131,17 @@ export default function AdminDashboardHome() {
               Full Monitor <FiArrowRight size={12} />
             </Link>
           </div>
-          {loading ? (
+          {liveQuery.isPending ? (
             <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 bg-white/5 rounded-xl animate-pulse" />)}</div>
           ) : liveMini.length === 0 ? (
             <div className="text-center py-10 text-white/30 text-sm">No live classes at the moment</div>
           ) : (
             <div className="space-y-2">
-              {liveMini.map((row, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/10 rounded-xl">
+              {liveMini.map((row) => (
+                <div key={row._id} className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/10 rounded-xl">
                   <div>
-                    <p className="text-white text-sm font-medium">{row.student?.displayName || row.student?.name || '—'}</p>
-                    <p className="text-white/40 text-xs">{row.class?.subject} · {row.class?.teacher?.displayName || '—'}</p>
+                    <p className="text-white text-sm font-medium">{row.subject}</p>
+                    <p className="text-white/40 text-xs">{row.teacherId?.displayName || row.teacherId?.name || '—'}</p>
                   </div>
                   <span className="badge badge-green text-[10px]">🟢 Live</span>
                 </div>
@@ -160,7 +155,7 @@ export default function AdminDashboardHome() {
           <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
             <FiAward className="text-gold" size={18} /> Best Teacher of the Month
           </h3>
-          {loading ? (
+          {teacherQuery.isPending ? (
             <div className="space-y-3">
               <div className="h-20 bg-white/5 rounded-xl animate-pulse" />
             </div>
@@ -218,7 +213,7 @@ export default function AdminDashboardHome() {
             <h3 className="text-white font-semibold">Recent Enquiries</h3>
             <Link to="/admin/enquiries" className="text-gold text-xs hover:underline">View All →</Link>
           </div>
-          {loading ? (
+          {enquiriesQuery.isPending ? (
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead><tr><th>Name</th><th>Course</th><th>Date</th><th>Status</th></tr></thead>
@@ -254,8 +249,8 @@ export default function AdminDashboardHome() {
           <h3 className="text-white font-semibold mb-4">⚡ Pending Actions</h3>
           <div className="space-y-3">
             {[
-              { label: 'Leave Requests', count: pendingLeaves, href: '/admin/leave', color: 'text-red-400', border: 'border-red-500/20' },
-              { label: 'Demo Bookings', count: pendingDemos, href: '/admin/demo-bookings', color: 'text-yellow-400', border: 'border-yellow-500/20' },
+              { label: 'Leave Requests', count: stats?.pendingLeaves, href: '/admin/leave', color: 'text-red-400', border: 'border-red-500/20' },
+              { label: 'Demo Bookings', count: stats?.pendingDemos, href: '/admin/demo-bookings', color: 'text-yellow-400', border: 'border-yellow-500/20' },
             ].map((item) => (
               <Link key={item.href} to={item.href}
                 className={`flex items-center justify-between p-4 bg-white/5 border ${item.border} rounded-xl hover:bg-white/10 transition-all`}>

@@ -10,6 +10,7 @@ const ClassAttendance = require('../models/ClassAttendance');
 const ClassSchedule = require('../models/ClassSchedule');
 const Conversation = require('../models/Conversation');
 const DemoBooking = require('../models/DemoBooking');
+const { getStats } = require('../services/adminDashboardCache');
 const Doubt = require('../models/Doubt');
 const DoubtAuditLog = require('../models/DoubtAuditLog');
 const DoubtReply = require('../models/DoubtReply');
@@ -129,7 +130,9 @@ const cleanupTempUpload = (file) => {
 // @access  Admin   
 const getAllStudents = async (req, res) => {
   try { 
-    const { page = 1, limit = 20, search, course, grade } = req.query;
+    const { search, course, grade } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 20);
     const filter = { role: 'student' };
     if (search) {
       filter.$or = [
@@ -145,16 +148,20 @@ const getAllStudents = async (req, res) => {
       .select('-password -refreshToken')
       .populate('course', 'title category')
       .populate('assignedTeachers', 'name') // Only name — no contact for student-facing
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit));
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit);
 
     const total = await User.countDocuments(filter);
 
     res.status(200).json({
       success: true,
       students,
-      pagination: { page: parseInt(page), limit: parseInt(limit), total },
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
+      pagination: { page, limit, total },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -453,33 +460,38 @@ const deleteStudent = async (req, res) => {
 // @access  Admin
 const getAdminStats = async (req, res) => {
   try {
-    const [totalStudents, totalTeachers, pendingEnquiries, pendingLeaves, pendingMaterialsCount] = await Promise.all([
-      User.countDocuments({ role: 'student', isActive: true }),
-      User.countDocuments({ role: 'teacher', isActive: true }),
-      require('../models/Enquiry').countDocuments({ status: 'new' }),
-      require('../models/LeaveApplication').countDocuments({ status: 'pending' }),
-      require('../models/StudyMaterial').countDocuments({ approvalStatus: { $in: ['pending_new', 'pending_edit', 'pending_delete'] } }),
-    ]);
-
-    // Revenue this month
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthRevenue = await FeesRecord.aggregate([
-      { $match: { status: 'paid', paidAt: { $gte: monthStart } } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
-    res.status(200).json({
-      success: true,
-      stats: {
-        totalStudents,
-        totalTeachers,
-        pendingEnquiries,
-        pendingLeaves,
-        pendingMaterialsCount,
-        monthRevenue: monthRevenue[0]?.total || 0,
-      },
+    const stats = await getStats(async () => {
+      const dayMs = 86400000;
+      const istOffset = 330 * 60000;
+      const now = new Date(Date.now() + istOffset);
+      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - istOffset);
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) - istOffset);
+      const weekStart = new Date(+dayStart - 6 * dayMs);
+      const nextDay = new Date(+dayStart + dayMs);
+      const [totalStudents, totalTeachers, classesToday, pendingDemos, pendingEnquiries, pendingLeaves, pendingMaterialsCount, revenue] = await Promise.all([
+        User.countDocuments({ role: 'student', isActive: true }),
+        User.countDocuments({ role: 'teacher', isActive: true }),
+        ClassSchedule.countDocuments({ scheduledDate: { $gte: dayStart, $lt: nextDay }, status: { $ne: 'cancelled' } }),
+        DemoBooking.countDocuments({ status: 'pending' }),
+        require('../models/Enquiry').countDocuments({ status: 'new' }),
+        LeaveApplication.countDocuments({ status: 'pending' }),
+        StudyMaterial.countDocuments({ approvalStatus: { $in: ['pending_new', 'pending_edit', 'pending_delete'] } }),
+        FeesRecord.aggregate([
+          { $match: { status: 'paid', paidAt: { $gte: new Date(Math.min(+monthStart, +weekStart)), $lt: nextDay } } },
+          { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt', timezone: 'Asia/Kolkata' } }, amount: { $sum: '$amount' } } },
+          { $sort: { _id: 1 } },
+        ]),
+      ]);
+      const monthKey = now.toISOString().slice(0, 7);
+      const weekKey = new Date(+weekStart + istOffset).toISOString().slice(0, 10);
+      return {
+        totalStudents, totalTeachers, classesToday, pendingDemos, pendingEnquiries, pendingLeaves, pendingMaterialsCount,
+        monthRevenue: revenue.filter(row => row._id.startsWith(monthKey)).reduce((sum, row) => sum + row.amount, 0),
+        weeklyRevenue: revenue.filter(row => row._id >= weekKey).map(row => ({ day: row._id.slice(5), amount: row.amount })),
+      };
     });
+    // Express generates an ETag for the JSON body. Browsers may revalidate privately.
+    res.set('Cache-Control', 'private, no-cache').status(200).json({ success: true, stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -1,6 +1,7 @@
 import { isLoginRequest } from '../utils/loginErrors';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/apiOrigin';
+import { invalidateAdminQueries } from './queryClient';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,7 +24,7 @@ api.interceptors.request.use(
 
 // ─── Response: handle 401 with refresh ───────────────────────────────────────
 api.interceptors.response.use(
-  (response) => response,
+  (response) => { invalidateAdminQueries(response); return response; },
   async (error) => {
     const originalRequest = error.config || {};
     if (error.response?.status === 401 && !isLoginRequest(originalRequest.url) && !originalRequest._retry) {
@@ -164,7 +165,7 @@ export const updateTeacherPermissions = (teacherId, data) => api.patch(`/profile
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 export const getAdminStats = () => api.get('/admin/stats');
-export const getAllStudents = (params) => api.get('/admin/students', { params });
+export const getAllStudents = (params, { signal } = {}) => api.get('/admin/students', { params, signal });
 export const getAllTeachers = (params) => api.get('/admin/teachers', { params });
 export const updateStudent = (id, data) => api.put(`/admin/students/${id}`, data);
 export const approveTeacher = (id) => api.put(`/admin/teachers/${id}/approve`);

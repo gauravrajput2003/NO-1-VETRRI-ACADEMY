@@ -7,6 +7,7 @@
 class MemoryCache {
   constructor() {
     this.store = new Map();
+    this.pending = new Map();
   }
 
   /**
@@ -37,12 +38,28 @@ class MemoryCache {
     this.store.set(key, { value, expiresAt });
   }
 
+  getOrSet(key, ttlSeconds, load) {
+    const cached = this.get(key);
+    if (cached !== null) return Promise.resolve(cached);
+    if (this.pending.has(key)) return this.pending.get(key);
+
+    const request = Promise.resolve().then(load).then(value => {
+      if (this.pending.get(key) === request) this.set(key, value, ttlSeconds);
+      return value;
+    }).finally(() => {
+      if (this.pending.get(key) === request) this.pending.delete(key);
+    });
+    this.pending.set(key, request);
+    return request;
+  }
+
   /**
    * Delete a specific cache key
    * @param {string} key
    */
   del(key) {
     this.store.delete(key);
+    this.pending.delete(key);
   }
 
   /**
@@ -55,6 +72,9 @@ class MemoryCache {
         this.store.delete(key);
       }
     }
+    for (const key of this.pending.keys()) {
+      if (key.startsWith(prefix)) this.pending.delete(key);
+    }
   }
 
   /**
@@ -62,6 +82,7 @@ class MemoryCache {
    */
   clear() {
     this.store.clear();
+    this.pending.clear();
   }
 }
 

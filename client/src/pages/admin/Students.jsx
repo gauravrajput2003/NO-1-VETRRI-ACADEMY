@@ -1,22 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import StudentLoginDetails, { copyLoginText } from '../../components/StudentLoginDetails';
 import { normalizeLoginMobile } from '../../utils/loginCredentials';
-import api from '../../services/api';
+import api, { getAllStudents } from '../../services/api';
+import useInfiniteScroll from '../../hooks/useInfiniteScroll';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { FiUsers, FiSearch, FiFilter, FiDownload, FiEye, FiEdit2, FiTrash2, FiPlus, FiBell, FiRefreshCw, FiTrendingUp, FiCreditCard, FiCheckCircle, FiUserPlus, FiHome, FiSettings, FiX, FiUser } from 'react-icons/fi';
+import { FiSearch, FiEye, FiEdit2, FiTrash2, FiPlus, FiBell, FiRefreshCw, FiUserPlus, FiX, FiUser } from 'react-icons/fi';
+
+const PAGE_SIZE = 20;
 
 export default function Students() {
-  const [students, setStudents] = useState([]);
+  const { user } = useAuth();
   const [teachers, setTeachers] = useState([]);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loadError, setLoadError] = useState(false);
-  const [revision, setRevision] = useState(0);
-  const request = useRef(0);
-  const pageSize = 20;
-  const [loading, setLoading] = useState(true);
+  const [readySearch, setReadySearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const fetchPage = useCallback(async (page, signal) => {
+    const { data } = await getAllStudents({ page, limit: PAGE_SIZE, search: search.trim() || undefined }, { signal });
+    if (!data.success) throw new Error('Student list request failed');
+    const items = data.students ?? [];
+    const total = data.total ?? data.pagination?.total ?? items.length;
+    return { items, total, hasMore: data.hasMore ?? page * PAGE_SIZE < total };
+  }, [search]);
+  const { items: students, total, hasMore, loading, error: loadError, sentinel, retry, refresh, updateItem, removeItem } =
+    useInfiniteScroll({
+      queryKey: ['students', { search: search.trim(), userId: user._id }],
+      fetchPage, pageSize: PAGE_SIZE, enabled: readySearch === search,
+    });
+
+  useEffect(() => {
+    const timer = setTimeout(() => setReadySearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,26 +64,6 @@ export default function Students() {
     isActive: true,
   });
 
-  const fetchStudents = async () => {
-    const id = ++request.current;
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const { data } = await api.get('/admin/students', { params: { page, limit: pageSize, search: search.trim() || undefined } });
-      if (id !== request.current) return;
-      if (!data.success) throw new Error('Student list request failed');
-      const count = data.pagination?.total ?? data.students?.length ?? 0;
-      const lastPage = Math.max(1, Math.ceil(count / pageSize));
-      if (page > lastPage) { setPage(lastPage); return; }
-      setTotal(count);
-      setStudents(data.students || []);
-    } catch {
-      if (id === request.current) setLoadError(true);
-    } finally {
-      if (id === request.current) setLoading(false);
-    }
-  };
-
   const fetchTeachers = async () => {
     try {
       const { data } = await api.get('/admin/teachers');
@@ -79,13 +74,6 @@ export default function Students() {
   useEffect(() => {
     fetchTeachers();
   }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      fetchStudents();
-    }, 300);
-    return () => { clearTimeout(t); request.current += 1; };
-  }, [search, page, revision]);
 
   // Handle Add Student
   const handleAddSubmit = async (e) => {
@@ -117,7 +105,7 @@ export default function Students() {
         setShowPassword(false);
         setShowAddModal(false);
         setAddForm({ name: '', mobile: '', email: '', password: '', grade: '', board: '', assignedTeacher: '' });
-        setRevision(value => value + 1);
+        refresh();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create student');
@@ -141,7 +129,7 @@ export default function Students() {
         setEditForm({});
         setShowPassword(false);
         setEditStudent(null);
-        setRevision(value => value + 1);
+        updateItem(data.student);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update student');
@@ -159,7 +147,7 @@ export default function Students() {
       const { data } = await api.delete(`/admin/students/${student._id}`);
       if (data.success) {
         toast.success('Student deleted');
-        setRevision(value => value + 1);
+        removeItem(student);
       }
     } catch {
       toast.error('Failed to delete student');
@@ -180,8 +168,6 @@ export default function Students() {
       isActive: s.isActive !== false,
     });
   };
-
-  const pages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="pb-8">
@@ -221,7 +207,8 @@ export default function Students() {
             <FiBell size={18} />
           </button>
           <button 
-            onClick={() => fetchStudents()}
+            onClick={refresh}
+            aria-label="Refresh students"
             className="w-10 h-10 rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#E5E7EB] text-[#6B7280] hover:text-[#111827] hover:shadow-md transition-all duration-200 flex items-center justify-center"
           >
             <FiRefreshCw size={18} className={loading ? "animate-spin" : ""} />
@@ -235,7 +222,9 @@ export default function Students() {
         </div>
       </div>
 
-      <div className="va-card mb-5"><p className="va-eyebrow">{search.trim() ? "Matching students" : "Total students"}</p><p className="va-stat__value" aria-live="polite">{loading || loadError ? "—" : total}</p></div>
+      <div className="va-card sticky top-[var(--va-topbar-height)] z-10 mb-5 !p-3">
+        <p className="font-semibold" aria-live="polite">{total === null ? 'Student directory' : `${total} ${search.trim() ? 'matching ' : ''}${total === 1 ? 'student' : 'students'}`}</p>
+      </div>
 
       {/* SEARCH AREA */}
       <div className="bg-white p-4 rounded-[20px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] mb-8 flex flex-col lg:flex-row gap-4 items-center justify-between border border-[#E5E7EB] animate-fade-up" style={{ animationDelay: '500ms' }}>
@@ -243,7 +232,10 @@ export default function Students() {
           <FiSearch className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ${isSearchFocused ? 'text-[#20C7C9]' : 'text-[#6B7280]'}`} size={18} />
           <input 
             value={search} 
-            onChange={e => { setLoading(true); setSearch(e.target.value); setPage(1); }}
+            onChange={e => {
+              setSearch(e.target.value);
+              window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
             aria-label="Search students"
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
@@ -255,9 +247,7 @@ export default function Students() {
 
       {/* STUDENT LIST */}
       <div className="flex flex-col gap-[20px]">
-        {loading && <p role="status">Loading students…</p>}
-        {!loading && loadError && <div role="alert">Could not load students. <button type="button" onClick={fetchStudents}>Try again</button></div>}
-        {!loading && !loadError && students.map((s, idx) => (
+        {students.map((s, idx) => (
           <div key={s._id} className="group bg-white rounded-[20px] p-[20px] border border-[#E5E7EB] shadow-[0_8px_30px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:border-[#FF4F8B] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all duration-200 flex flex-col lg:flex-row items-center justify-between gap-6 animate-fade-up" style={{ animationDelay: `${600 + (idx * 50)}ms` }}>
             
             {/* LEFT */}
@@ -327,16 +317,12 @@ export default function Students() {
         )}
       </div>
 
-      {!loading && !loadError && total > 0 && (
-        <nav className="va-card flex flex-wrap items-center justify-between gap-3 mt-5" aria-label="Student pages">
-          <p>Showing {(page - 1) * pageSize + 1}–{(page - 1) * pageSize + students.length} of {total} students</p>
-          <div className="flex items-center gap-3">
-            <button className="va-button va-button--ghost" disabled={page <= 1} onClick={() => { setLoading(true); setPage(page - 1); }}>Previous</button>
-            <span>Page {page} of {pages}</span>
-            <button className="va-button va-button--ghost" disabled={page >= pages} onClick={() => { setLoading(true); setPage(page + 1); }}>Next</button>
-          </div>
-        </nav>
-      )}
+      <div className="py-5 text-center va-secondary">
+        {loading && <p className="flex items-center justify-center gap-2" role="status"><FiRefreshCw className="motion-safe:animate-spin" aria-hidden="true" />{students.length ? 'Loading more students…' : 'Loading students…'}</p>}
+        {loadError && <div role="alert">Could not load students. <button type="button" className="va-button va-button--ghost" onClick={retry}>Retry</button></div>}
+        {!loading && !loadError && !hasMore && students.length > 0 && <p>You’ve reached the end</p>}
+        <div ref={sentinel} className="h-px" aria-hidden="true" />
+      </div>
 
       {/* ─── ADD STUDENT MODAL ─── */}
       {showAddModal && (

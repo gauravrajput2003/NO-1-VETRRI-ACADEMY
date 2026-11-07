@@ -52,6 +52,7 @@ grade: { type: String, default: '' },    teacherId: { type: mongoose.Schema.Type
 
 // Index for quickly finding today's classes
 classScheduleSchema.index({ teacherId: 1, scheduledDate: 1 });
+classScheduleSchema.index({ scheduledDate: 1, status: 1 });
 classScheduleSchema.index({ studentIds: 1, scheduledDate: 1 });
 classScheduleSchema.index({ course: 1, grade: 1, status: 1 });
 
