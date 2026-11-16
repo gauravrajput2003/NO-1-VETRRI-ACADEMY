@@ -11,6 +11,7 @@ import NotificationAcknowledgement from './components/NotificationAcknowledgemen
 
 // ─── Public pages ──────────────────────────────────────────────────────────────
 const Landing = lazy(() => import('./pages/Landing'));
+const CbseMathsNotes = lazy(() => import('./pages/CbseMathsNotes'));
 import Login from './pages/auth/Login';
 import StudentSignup from './pages/auth/StudentSignup';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -89,6 +90,7 @@ function AppRoutes() {
     <Routes>
       {/* ── Public ── */}
       <Route path="/" element={<Landing />} />
+      <Route path="/notes/cbsemaths" element={<CbseMathsNotes />} />
       <Route path="/login" element={<Login />} />
       <Route path="/login/student" element={<Navigate to="/login" replace />} />
       <Route path="/login/teacher" element={<Navigate to="/login" replace />} />
