@@ -15,7 +15,7 @@ import {
   FiUsers, FiAward, FiVideo, FiMessageCircle, FiCheckCircle,
   FiStar, FiPhone, FiMail, FiMapPin, FiArrowRight, FiMenu, FiX,
   FiMonitor, FiFileText, FiTrendingUp, FiShield, FiChevronDown, FiTarget,
-  FiFacebook, FiInstagram, FiYoutube, FiLinkedin, FiSend, FiArrowUp,
+  FiFacebook, FiInstagram, FiYoutube, FiLinkedin, FiSend, FiArrowUp, FiBookOpen,
 } from 'react-icons/fi';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ function Navbar({ user }) {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  const navLinks = [['About Us', '#about'], ['Courses', '#courses'], ['Teachers', '#teachers'], ['Why Us', '#why-us'], ['Contact', '#contact']];
+  const navLinks = [['About Us', '#about'], ['Courses', '#courses'], ['Teachers', '#teachers'], ['Why Us', '#why-us'], ['Contact', '#contact'], ['Notes', '/notes']];
 
   return (
     <motion.nav
@@ -192,7 +192,7 @@ function Navbar({ user }) {
         scrolled ? 'border-teal-800/10 shadow-md' : 'border-transparent shadow-sm'
       }`}
     >
-      <div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between gap-4 px-4 sm:h-20 sm:px-6 lg:px-10">
+      <div className="mx-auto flex h-[76px] max-w-[1920px] items-center justify-between gap-4 px-4 sm:h-20 sm:px-6 lg:px-10">
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <img
             src="/landing-templates/assets/logo_playstore.png"
@@ -208,33 +208,34 @@ function Navbar({ user }) {
           </div>
         </Link>
 
-        <div className="hidden items-center gap-8 lg:flex">
-          {navLinks.map(([label, href]) => (
-            <a
-              key={href}
-              href={href}
-              className="whitespace-nowrap font-jakarta text-[16px] font-bold text-teal-950 transition-colors hover:text-amber-600"
-            >
-              {label}
-            </a>
+        <div className="hidden items-center gap-7 xl:flex">
+          {navLinks.map(([label, href]) => href === '/notes' ? (
+            <Link key={href} to={href} className="group relative inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-yellow-50 to-rose-50 px-4 py-2.5 font-jakarta text-[15px] font-extrabold text-teal-950 shadow-sm shadow-amber-900/10 transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md">
+              <FiBookOpen size={17} className="text-teal-700" /> Notes <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">Explore</span>
+            </Link>
+          ) : (
+            <a key={href} href={href} className="whitespace-nowrap font-jakarta text-[16px] font-bold text-teal-950 transition-colors hover:text-amber-600">{label}</a>
           ))}
         </div>
 
         <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
+          <Link to="/notes" className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-rose-50 px-2.5 py-2 font-jakarta text-[13px] font-extrabold text-teal-950 shadow-sm shadow-amber-900/10 transition-all hover:-translate-y-0.5 hover:border-amber-400 xl:hidden sm:px-3.5 sm:text-[14px]">
+            <FiBookOpen size={17} className="text-teal-700" /> Notes
+          </Link>
           <Link
             to="/login"
-            className="rounded-lg border-2 border-teal-700 px-3.5 py-2.5 font-jakarta text-[14px] font-bold text-teal-800 transition-colors hover:bg-teal-50 sm:rounded-xl sm:px-5 sm:text-[15px]"
+            className="hidden rounded-lg border-2 border-teal-700 px-3.5 py-2.5 font-jakarta text-[14px] font-bold text-teal-800 transition-colors hover:bg-teal-50 sm:rounded-xl sm:px-5 sm:text-[15px] xl:inline-block"
           >
             Login
           </Link>
           <a
             href="#enquiry"
-            className="hidden whitespace-nowrap rounded-xl bg-gradient-to-br from-amber-600 to-amber-500 px-6 py-3 font-jakarta text-[15px] font-extrabold text-white shadow-md shadow-amber-500/30 transition-transform hover:scale-[1.03] sm:inline-block"
+            className="hidden whitespace-nowrap rounded-xl bg-gradient-to-br from-amber-600 to-amber-500 px-6 py-3 font-jakarta text-[15px] font-extrabold text-white shadow-md shadow-amber-500/30 transition-transform hover:scale-[1.03] xl:inline-block"
           >
             📅 Free Demo
           </a>
 
-          <button onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg p-2 text-teal-950 lg:hidden" aria-label="Toggle menu">
+          <button onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg p-2 text-teal-950 xl:hidden" aria-label="Toggle menu">
             {menuOpen ? <FiX size={26} /> : <FiMenu size={26} />}
           </button>
         </div>
@@ -244,12 +245,12 @@ function Navbar({ user }) {
         {menuOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="flex flex-col gap-4 border-t border-teal-900/10 bg-white px-6 py-5 lg:hidden"
+            className="flex flex-col gap-4 border-t border-teal-900/10 bg-white px-6 py-5 xl:hidden"
           >
-            {navLinks.map(([label, href]) => (
-              <a key={href} href={href} onClick={() => setMenuOpen(false)} className="border-b border-teal-950/10 py-2.5 text-[17px] font-bold text-teal-950">
-                {label}
-              </a>
+            {navLinks.map(([label, href]) => href === '/notes' ? (
+              <Link key={href} to={href} onClick={() => setMenuOpen(false)} className="flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-rose-50 py-3.5 text-[17px] font-extrabold text-teal-950"><FiBookOpen size={19} className="text-teal-700" /> Explore Notes</Link>
+            ) : (
+              <a key={href} href={href} onClick={() => setMenuOpen(false)} className="border-b border-teal-950/10 py-2.5 text-[17px] font-bold text-teal-950">{label}</a>
             ))}
             <a href="#enquiry" onClick={() => setMenuOpen(false)} className="rounded-xl bg-gradient-to-br from-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-extrabold text-white">
               📅 Book Free Demo
@@ -487,7 +488,7 @@ export default function Landing() {
         <motion.div animate={reducedMotion ? undefined : { scale: [1, 1.3, 1], opacity: [0.15, 0.35, 0.15] }} transition={{ duration: 7, repeat: reducedMotion ? 0 : Infinity, delay: 2 }}
           className="pointer-events-none absolute bottom-[20%] left-[4%] h-60 w-60 rounded-full bg-teal-500/15 blur-3xl" />
 
-        <motion.div style={{ y: isMobile ? undefined : heroY, opacity: heroOpacity }} className="relative z-10 mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-8 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-10 lg:py-16 xl:px-16">
+        <motion.div style={{ y: isMobile ? undefined : heroY, opacity: heroOpacity }} className="relative z-10 mx-auto grid w-full max-w-[1920px] grid-cols-1 items-center gap-8 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-10 lg:py-16 xl:px-16">
           <div>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
               className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2">
@@ -556,7 +557,7 @@ export default function Landing() {
       <section className="hero-rise border-y border-teal-800/10 bg-teal-600/[0.06] px-4 py-10 sm:px-6 lg:px-10">
         <motion.div
           variants={gridContainer} initial="hidden" whileInView="show" viewport={{ once: true }}
-          className="mx-auto grid max-w-[1440px] grid-cols-2 gap-6 md:grid-cols-4"
+          className="mx-auto grid max-w-[1920px] grid-cols-2 gap-6 md:grid-cols-4"
         >
           {STATS.map((stat) => (
             <motion.div key={stat.label} variants={gridItem} whileHover={{ y: -4 }}
@@ -590,7 +591,7 @@ export default function Landing() {
 
       {/* ── ABOUT ─────────────────────────────────────────────────────────── */}
       <Section id="about" className="bg-white px-4 py-20 sm:px-6 lg:px-10 lg:py-28">
-        <div className="mx-auto grid max-w-[1440px] items-center gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:gap-16">
+        <div className="mx-auto grid max-w-[1920px] items-center gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:gap-16">
           <div>
             <Eyebrow>About Us</Eyebrow>
             <h2 className="mb-5 text-[clamp(2.1rem,4vw,3.2rem)] font-black tracking-tight">
@@ -620,7 +621,7 @@ export default function Landing() {
 
       {/* ── COURSES ───────────────────────────────────────────────────────── */}
       <Section id="courses" className="bg-teal-50 px-4 py-24 sm:px-6 lg:px-10">
-        <div className="mx-auto max-w-[1440px]">
+        <div className="mx-auto max-w-[1920px]">
           <div className="mb-14 text-center">
             <Eyebrow>Our Programmes</Eyebrow>
             <h2 className="mb-4 text-[clamp(2.1rem,4vw,3.2rem)] font-black tracking-tight">
@@ -690,7 +691,7 @@ export default function Landing() {
 
       {/* ── TEACHERS ──────────────────────────────────────────────────────── */}
       <Section id="teachers" className="bg-teal-100/50 px-4 py-24 sm:px-6 lg:px-10">
-        <div className="mx-auto max-w-[1440px]">
+        <div className="mx-auto max-w-[1920px]">
           <div className="mb-14 text-center">
             <Eyebrow>Our Faculty</Eyebrow>
             <h2 className="mb-4 text-[clamp(2.1rem,4vw,3.2rem)] font-black tracking-tight">
@@ -749,7 +750,7 @@ export default function Landing() {
 
       {/* ── WHY CHOOSE US ─────────────────────────────────────────────────── */}
       <Section id="why-us" className="bg-teal-50 px-4 py-24 sm:px-6 lg:px-10">
-        <div className="mx-auto max-w-[1440px]">
+        <div className="mx-auto max-w-[1920px]">
           <div className="mb-14 text-center">
             <Eyebrow>Why Us</Eyebrow>
             <h2 className="text-[clamp(2.1rem,4vw,3.2rem)] font-black tracking-tight">
@@ -778,7 +779,7 @@ export default function Landing() {
 
       {/* ── TESTIMONIALS ──────────────────────────────────────────────────── */}
       <Section className="bg-teal-100/50 px-4 py-24 sm:px-6 lg:px-10">
-        <div className="mx-auto max-w-[1440px]">
+        <div className="mx-auto max-w-[1920px]">
           <div className="mb-14 text-center">
             <Eyebrow>Success Stories</Eyebrow>
             <h2 className="text-[clamp(2.1rem,4vw,3.2rem)] font-black tracking-tight">
@@ -890,7 +891,7 @@ export default function Landing() {
 
       {/* ── CONTACT ───────────────────────────────────────────────────────── */}
       <Section id="contact" className="bg-teal-100/50 px-4 py-20 sm:px-6 lg:px-10">
-        <div className="mx-auto grid max-w-[1440px] grid-cols-1 items-start gap-14 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-[1920px] grid-cols-1 items-start gap-14 lg:grid-cols-2">
           <div>
             <h2 className="mb-5 text-[clamp(2rem,3vw,2.7rem)] font-black tracking-tight">
               Get In <span className="bg-gradient-to-br from-amber-600 to-amber-400 bg-clip-text text-transparent">Touch</span>
@@ -936,7 +937,7 @@ export default function Landing() {
         <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-teal-500/10 blur-3xl" />
         <div className="pointer-events-none absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
 
-        <div className="relative mx-auto max-w-[1440px]">
+        <div className="relative mx-auto max-w-[1920px]">
           {/* Newsletter / CTA strip */}
           <div className="mb-16 flex flex-col items-center justify-between gap-6 rounded-3xl border border-white/10 bg-white/[0.04] p-8 sm:p-10 lg:flex-row">
             <div className="text-center lg:text-left">
